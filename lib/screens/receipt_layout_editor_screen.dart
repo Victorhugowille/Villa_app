@@ -1,13 +1,14 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
 import 'package:villabistromobile/models/print_style_settings.dart';
 import 'package:villabistromobile/providers/printer_provider.dart';
-import 'package:villabistromobile/services/printing_service.dart';
 import 'package:villabistromobile/data/app_data.dart' as app_data;
 import 'package:villabistromobile/widgets/custom_app_bar.dart';
 
@@ -21,11 +22,11 @@ class ReceiptLayoutEditorScreen extends StatefulWidget {
 
 class _ReceiptLayoutEditorScreenState extends State<ReceiptLayoutEditorScreen> {
   late ReceiptTemplateSettings _currentSettings;
-  final PrintingService _printingService = PrintingService();
   late TextEditingController _subtitleController;
   late TextEditingController _addressController;
   late TextEditingController _phoneController;
   late TextEditingController _finalMessageController;
+  Timer? _debounce;
 
   @override
   void initState() {
@@ -44,16 +45,15 @@ class _ReceiptLayoutEditorScreenState extends State<ReceiptLayoutEditorScreen> {
     _addressController.dispose();
     _phoneController.dispose();
     _finalMessageController.dispose();
+    _debounce?.cancel();
     super.dispose();
   }
 
-  void _saveSettings() {
-    Provider.of<PrinterProvider>(context, listen: false).saveReceiptTemplateSettings(_currentSettings);
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      content: Text('Layout salvo com sucesso!'),
-      backgroundColor: Colors.green,
-    ));
-    Navigator.of(context).pop();
+  void _autoSaveSettings() {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      Provider.of<PrinterProvider>(context, listen: false).saveReceiptTemplateSettings(_currentSettings);
+    });
   }
 
   void _resetToDefaults() {
@@ -64,9 +64,30 @@ class _ReceiptLayoutEditorScreenState extends State<ReceiptLayoutEditorScreen> {
       _phoneController.text = _currentSettings.phoneText;
       _finalMessageController.text = _currentSettings.finalMessageText;
     });
+    _autoSaveSettings();
+  }
+  
+  pw.Alignment _getAlignment(pw.CrossAxisAlignment crossAxisAlignment) {
+    switch (crossAxisAlignment) {
+      case pw.CrossAxisAlignment.start:
+        return pw.Alignment.centerLeft;
+      case pw.CrossAxisAlignment.center:
+        return pw.Alignment.center;
+      case pw.CrossAxisAlignment.end:
+        return pw.Alignment.centerRight;
+      default:
+        return pw.Alignment.centerLeft;
+    }
   }
 
-  Future<Uint8List> _generatePreviewPdfBytes() async {
+  pw.TextStyle _getTextStyle(PrintStyle style) {
+    return pw.TextStyle(
+      fontWeight: style.isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
+      fontSize: style.fontSize,
+    );
+  }
+
+  Future<Uint8List> _generatePreviewPdfBytes(PdfPageFormat format) async {
     final mockOrder = app_data.Order(
       id: 1,
       status: 'closed',
@@ -76,13 +97,100 @@ class _ReceiptLayoutEditorScreenState extends State<ReceiptLayoutEditorScreen> {
          app_data.CartItem(product: app_data.Product(id: 2, name: 'Produto Exemplo 2', price: 15.0, categoryId: 1, categoryName: 'Bebidas', displayOrder: 2, isSoldOut: false), quantity: 1),
       ]
     );
+    
+    final doc = pw.Document();
+    final settings = _currentSettings;
 
-    return await _printingService.getReceiptPdfBytes(
-      orders: [mockOrder],
-      tableNumber: 'XX',
-      totalAmount: mockOrder.total,
-      settings: _currentSettings,
+    doc.addPage(
+      pw.Page(
+        pageFormat: format.copyWith(
+            marginLeft: 2 * PdfPageFormat.mm,
+            marginRight: 2 * PdfPageFormat.mm,
+            marginTop: 2 * PdfPageFormat.mm,
+            marginBottom: 2 * PdfPageFormat.mm
+        ),
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Container(
+                width: double.infinity,
+                alignment: _getAlignment(settings.headerStyle.alignment),
+                child: pw.Text('VILLA BISTRO', style: _getTextStyle(settings.headerStyle)),
+              ),
+              if (settings.subtitleText.isNotEmpty)
+                pw.Container(
+                  width: double.infinity,
+                  alignment: _getAlignment(settings.subtitleStyle.alignment),
+                  child: pw.Text(settings.subtitleText, style: _getTextStyle(settings.subtitleStyle)),
+                ),
+               if (settings.addressText.isNotEmpty)
+                pw.Container(
+                  width: double.infinity,
+                  alignment: _getAlignment(settings.addressStyle.alignment),
+                  child: pw.Text(settings.addressText, style: _getTextStyle(settings.addressStyle)),
+                ),
+              if (settings.phoneText.isNotEmpty)
+                pw.Container(
+                  width: double.infinity,
+                  alignment: _getAlignment(settings.phoneStyle.alignment),
+                  child: pw.Text(settings.phoneText, style: _getTextStyle(settings.phoneStyle)),
+                ),
+              pw.SizedBox(height: 5),
+              pw.Container(
+                width: double.infinity,
+                alignment: _getAlignment(settings.infoStyle.alignment),
+                child: pw.Text('Conferência - Mesa XX', style: _getTextStyle(settings.infoStyle)),
+              ),
+              pw.Container(
+                width: double.infinity,
+                alignment: _getAlignment(settings.infoStyle.alignment),
+                child: pw.Text(DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now()), style: _getTextStyle(settings.infoStyle)),
+              ),
+              pw.Divider(height: 12),
+              pw.Column(
+                children: mockOrder.items.map((item) {
+                  return pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Expanded(
+                        child: pw.Text(
+                          '${item.quantity}x ${item.product.name}',
+                          style: _getTextStyle(settings.itemStyle),
+                        ),
+                      ),
+                      pw.Text(
+                        'R\$ ${(item.product.price * item.quantity).toStringAsFixed(2)}',
+                        style: _getTextStyle(settings.itemStyle),
+                      ),
+                    ],
+                  );
+                }).toList(),
+              ),
+              pw.Divider(height: 12),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Total:',
+                      style: _getTextStyle(settings.totalStyle)),
+                  pw.Text('R\$ ${mockOrder.total.toStringAsFixed(2)}',
+                      style: _getTextStyle(settings.totalStyle)),
+                ],
+              ),
+              pw.SizedBox(height: 20),
+              if (settings.finalMessageText.isNotEmpty)
+                pw.Container(
+                  width: double.infinity,
+                  alignment: _getAlignment(settings.finalMessageStyle.alignment),
+                  child: pw.Text(settings.finalMessageText, style: _getTextStyle(settings.finalMessageStyle)),
+                ),
+            ],
+          );
+        },
+      ),
     );
+    return doc.save();
   }
 
   @override
@@ -98,7 +206,15 @@ class _ReceiptLayoutEditorScreenState extends State<ReceiptLayoutEditorScreen> {
               icon: const Icon(Icons.preview_outlined),
               tooltip: 'Visualizar',
               onPressed: () async {
-                final pdfBytes = await _generatePreviewPdfBytes();
+                final format = const PdfPageFormat(
+                  57 * PdfPageFormat.mm, 
+                  250 * PdfPageFormat.mm,
+                  marginLeft: 2 * PdfPageFormat.mm,
+                  marginRight: 2 * PdfPageFormat.mm,
+                  marginTop: 2 * PdfPageFormat.mm,
+                  marginBottom: 2 * PdfPageFormat.mm,
+                );
+                final pdfBytes = await _generatePreviewPdfBytes(format);
                 await Printing.layoutPdf(onLayout: (format) async => pdfBytes);
               },
             ),
@@ -106,11 +222,6 @@ class _ReceiptLayoutEditorScreenState extends State<ReceiptLayoutEditorScreen> {
             icon: const Icon(Icons.refresh),
             tooltip: 'Redefinir Padrão',
             onPressed: _resetToDefaults,
-          ),
-          IconButton(
-            icon: const Icon(Icons.save),
-            tooltip: 'Salvar',
-            onPressed: _saveSettings,
           ),
         ],
       ),
@@ -122,7 +233,7 @@ class _ReceiptLayoutEditorScreenState extends State<ReceiptLayoutEditorScreen> {
     return Row(
       children: [
         Expanded(
-          flex: 2,
+          flex: 1,
           child: _buildControlsPanel(),
         ),
         const VerticalDivider(width: 1),
@@ -145,8 +256,7 @@ class _ReceiptLayoutEditorScreenState extends State<ReceiptLayoutEditorScreen> {
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(8.0),
                       child: PdfPreview(
-                        build: (format) => _generatePreviewPdfBytes(),
-                        pageFormats: const {'58mm': PdfPageFormat(58 * PdfPageFormat.mm, 250 * PdfPageFormat.mm, marginAll: 2 * PdfPageFormat.mm)},
+                        build: (format) => _generatePreviewPdfBytes(format),
                         canChangeOrientation: false,
                         canChangePageFormat: false,
                         canDebug: false,
@@ -172,14 +282,50 @@ class _ReceiptLayoutEditorScreenState extends State<ReceiptLayoutEditorScreen> {
       padding: const EdgeInsets.all(16.0),
       child: Column(
         children: [
-          _buildStyleEditor('Cabeçalho (Nome do Local)', _currentSettings.headerStyle, (newStyle) => setState(() => _currentSettings = _currentSettings.copyWith(headerStyle: newStyle))),
-          _buildTextAndStyleEditor('Subtítulo (CNPJ)', _subtitleController, (newText) => setState(()=> _currentSettings = _currentSettings.copyWith(subtitleText: newText)), _currentSettings.subtitleStyle, (newStyle) => setState(() => _currentSettings = _currentSettings.copyWith(subtitleStyle: newStyle))),
-          _buildTextAndStyleEditor('Endereço', _addressController, (newText) => setState(()=> _currentSettings = _currentSettings.copyWith(addressText: newText)), _currentSettings.addressStyle, (newStyle) => setState(() => _currentSettings = _currentSettings.copyWith(addressStyle: newStyle))),
-          _buildTextAndStyleEditor('Telefone', _phoneController, (newText) => setState(()=> _currentSettings = _currentSettings.copyWith(phoneText: newText)), _currentSettings.phoneStyle, (newStyle) => setState(() => _currentSettings = _currentSettings.copyWith(phoneStyle: newStyle))),
-          _buildStyleEditor('Info (Mesa e Data)', _currentSettings.infoStyle, (newStyle) => setState(() => _currentSettings = _currentSettings.copyWith(infoStyle: newStyle))),
-          _buildStyleEditor('Itens', _currentSettings.itemStyle, (newStyle) => setState(() => _currentSettings = _currentSettings.copyWith(itemStyle: newStyle))),
-          _buildStyleEditor('Total', _currentSettings.totalStyle, (newStyle) => setState(() => _currentSettings = _currentSettings.copyWith(totalStyle: newStyle))),
-          _buildTextAndStyleEditor('Mensagem Final', _finalMessageController, (newText) => setState(()=> _currentSettings = _currentSettings.copyWith(finalMessageText: newText)), _currentSettings.finalMessageStyle, (newStyle) => setState(() => _currentSettings = _currentSettings.copyWith(finalMessageStyle: newStyle))),
+          _buildStyleEditor('Cabeçalho (Nome do Local)', _currentSettings.headerStyle, (newStyle) {
+            setState(() => _currentSettings = _currentSettings.copyWith(headerStyle: newStyle));
+            _autoSaveSettings();
+          }),
+          _buildTextAndStyleEditor('Subtítulo (CNPJ)', _subtitleController, (newText) {
+            setState(()=> _currentSettings = _currentSettings.copyWith(subtitleText: newText));
+            _autoSaveSettings();
+          }, _currentSettings.subtitleStyle, (newStyle) {
+            setState(() => _currentSettings = _currentSettings.copyWith(subtitleStyle: newStyle));
+            _autoSaveSettings();
+          }),
+          _buildTextAndStyleEditor('Endereço', _addressController, (newText) {
+            setState(()=> _currentSettings = _currentSettings.copyWith(addressText: newText));
+            _autoSaveSettings();
+          }, _currentSettings.addressStyle, (newStyle) {
+            setState(() => _currentSettings = _currentSettings.copyWith(addressStyle: newStyle));
+            _autoSaveSettings();
+          }),
+          _buildTextAndStyleEditor('Telefone', _phoneController, (newText) {
+            setState(()=> _currentSettings = _currentSettings.copyWith(phoneText: newText));
+            _autoSaveSettings();
+          }, _currentSettings.phoneStyle, (newStyle) {
+            setState(() => _currentSettings = _currentSettings.copyWith(phoneStyle: newStyle));
+            _autoSaveSettings();
+          }),
+          _buildStyleEditor('Info (Mesa e Data)', _currentSettings.infoStyle, (newStyle) {
+            setState(() => _currentSettings = _currentSettings.copyWith(infoStyle: newStyle));
+            _autoSaveSettings();
+          }),
+          _buildStyleEditor('Itens', _currentSettings.itemStyle, (newStyle) {
+            setState(() => _currentSettings = _currentSettings.copyWith(itemStyle: newStyle));
+            _autoSaveSettings();
+          }),
+          _buildStyleEditor('Total', _currentSettings.totalStyle, (newStyle) {
+            setState(() => _currentSettings = _currentSettings.copyWith(totalStyle: newStyle));
+            _autoSaveSettings();
+          }),
+          _buildTextAndStyleEditor('Mensagem Final', _finalMessageController, (newText) {
+            setState(()=> _currentSettings = _currentSettings.copyWith(finalMessageText: newText));
+            _autoSaveSettings();
+          }, _currentSettings.finalMessageStyle, (newStyle) {
+            setState(() => _currentSettings = _currentSettings.copyWith(finalMessageStyle: newStyle));
+            _autoSaveSettings();
+          }),
         ],
       ),
     );
@@ -268,7 +414,6 @@ class _ReceiptLayoutEditorScreenState extends State<ReceiptLayoutEditorScreen> {
     );
   }
 }
-
 
 extension on ReceiptTemplateSettings {
   ReceiptTemplateSettings copyWith({

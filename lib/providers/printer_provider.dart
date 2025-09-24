@@ -88,35 +88,33 @@ class PrinterProvider with ChangeNotifier {
   void startListening() {
     if (_isListening) return;
     
-    _orderChannel = _supabase
-        .channel('public:pedidos')
-        .on<Map<String, dynamic>>(
-          RealtimeListenTypes.postgresChanges,
-          ChannelFilter(
-            event: 'INSERT',
-            schema: 'public',
-            table: 'pedidos',
-            filter: 'status=eq.open',
-          ),
-          (payload) {
-            _handleNewOrder(payload['new']);
-          },
-        ).subscribe(
-          (status, [error]) {
-            if (status == 'SUBSCRIBED') {
-              _isListening = true;
-              _addLog('Monitoramento de novos pedidos iniciado.');
-              notifyListeners();
-            } else {
-               _isListening = false;
-               _addLog('Monitoramento parado. Status: $status');
-               if(error != null) {
-                 _addLog('Erro de conexão: $error');
-               }
-               notifyListeners();
-            }
+    _orderChannel = _supabase.channel('public:pedidos');
+    _orderChannel!.onPostgresChanges(
+        event: PostgresChangeEvent.insert,
+        schema: 'public',
+        table: 'pedidos',
+        filter: PostgresChangeFilter(
+          type: PostgresChangeFilterType.eq,
+          column: 'status',
+          value: 'open',
+        ),
+        callback: (payload) {
+          _handleNewOrder(payload.newRecord);
+        },
+      ).subscribe((status, [error]) {
+        if (status == RealtimeSubscribeStatus.subscribed) {
+          _isListening = true;
+          _addLog('Monitoramento de novos pedidos iniciado.');
+          notifyListeners();
+        } else {
+          _isListening = false;
+          _addLog('Monitoramento parado. Status: $status');
+          if (error != null) {
+            _addLog('Erro de conexão: $error');
           }
-        );
+          notifyListeners();
+        }
+    });
   }
 
   void stopListening() {

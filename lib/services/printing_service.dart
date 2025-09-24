@@ -79,10 +79,22 @@ class PrintingService {
     final pdf = pw.Document();
 
     final pageFormat = paperSize == '80'
-        ? const PdfPageFormat(80 * PdfPageFormat.mm, double.infinity,
-            marginAll: 2 * PdfPageFormat.mm)
-        : const PdfPageFormat(57 * PdfPageFormat.mm, double.infinity,
-            marginAll: 1.5 * PdfPageFormat.mm);
+        ? const PdfPageFormat(
+            80 * PdfPageFormat.mm, 
+            double.infinity,
+            marginLeft: 2 * PdfPageFormat.mm,
+            marginRight: 2 * PdfPageFormat.mm,
+            marginTop: 2 * PdfPageFormat.mm,
+            marginBottom: 2 * PdfPageFormat.mm,
+          )
+        : const PdfPageFormat(
+            57 * PdfPageFormat.mm, 
+            double.infinity,
+            marginLeft: 1.5 * PdfPageFormat.mm,
+            marginRight: 1.5 * PdfPageFormat.mm,
+            marginTop: 1.5 * PdfPageFormat.mm,
+            marginBottom: 1.5 * PdfPageFormat.mm,
+          );
 
     pw.TextStyle _getTextStyle(PrintStyle style) {
       return pw.TextStyle(
@@ -165,8 +177,14 @@ class PrintingService {
     
     pdf.addPage(
       pw.Page(
-        pageFormat: const PdfPageFormat(57 * PdfPageFormat.mm, double.infinity,
-            marginAll: 2 * PdfPageFormat.mm),
+        pageFormat: const PdfPageFormat(
+          57 * PdfPageFormat.mm, 
+          double.infinity,
+          marginLeft: 2 * PdfPageFormat.mm,
+          marginRight: 2 * PdfPageFormat.mm,
+          marginTop: 2 * PdfPageFormat.mm,
+          marginBottom: 2 * PdfPageFormat.mm,
+        ),
         build: (pw.Context context) {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,

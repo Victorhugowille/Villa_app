@@ -1,13 +1,14 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
 import 'package:villabistromobile/models/print_style_settings.dart';
 import 'package:villabistromobile/providers/printer_provider.dart';
-import 'package:villabistromobile/services/printing_service.dart';
 import 'package:villabistromobile/data/app_data.dart' as app_data;
 import 'package:villabistromobile/widgets/custom_app_bar.dart';
 
@@ -21,8 +22,8 @@ class PrintLayoutEditorScreen extends StatefulWidget {
 
 class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
   late PrintTemplateSettings _currentSettings;
-  final PrintingService _printingService = PrintingService();
   late TextEditingController _footerController;
+  Timer? _debounce;
 
   @override
   void initState() {
@@ -37,17 +38,16 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
   @override
   void dispose() {
     _footerController.dispose();
+    _debounce?.cancel();
     super.dispose();
   }
 
-  void _saveSettings() {
-    Provider.of<PrinterProvider>(context, listen: false)
-        .saveTemplateSettings(_currentSettings);
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      content: Text('Layout salvo com sucesso!'),
-      backgroundColor: Colors.green,
-    ));
-    Navigator.of(context).pop();
+  void _autoSaveSettings() {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      Provider.of<PrinterProvider>(context, listen: false)
+          .saveTemplateSettings(_currentSettings);
+    });
   }
 
   void _resetToDefaults() {
@@ -55,9 +55,29 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
       _currentSettings = PrintTemplateSettings.defaults();
       _footerController.text = _currentSettings.footerText;
     });
+    _autoSaveSettings();
+  }
+  
+  pw.Alignment _getAlignment(pw.CrossAxisAlignment crossAxisAlignment) {
+    switch (crossAxisAlignment) {
+      case pw.CrossAxisAlignment.start:
+        return pw.Alignment.centerLeft;
+      case pw.CrossAxisAlignment.center:
+        return pw.Alignment.center;
+      case pw.CrossAxisAlignment.end:
+        return pw.Alignment.centerRight;
+      default:
+        return pw.Alignment.centerLeft;
+    }
   }
 
-  // CORREÇÃO APLICADA AQUI
+  pw.TextStyle _getTextStyle(PrintStyle style) {
+    return pw.TextStyle(
+      fontWeight: style.isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
+      fontSize: style.fontSize,
+    );
+  }
+
   Future<Uint8List> _generatePreviewPdfBytes(PdfPageFormat format) async {
     final mockItems = [
       app_data.CartItem(
@@ -70,44 +90,74 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
       ),
     ];
 
-    // Recriando a lógica de geração aqui para usar o `format` do preview
     final doc = pw.Document();
-    
-    // Usar o `_printingService` é uma boa prática, mas para o preview,
-    // precisamos ter certeza de que o `format` é respeitado.
-    // A maneira mais segura é recriar a lógica aqui.
-    final pageFormat = format.copyWith(
-      marginLeft: 1.5 * PdfPageFormat.mm,
-      marginRight: 1.5 * PdfPageFormat.mm,
-      marginTop: 2 * PdfPageFormat.mm,
-      marginBottom: 2 * PdfPageFormat.mm,
-    );
+    final settings = _currentSettings;
 
     doc.addPage(
       pw.Page(
-        pageFormat: pageFormat,
+        pageFormat: format.copyWith(
+            marginLeft: 1.5 * PdfPageFormat.mm,
+            marginRight: 1.5 * PdfPageFormat.mm,
+            marginTop: 2 * PdfPageFormat.mm,
+            marginBottom: 2 * PdfPageFormat.mm,
+        ),
         orientation: pw.PageOrientation.portrait,
         build: (context) {
-          return pw.Container(
-            // A lógica de construção do PDF pode ser extraída para um método comum
-            // se ficar muito repetitiva, mas por enquanto isso resolve.
-             child: pw.Text("Preview..."), // Simplificado para o exemplo
+          return pw.Column(
+            children: [
+              pw.Container(
+                width: double.infinity,
+                alignment: _getAlignment(settings.headerStyle.alignment),
+                child: pw.Text('VillaBistrô',
+                    style: _getTextStyle(settings.headerStyle)),
+              ),
+              pw.SizedBox(height: 5),
+              pw.Center(child: pw.Text('----------------------------------')),
+              pw.SizedBox(height: 5),
+              pw.Container(
+                width: double.infinity,
+                alignment: _getAlignment(settings.tableStyle.alignment),
+                child: pw.Text('MESA XX',
+                    style: _getTextStyle(settings.tableStyle)),
+              ),
+              pw.SizedBox(height: 5),
+              pw.Container(
+                width: double.infinity,
+                alignment: _getAlignment(settings.orderInfoStyle.alignment),
+                child: pw.Text(
+                  'Pedido #999 - ${DateFormat('HH:mm').format(DateTime.now())}',
+                  style: _getTextStyle(settings.orderInfoStyle),
+                ),
+              ),
+              pw.SizedBox(height: 5),
+              pw.Center(child: pw.Text('----------------------------------')),
+              pw.SizedBox(height: 5),
+              for (final item in mockItems)
+                pw.Container(
+                  width: double.infinity,
+                  alignment: _getAlignment(settings.itemStyle.alignment),
+                  padding: const pw.EdgeInsets.symmetric(vertical: 2),
+                  child: pw.Text(
+                    '(${item.quantity}) ${item.product.name}',
+                    style: _getTextStyle(settings.itemStyle),
+                  ),
+                ),
+              if (settings.footerText.isNotEmpty)
+                pw.Padding(
+                  padding: const pw.EdgeInsets.only(top: 10),
+                  child: pw.Container(
+                    width: double.infinity,
+                    alignment: _getAlignment(settings.footerStyle.alignment),
+                    child: pw.Text(settings.footerText, style: _getTextStyle(settings.footerStyle)),
+                  ),
+                ),
+            ],
           );
         },
       ),
     );
     
-    // Para evitar duplicar todo o código, vamos chamar o serviço mas
-    // o ideal seria refatorar o serviço para aceitar um `PdfPageFormat`.
-    // Por simplicidade agora, vamos apenas chamar o serviço como antes,
-    // a correção principal já foi feita no `PrintingService`.
-    return await _printingService.getKitchenOrderPdfBytes(
-      items: mockItems,
-      tableNumber: 'XX',
-      orderId: 999,
-      paperSize: '58',
-      templateSettings: _currentSettings,
-    );
+    return doc.save();
   }
 
   @override
@@ -123,7 +173,15 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
               icon: const Icon(Icons.preview_outlined),
               tooltip: 'Visualizar',
               onPressed: () async {
-                final pdfBytes = await _generatePreviewPdfBytes(PdfPageFormat.a4); // Passando um formato padrão
+                final format = const PdfPageFormat(
+                  57 * PdfPageFormat.mm, 
+                  250 * PdfPageFormat.mm,
+                  marginLeft: 1.5 * PdfPageFormat.mm,
+                  marginRight: 1.5 * PdfPageFormat.mm,
+                  marginTop: 2 * PdfPageFormat.mm,
+                  marginBottom: 2 * PdfPageFormat.mm,
+                );
+                final pdfBytes = await _generatePreviewPdfBytes(format);
                 await Printing.layoutPdf(onLayout: (format) async => pdfBytes);
               },
             ),
@@ -131,11 +189,6 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
             icon: const Icon(Icons.refresh),
             tooltip: 'Redefinir Padrão',
             onPressed: _resetToDefaults,
-          ),
-          IconButton(
-            icon: const Icon(Icons.save),
-            tooltip: 'Salvar',
-            onPressed: _saveSettings,
           ),
         ],
       ),
@@ -147,7 +200,7 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
     return Row(
       children: [
         Expanded(
-          flex: 2,
+          flex: 1,
           child: _buildControlsPanel(),
         ),
         const VerticalDivider(width: 1),
@@ -173,7 +226,9 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(8.0),
                       child: PdfPreview(
-                        build: (format) => _generatePreviewPdfBytes(format), // Passando o formato do preview
+                        build: (format) => _generatePreviewPdfBytes(
+                          format.copyWith(width: 58 * PdfPageFormat.mm)
+                        ),
                         canChangeOrientation: false,
                         canChangePageFormat: false,
                         canDebug: false,
@@ -201,11 +256,26 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
       padding: const EdgeInsets.all(16.0),
       child: Column(
         children: [
-          _buildStyleEditor('Cabeçalho (Nome do Local)', _currentSettings.headerStyle, (newStyle) => setState(() => _currentSettings = _currentSettings.copyWith(headerStyle: newStyle))),
-          _buildStyleEditor('Número da Mesa', _currentSettings.tableStyle, (newStyle) => setState(() => _currentSettings = _currentSettings.copyWith(tableStyle: newStyle))),
-          _buildStyleEditor('Informações do Pedido', _currentSettings.orderInfoStyle, (newStyle) => setState(() => _currentSettings = _currentSettings.copyWith(orderInfoStyle: newStyle))),
-          _buildStyleEditor('Itens do Pedido', _currentSettings.itemStyle, (newStyle) => setState(() => _currentSettings = _currentSettings.copyWith(itemStyle: newStyle))),
-          _buildTextAndStyleEditor('Rodapé', _footerController, (newStyle) => setState(() => _currentSettings = _currentSettings.copyWith(footerStyle: newStyle)), _currentSettings.footerStyle),
+          _buildStyleEditor('Cabeçalho (Nome do Local)', _currentSettings.headerStyle, (newStyle) {
+            setState(() => _currentSettings = _currentSettings.copyWith(headerStyle: newStyle));
+            _autoSaveSettings();
+          }),
+          _buildStyleEditor('Número da Mesa', _currentSettings.tableStyle, (newStyle) {
+            setState(() => _currentSettings = _currentSettings.copyWith(tableStyle: newStyle));
+            _autoSaveSettings();
+          }),
+          _buildStyleEditor('Informações do Pedido', _currentSettings.orderInfoStyle, (newStyle) {
+            setState(() => _currentSettings = _currentSettings.copyWith(orderInfoStyle: newStyle));
+            _autoSaveSettings();
+          }),
+          _buildStyleEditor('Itens do Pedido', _currentSettings.itemStyle, (newStyle) {
+            setState(() => _currentSettings = _currentSettings.copyWith(itemStyle: newStyle));
+            _autoSaveSettings();
+          }),
+          _buildTextAndStyleEditor('Rodapé', _footerController, (newStyle) {
+            setState(() => _currentSettings = _currentSettings.copyWith(footerStyle: newStyle));
+            _autoSaveSettings();
+          }, _currentSettings.footerStyle),
         ],
       ),
     );
@@ -228,6 +298,7 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
                 setState(() {
                   _currentSettings = _currentSettings.copyWith(footerText: value);
                 });
+                _autoSaveSettings();
               },
             ),
             const SizedBox(height: 16),
