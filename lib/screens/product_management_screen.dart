@@ -11,6 +11,8 @@ class ProductManagementScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final navProvider = Provider.of<NavigationProvider>(context, listen: false);
+
     return Scaffold(
       appBar: CustomAppBar(
         title: 'Gerenciar Produtos',
@@ -19,7 +21,7 @@ class ProductManagementScreen extends StatelessWidget {
             icon: const Icon(Icons.add),
             tooltip: 'Adicionar Produto',
             onPressed: () {
-              NavigationProvider.navigateTo(context, const ProductEditScreen());
+              navProvider.navigateTo(context, const ProductEditScreen(), 'Novo Produto');
             },
           ),
         ],
@@ -89,8 +91,8 @@ class ProductManagementScreen extends StatelessWidget {
                           )
                         : null,
                     onTap: () {
-                      NavigationProvider.navigateTo(
-                          context, ProductEditScreen(product: item));
+                      navProvider.navigateTo(
+                          context, ProductEditScreen(product: item), 'Editar Produto');
                     },
                   ),
                 );

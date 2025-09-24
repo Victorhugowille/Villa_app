@@ -39,6 +39,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final productProvider = Provider.of<ProductProvider>(context);
+    final navProvider = Provider.of<NavigationProvider>(context, listen: false);
 
     return Scaffold(
       appBar: CustomAppBar(
@@ -78,8 +79,8 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                       },
                     ),
                     onTap: () {
-                      NavigationProvider.navigateTo(
-                          context, CategoryEditScreen(category: category));
+                      navProvider.navigateTo(
+                          context, CategoryEditScreen(category: category), 'Editar Categoria');
                     },
                   ),
                 );
@@ -87,7 +88,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
             ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          NavigationProvider.navigateTo(context, const CategoryEditScreen());
+          navProvider.navigateTo(context, const CategoryEditScreen(), 'Nova Categoria');
         },
         child: const Icon(Icons.add),
       ),

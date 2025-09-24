@@ -16,6 +16,7 @@ class CategoryScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final screenWidth = MediaQuery.of(context).size.width;
+    final navProvider = Provider.of<NavigationProvider>(context, listen: false);
     int crossAxisCount;
     if (screenWidth > 1200) {
       crossAxisCount = 5;
@@ -37,18 +38,17 @@ class CategoryScreen extends StatelessWidget {
                 IconButton(
                   icon: const Icon(Icons.shopping_cart_outlined, size: 28),
                   onPressed: () {
-                    // AQUI ENVOLVEMOS A TELA NO SCAFFOLD
                     final cartScreenWithScaffold = Scaffold(
                       appBar: CustomAppBar(
                         title: 'Carrinho - Mesa ${table.tableNumber}',
                       ),
                       body: CartScreen(table: table),
                     );
-                    NavigationProvider.navigateTo(
-                        context, cartScreenWithScaffold);
+                    navProvider.navigateTo(
+                        context, cartScreenWithScaffold, 'Carrinho');
                   },
                 ),
-                if (cart.totalItemsQuantity > 0) // USANDO O NOVO GETTER
+                if (cart.totalItemsQuantity > 0)
                   Positioned(
                     right: 8,
                     top: 8,
@@ -61,7 +61,7 @@ class CategoryScreen extends StatelessWidget {
                       constraints:
                           const BoxConstraints(minWidth: 16, minHeight: 16),
                       child: Text(
-                        '${cart.totalItemsQuantity}', // USANDO O NOVO GETTER
+                        '${cart.totalItemsQuantity}',
                         style: const TextStyle(
                             color: Colors.white, fontSize: 10),
                         textAlign: TextAlign.center,
@@ -99,13 +99,14 @@ class CategoryScreen extends StatelessWidget {
 
               return GestureDetector(
                 onTap: () {
-                  NavigationProvider.navigateTo(
+                  navProvider.navigateTo(
                     context,
                     ProductSelectionScreen(
                       table: table,
                       category: category,
                       products: productsInCategory,
                     ),
+                    category.name,
                   );
                 },
                 child: Card(

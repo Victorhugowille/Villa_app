@@ -9,7 +9,7 @@ class KitchenPrinterScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Estação de Impressão'),
+        title: const Text(''),
       ),
       body: Consumer<PrinterProvider>(
         builder: (context, printerProvider, child) {

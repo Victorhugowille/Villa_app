@@ -9,6 +9,7 @@ import 'package:villabistromobile/providers/product_provider.dart';
 import 'package:villabistromobile/providers/table_provider.dart';
 import 'package:villabistromobile/providers/transaction_provider.dart';
 import 'package:villabistromobile/providers/theme_provider.dart';
+import 'package:villabistromobile/providers/kds_provider.dart';
 import 'package:villabistromobile/screens/splash_screen.dart';
 import 'package:villabistromobile/screens/login_screen.dart';
 import 'package:villabistromobile/screens/onboarding_screen.dart';
@@ -35,6 +36,8 @@ void main() async {
         ChangeNotifierProvider(create: (context) => ProductProvider()),
         ChangeNotifierProvider(create: (context) => TransactionProvider()),
         ChangeNotifierProvider(create: (context) => PrinterProvider()),
+        ChangeNotifierProvider(create: (context) => KdsProvider()), // ADICIONADO AQUI
+
         
         // ADICIONE ESTA LINHA FALTANTE
         ChangeNotifierProvider(create: (context) => NavigationProvider()),

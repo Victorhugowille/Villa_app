@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:villabistromobile/providers/navigation_provider.dart';
 import 'package:villabistromobile/screens/category_management_screen.dart';
 import 'package:villabistromobile/screens/product_management_screen.dart';
@@ -10,8 +11,10 @@ class ManagementScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final navProvider = Provider.of<NavigationProvider>(context, listen: false);
+
     return Scaffold(
-      appBar: const CustomAppBar(title: 'Gestão'),
+      appBar: const CustomAppBar(title: ''),
       body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [
@@ -20,8 +23,8 @@ class ManagementScreen extends StatelessWidget {
             icon: Icons.restaurant_menu,
             title: 'Gerenciar Produtos',
             onTap: () {
-              NavigationProvider.navigateTo(
-                  context, const ProductManagementScreen());
+              navProvider.navigateTo(
+                  context, const ProductManagementScreen(), 'Gerenciar Produtos');
             },
           ),
           const SizedBox(height: 16),
@@ -30,8 +33,8 @@ class ManagementScreen extends StatelessWidget {
             icon: Icons.category,
             title: 'Gerenciar Categorias',
             onTap: () {
-              NavigationProvider.navigateTo(
-                  context, const CategoryManagementScreen());
+              navProvider.navigateTo(
+                  context, const CategoryManagementScreen(), 'Gerenciar Categorias');
             },
           ),
           const SizedBox(height: 16),
@@ -40,8 +43,8 @@ class ManagementScreen extends StatelessWidget {
             icon: Icons.table_restaurant,
             title: 'Gerenciar Mesas',
             onTap: () {
-              NavigationProvider.navigateTo(
-                  context, const TableManagementScreen());
+              navProvider.navigateTo(
+                  context, const TableManagementScreen(), 'Gerenciar Mesas');
             },
           ),
         ],

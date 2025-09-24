@@ -67,7 +67,7 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
     if (!_formKey.currentState!.validate()) return;
     _formKey.currentState!.save();
     final productProvider = Provider.of<ProductProvider>(context, listen: false);
-    final isDesktop = MediaQuery.of(context).size.width > 800;
+    
     try {
       if (_isEditMode) {
         await productProvider.updateProduct(
@@ -80,11 +80,7 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
             productsInCategory, _isSoldOut, _imageFile);
       }
       if (mounted) {
-        if (isDesktop) {
-          Provider.of<NavigationProvider>(context, listen: false).pop();
-        } else {
-          Navigator.of(context).pop(true);
-        }
+        Provider.of<NavigationProvider>(context, listen: false).pop(context);
       }
     } catch (e) {
       if (mounted) {
@@ -115,16 +111,11 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
     );
 
     if (confirmed == true && mounted) {
-      final isDesktop = MediaQuery.of(context).size.width > 800;
       try {
         await Provider.of<ProductProvider>(context, listen: false)
             .deleteProduct(widget.product!.id);
         if (mounted) {
-          if (isDesktop) {
-            Provider.of<NavigationProvider>(context, listen: false).pop();
-          } else {
-            Navigator.of(context).pop(true);
-          }
+          Provider.of<NavigationProvider>(context, listen: false).pop(context);
         }
       } catch (e) {
         if (mounted) {
@@ -138,6 +129,72 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDesktop = MediaQuery.of(context).size.width > 800;
+
+    Widget content = _isLoading
+      ? Center(child: CircularProgressIndicator(color: theme.primaryColor))
+      : Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Form(
+            key: _formKey,
+            child: ListView(
+              children: <Widget>[
+                _buildImagePicker(theme),
+                const SizedBox(height: 24),
+                TextFormField(
+                  initialValue: _name,
+                  decoration:
+                      const InputDecoration(labelText: 'Nome do Produto'),
+                  validator: (v) =>
+                      (v == null || v.isEmpty) ? 'Insira um nome.' : null,
+                  onSaved: (v) => _name = v!,
+                ),
+                TextFormField(
+                  initialValue: _price > 0 ? _price.toStringAsFixed(2) : '',
+                  decoration: const InputDecoration(labelText: 'Preço'),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  validator: (v) => (v == null ||
+                          v.isEmpty ||
+                          double.tryParse(v.replaceAll(',', '.')) == null)
+                      ? 'Insira um preço válido.'
+                      : null,
+                  onSaved: (v) => _price = double.parse(v!.replaceAll(',', '.')),
+                ),
+                DropdownButtonFormField<int>(
+                  value: _categoryId,
+                  items: _availableCategories
+                      .map((c) =>
+                          DropdownMenuItem<int>(value: c.id, child: Text(c.name)))
+                      .toList(),
+                  onChanged: (v) => setState(() => _categoryId = v),
+                  validator: (v) =>
+                      (v == null) ? 'Selecione uma categoria.' : null,
+                  decoration: const InputDecoration(labelText: 'Categoria'),
+                ),
+                const SizedBox(height: 16),
+                SwitchListTile(
+                  title: const Text('Produto Esgotado'),
+                  value: _isSoldOut,
+                  onChanged: (value) => setState(() => _isSoldOut = value),
+                  activeColor: theme.primaryColor,
+                ),
+                const SizedBox(height: 20),
+                if (!isDesktop)
+                  ElevatedButton(
+                    onPressed: _saveForm,
+                    child: Text(
+                        _isEditMode ? 'Salvar Alterações' : 'Adicionar Produto'),
+                  ),
+              ],
+            ),
+          ),
+        );
+
+    if (isDesktop) {
+      return content;
+    }
+
     return Scaffold(
       appBar: CustomAppBar(
         title: _isEditMode ? 'Editar Produto' : 'Novo Produto',
@@ -152,64 +209,7 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
               icon: const Icon(Icons.save), onPressed: _saveForm, tooltip: 'Salvar'),
         ],
       ),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: theme.primaryColor))
-          : Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Form(
-                key: _formKey,
-                child: ListView(
-                  children: <Widget>[
-                    _buildImagePicker(theme),
-                    const SizedBox(height: 24),
-                    TextFormField(
-                      initialValue: _name,
-                      decoration:
-                          const InputDecoration(labelText: 'Nome do Produto'),
-                      validator: (v) =>
-                          (v == null || v.isEmpty) ? 'Insira um nome.' : null,
-                      onSaved: (v) => _name = v!,
-                    ),
-                    TextFormField(
-                      initialValue: _price > 0 ? _price.toStringAsFixed(2) : '',
-                      decoration: const InputDecoration(labelText: 'Preço'),
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
-                      validator: (v) => (v == null ||
-                              v.isEmpty ||
-                              double.tryParse(v.replaceAll(',', '.')) == null)
-                          ? 'Insira um preço válido.'
-                          : null,
-                      onSaved: (v) => _price = double.parse(v!.replaceAll(',', '.')),
-                    ),
-                    DropdownButtonFormField<int>(
-                      value: _categoryId,
-                      items: _availableCategories
-                          .map((c) =>
-                              DropdownMenuItem<int>(value: c.id, child: Text(c.name)))
-                          .toList(),
-                      onChanged: (v) => setState(() => _categoryId = v),
-                      validator: (v) =>
-                          (v == null) ? 'Selecione uma categoria.' : null,
-                      decoration: const InputDecoration(labelText: 'Categoria'),
-                    ),
-                    const SizedBox(height: 16),
-                    SwitchListTile(
-                      title: const Text('Produto Esgotado'),
-                      value: _isSoldOut,
-                      onChanged: (value) => setState(() => _isSoldOut = value),
-                      activeColor: theme.primaryColor,
-                    ),
-                    const SizedBox(height: 20),
-                    ElevatedButton(
-                      onPressed: _saveForm,
-                      child: Text(
-                          _isEditMode ? 'Salvar Alterações' : 'Adicionar Produto'),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+      body: content,
     );
   }
 

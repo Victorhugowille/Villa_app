@@ -48,6 +48,103 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDesktop = MediaQuery.of(context).size.width > 800;
+
+    Widget content = ListView.builder(
+      itemCount: widget.products.length,
+      itemBuilder: (ctx, index) {
+        final product = widget.products[index];
+        final quantity = _selection[product.id] ?? 0;
+
+        return Card(
+          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: ListTile(
+              leading: SizedBox(
+                width: 60,
+                height: 60,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8.0),
+                  child: Image.network(
+                    product.imageUrl ??
+                        'https://placehold.co/100x100/e2e8f0/e2e8f0?text=Img',
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Icon(
+                        Icons.fastfood,
+                        color: theme.primaryColor.withOpacity(0.5)),
+                  ),
+                ),
+              ),
+              title: Text(product.name,
+                  style: const TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: Text('R\$ ${product.price.toStringAsFixed(2)}'),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: Icon(Icons.remove_circle_outline,
+                        color: quantity > 0 ? Colors.red : Colors.grey),
+                    onPressed: quantity > 0
+                        ? () => _updateSelection(product.id, quantity - 1)
+                        : null,
+                  ),
+                  Text(
+                    '$quantity',
+                    style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.add_circle_outline,
+                        color: theme.primaryColor, size: 28),
+                    onPressed: () =>
+                        _updateSelection(product.id, quantity + 1),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    FloatingActionButton? fab = _totalSelectedItems > 0
+      ? FloatingActionButton.extended(
+          onPressed: () {
+            final cart = Provider.of<CartProvider>(context, listen: false);
+            final nav = Provider.of<NavigationProvider>(context, listen: false);
+
+            cart.addItemsFromSelection(_selection, widget.products);
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                    '$_totalSelectedItems tipo(s) de item atualizado(s) no carrinho.'),
+                backgroundColor: theme.primaryColor,
+              ),
+            );
+
+            nav.pop(context);
+          },
+          icon: const Icon(Icons.shopping_cart_checkout),
+          label: const Text('ATUALIZAR CARRINHO'),
+        )
+      : null;
+    
+    if (isDesktop) {
+        return Stack(
+          children: [
+            content,
+            if (fab != null)
+            Positioned(
+              bottom: 24,
+              right: 24,
+              child: fab,
+            )
+          ],
+        );
+    }
+
     return Scaffold(
       appBar: CustomAppBar(
         title: widget.category.name,
@@ -59,14 +156,8 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
                 IconButton(
                   icon: const Icon(Icons.shopping_cart_outlined, size: 28),
                   onPressed: () {
-                    final cartScreenWithScaffold = Scaffold(
-                      appBar: CustomAppBar(
-                        title: 'Carrinho - Mesa ${widget.table.tableNumber}',
-                      ),
-                      body: CartScreen(table: widget.table),
-                    );
-                    NavigationProvider.navigateTo(
-                        context, cartScreenWithScaffold);
+                    final cartScreen = CartScreen(table: widget.table);
+                    Provider.of<NavigationProvider>(context, listen: false).navigateTo(context, cartScreen, 'Carrinho - Mesa ${widget.table.tableNumber}');
                   },
                 ),
                 if (cart.totalItemsQuantity > 0)
@@ -94,93 +185,8 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
           ),
         ],
       ),
-      body: ListView.builder(
-        itemCount: widget.products.length,
-        itemBuilder: (ctx, index) {
-          final product = widget.products[index];
-          final quantity = _selection[product.id] ?? 0;
-
-          return Card(
-            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8.0),
-              child: ListTile(
-                leading: SizedBox(
-                  width: 60,
-                  height: 60,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8.0),
-                    child: Image.network(
-                      product.imageUrl ??
-                          'https://placehold.co/100x100/e2e8f0/e2e8f0?text=Img',
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Icon(
-                          Icons.fastfood,
-                          color: theme.primaryColor.withOpacity(0.5)),
-                    ),
-                  ),
-                ),
-                title: Text(product.name,
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Text('R\$ ${product.price.toStringAsFixed(2)}'),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.remove_circle_outline,
-                          color: quantity > 0 ? Colors.red : Colors.grey),
-                      onPressed: quantity > 0
-                          ? () => _updateSelection(product.id, quantity - 1)
-                          : null,
-                    ),
-                    Text(
-                      '$quantity',
-                      style: const TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    IconButton(
-                      icon: Icon(Icons.add_circle_outline,
-                          color: theme.primaryColor, size: 28),
-                      onPressed: () =>
-                          _updateSelection(product.id, quantity + 1),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-      floatingActionButton: _totalSelectedItems > 0
-          ? FloatingActionButton.extended(
-              onPressed: () {
-                final cart = Provider.of<CartProvider>(context, listen: false);
-                final nav = Provider.of<NavigationProvider>(context, listen: false);
-                final isDesktop = MediaQuery.of(context).size.width > 800;
-
-                // 1. Atualiza o carrinho
-                cart.addItemsFromSelection(_selection, widget.products);
-
-                // 2. Mostra a SnackBar ANTES de fechar a tela
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                        '$_totalSelectedItems tipo(s) de item atualizado(s) no carrinho.'),
-                    backgroundColor: theme.primaryColor,
-                  ),
-                );
-
-                // 3. Fecha a tela da forma correta
-                if (isDesktop) {
-                  nav.pop();
-                } else {
-                  Navigator.of(context).pop();
-                }
-              },
-              icon: const Icon(Icons.shopping_cart_checkout),
-              label: const Text('ATUALIZAR CARRINHO'),
-            )
-          : null,
+      body: content,
+      floatingActionButton: fab,
     );
   }
 }

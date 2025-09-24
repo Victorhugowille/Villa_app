@@ -57,7 +57,7 @@ class _TransactionsReportScreenState extends State<TransactionsReportScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Movimentação'),
+        title: const Text(''),
       ),
       body: Column(
         children: [

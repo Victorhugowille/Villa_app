@@ -75,14 +75,12 @@ class Table {
   }
 }
 
-// CLASSE ATUALIZADA
 class CartItem {
   final Product product;
-  final int quantity; // Alterado para final (imutável)
+  final int quantity;
 
   CartItem({required this.product, required this.quantity});
 
-  // CORREÇÃO: Adicionando o construtor 'fromJson' que estava faltando
   factory CartItem.fromJson(Map<String, dynamic> json) {
     return CartItem(
       product: Product.fromJson(json['produtos']),
@@ -90,7 +88,6 @@ class CartItem {
     );
   }
 
-  // MELHORIA: Adicionando o método 'copyWith'
   CartItem copyWith({
     Product? product,
     int? quantity,
@@ -102,23 +99,48 @@ class CartItem {
   }
 }
 
-
 class Order {
   final int id;
   final List<CartItem> items;
   final DateTime timestamp;
   final String status;
+  final String type;
+  final int? tableNumber;
+  final int? tableId;
 
   Order({
     required this.id,
     required this.items,
     required this.timestamp,
     required this.status,
+    required this.type,
+    this.tableNumber,
+    this.tableId,
   });
+
+  factory Order.fromJson(Map<String, dynamic> json) {
+    var itemsList = <CartItem>[];
+    if (json['itens_pedido'] != null) {
+      itemsList = (json['itens_pedido'] as List)
+          .map((itemJson) => CartItem.fromJson(itemJson))
+          .toList();
+    }
+    
+    return Order(
+      id: json['id'],
+      items: itemsList,
+      timestamp: DateTime.parse(json['created_at']),
+      status: json['status'] ?? 'production',
+      type: json['type'] ?? 'mesa',
+      tableNumber: (json['mesa_id'] is Map) ? json['mesa_id']['numero'] : null,
+      tableId: (json['mesa_id'] is Map) ? json['mesa_id']['id'] : (json['mesa_id'] is int ? json['mesa_id'] : null),
+    );
+  }
   
   double get total =>
       items.fold(0.0, (sum, item) => sum + (item.product.price * item.quantity));
 }
+
 
 class Transaction {
   final int id;

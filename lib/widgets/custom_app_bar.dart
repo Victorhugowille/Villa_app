@@ -13,14 +13,12 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     final isDesktop = MediaQuery.of(context).size.width > 800;
     final navProvider = Provider.of<NavigationProvider>(context);
 
-    final bool canPopOnDesktop = isDesktop && navProvider.screenStack.length > 1;
-
     return AppBar(
       title: Text(title),
-      leading: canPopOnDesktop
+      leading: isDesktop && navProvider.canPop
           ? IconButton(
               icon: const Icon(Icons.arrow_back),
-              onPressed: () => navProvider.pop(),
+              onPressed: () => navProvider.pop(context),
             )
           : null,
       actions: actions,

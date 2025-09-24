@@ -92,6 +92,7 @@ class _ReceiptLayoutEditorScreenState extends State<ReceiptLayoutEditorScreen> {
       id: 1,
       status: 'closed',
       timestamp: DateTime.now(),
+      type: 'mesa',
       items: [
          app_data.CartItem(product: app_data.Product(id: 1, name: 'Produto Exemplo 1', price: 10.0, categoryId: 1, categoryName: 'Bebidas', displayOrder: 1, isSoldOut: false), quantity: 2),
          app_data.CartItem(product: app_data.Product(id: 2, name: 'Produto Exemplo 2', price: 15.0, categoryId: 1, categoryName: 'Bebidas', displayOrder: 2, isSoldOut: false), quantity: 1),
@@ -256,7 +257,9 @@ class _ReceiptLayoutEditorScreenState extends State<ReceiptLayoutEditorScreen> {
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(8.0),
                       child: PdfPreview(
-                        build: (format) => _generatePreviewPdfBytes(format),
+                        build: (format) => _generatePreviewPdfBytes(
+                          format.copyWith(width: 58 * PdfPageFormat.mm)
+                        ),
                         canChangeOrientation: false,
                         canChangePageFormat: false,
                         canDebug: false,

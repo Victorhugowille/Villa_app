@@ -88,6 +88,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final navProvider = Provider.of<NavigationProvider>(context, listen: false);
 
     return Scaffold(
       appBar: CustomAppBar(
@@ -178,13 +179,14 @@ class _OrderListScreenState extends State<OrderListScreen> {
                           padding: const EdgeInsets.symmetric(vertical: 16)),
                       onPressed: totalAmount > 0
                           ? () {
-                              NavigationProvider.navigateTo(
+                              navProvider.navigateTo(
                                 context,
                                 PaymentScreen(
                                   table: widget.table,
                                   totalAmount: totalAmount,
                                   orders: _loadedOrders,
                                 ),
+                                'Pagamento - Mesa ${widget.table.tableNumber}',
                               );
                             }
                           : null,

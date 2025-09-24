@@ -119,7 +119,7 @@ class _ThemeManagementScreenState extends State<ThemeManagementScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Gestão de Temas'),
+        title: const Text(''),
         actions: [
           IconButton(
             icon: Icon(Icons.color_lens, color: theme.primaryColor),

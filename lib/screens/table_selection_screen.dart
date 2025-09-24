@@ -6,10 +6,22 @@ import 'package:villabistromobile/providers/navigation_provider.dart';
 import 'package:villabistromobile/providers/table_provider.dart';
 import 'package:villabistromobile/screens/category_screen.dart';
 import 'package:villabistromobile/screens/order_list_screen.dart';
-import 'package:villabistromobile/screens/payment_screen.dart';
 
-class TableSelectionScreen extends StatelessWidget {
+class TableSelectionScreen extends StatefulWidget {
   const TableSelectionScreen({super.key});
+
+  @override
+  State<TableSelectionScreen> createState() => _TableSelectionScreenState();
+}
+
+class _TableSelectionScreenState extends State<TableSelectionScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<TableProvider>(context, listen: false).fetchAndSetTables();
+    });
+  }
 
   void _handleTableTap(BuildContext context, app_data.Table table) {
     Provider.of<CartProvider>(context, listen: false).clearCart();
@@ -22,7 +34,8 @@ class TableSelectionScreen extends StatelessWidget {
         _showMobileOptions(context, table);
       }
     } else {
-      NavigationProvider.navigateTo(context, CategoryScreen(table: table));
+      Provider.of<NavigationProvider>(context, listen: false)
+          .navigateTo(context, CategoryScreen(table: table), 'Nova Venda');
     }
   }
 
@@ -41,8 +54,8 @@ class TableSelectionScreen extends StatelessWidget {
                 icon: Icons.visibility,
                 title: 'Visualizar Pedidos',
                 onTap: () {
-                  NavigationProvider.navigateTo(
-                      context, OrderListScreen(table: table));
+                  Provider.of<NavigationProvider>(context, listen: false).navigateTo(
+                      context, OrderListScreen(table: table), 'Pedidos - Mesa ${table.tableNumber}');
                 },
               ),
               _buildOptionTile(
@@ -50,8 +63,8 @@ class TableSelectionScreen extends StatelessWidget {
                 icon: Icons.add_shopping_cart,
                 title: 'Adicionar Itens',
                 onTap: () {
-                  NavigationProvider.navigateTo(
-                      context, CategoryScreen(table: table));
+                  Provider.of<NavigationProvider>(context, listen: false)
+                      .navigateTo(context, CategoryScreen(table: table), 'Adicionar Itens');
                 },
               ),
               _buildOptionTile(
@@ -60,16 +73,6 @@ class TableSelectionScreen extends StatelessWidget {
                 title: 'Limpar Mesa',
                 onTap: () => _confirmClearTable(context, table),
               ),
-              _buildOptionTile(
-                context: ctx,
-                icon: Icons.payment,
-                title: 'Fechar Conta',
-                onTap: () {
-                  NavigationProvider.navigateTo(
-                      context, OrderListScreen(table: table));
-                },
-              ),
-              
             ],
           ),
         ),
@@ -89,8 +92,8 @@ class TableSelectionScreen extends StatelessWidget {
               icon: Icons.visibility,
               title: 'Visualizar Pedidos',
               onTap: () {
-                NavigationProvider.navigateTo(
-                    context, OrderListScreen(table: table));
+                Provider.of<NavigationProvider>(context, listen: false).navigateTo(
+                    context, OrderListScreen(table: table), 'Pedidos - Mesa ${table.tableNumber}');
               },
             ),
             _buildOptionTile(
@@ -98,8 +101,8 @@ class TableSelectionScreen extends StatelessWidget {
               icon: Icons.add_shopping_cart,
               title: 'Fazer um novo pedido',
               onTap: () {
-                NavigationProvider.navigateTo(
-                    context, CategoryScreen(table: table));
+                Provider.of<NavigationProvider>(context, listen: false)
+                    .navigateTo(context, CategoryScreen(table: table), 'Nova Venda');
               },
             ),
             _buildOptionTile(
@@ -107,15 +110,6 @@ class TableSelectionScreen extends StatelessWidget {
               icon: Icons.delete_forever,
               title: 'Limpar Mesa',
               onTap: () => _confirmClearTable(context, table),
-            ),
-            _buildOptionTile(
-              context: ctx,
-              icon: Icons.payment,
-              title: ' Fechar conta ',
-              onTap: () {
-                NavigationProvider.navigateTo(
-                    context, OrderListScreen(table: table));
-              },
             ),
           ],
         ),
@@ -196,13 +190,13 @@ class TableSelectionScreen extends StatelessWidget {
           return Center(
               child: CircularProgressIndicator(color: theme.primaryColor));
         }
-
+    
         if (tableProvider.tables.isEmpty) {
           return const Center(child: Text('Nenhuma mesa cadastrada.'));
         }
-
+    
         final tables = tableProvider.tables;
-
+    
         return RefreshIndicator(
           onRefresh: () => tableProvider.fetchAndSetTables(),
           child: GridView.builder(
@@ -217,11 +211,11 @@ class TableSelectionScreen extends StatelessWidget {
             itemBuilder: (context, index) {
               final app_data.Table table = tables[index];
               final bool isOccupied = table.isOccupied;
-
+    
               return Card(
                 elevation: 4,
                 color:
-                    isOccupied ? Colors.red : theme.cardColor,
+                    isOccupied ? Colors.red.shade700 : theme.cardColor,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -236,7 +230,7 @@ class TableSelectionScreen extends StatelessWidget {
                           Icons.table_restaurant,
                           size: 40,
                           color: isOccupied
-                              ? theme.colorScheme.onSecondary
+                              ? Colors.white
                               : theme.colorScheme.onSurface.withOpacity(0.7),
                         ),
                         const SizedBox(height: 8),
@@ -245,7 +239,7 @@ class TableSelectionScreen extends StatelessWidget {
                           style: theme.textTheme.headlineSmall?.copyWith(
                             fontWeight: FontWeight.bold,
                             color: isOccupied
-                                ? theme.colorScheme.onSecondary
+                                ? Colors.white
                                 : theme.colorScheme.onSurface,
                           ),
                         ),

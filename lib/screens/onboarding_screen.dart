@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -9,6 +10,14 @@ class OnboardingScreen extends StatefulWidget {
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
+
+  Future<void> _completeOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('seenOnboarding', true);
+    if (mounted) {
+      Navigator.of(context).pushReplacementNamed('/home');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,12 +51,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          TextButton(onPressed: () => Navigator.of(context).pushReplacementNamed('/login'), child: Text('PULAR', style: TextStyle(color: theme.colorScheme.onBackground))),
+          TextButton(onPressed: _completeOnboarding, child: Text('PULAR', style: TextStyle(color: theme.colorScheme.onBackground))),
           Row(children: List.generate(3, (index) => _buildDot(index, theme))),
           ElevatedButton(
             onPressed: () {
               if (_currentPage == 2) {
-                Navigator.of(context).pushReplacementNamed('/login');
+                _completeOnboarding();
               } else {
                 _pageController.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeIn);
               }
@@ -76,7 +85,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Image.asset(imagePath, height: 250),
+          // Image.asset(imagePath, height: 250),
           const SizedBox(height: 40),
           Text(title, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: theme.colorScheme.onBackground)),
           const SizedBox(height: 16),

@@ -110,7 +110,12 @@ class TableProvider with ChangeNotifier {
     try {
       final orderResponse = await _supabase
           .from('pedidos')
-          .insert({'mesa_id': tableId, 'status': 'open', 'user_id': userId})
+          .insert({
+            'mesa_id': tableId, 
+            'status': 'production', 
+            'type': 'mesa',
+            'user_id': userId,
+          })
           .select()
           .single();
       final orderId = orderResponse['id'];
@@ -138,24 +143,9 @@ class TableProvider with ChangeNotifier {
           .from('pedidos')
           .select('*, itens_pedido(*, produtos(*, categorias(name)))')
           .eq('mesa_id', tableId)
-          .eq('status', 'open');
+          .neq('status', 'completed');
 
-      return response.map((orderData) {
-        final itemsData = orderData['itens_pedido'] as List;
-        final orderItems = itemsData.map((itemData) {
-          return app_data.CartItem(
-            product: app_data.Product.fromJson(itemData['produtos']),
-            quantity: itemData['quantidade'],
-          );
-        }).toList();
-
-        return app_data.Order(
-          id: orderData['id'],
-          timestamp: DateTime.parse(orderData['created_at']),
-          status: orderData['status'],
-          items: orderItems,
-        );
-      }).toList();
+      return response.map((orderData) => app_data.Order.fromJson(orderData)).toList();
     } catch (error) {
       debugPrint("Erro ao buscar pedidos: $error");
       return [];
@@ -164,16 +154,11 @@ class TableProvider with ChangeNotifier {
 
   Future<bool> clearTable(int tableId) async {
     try {
-      final openOrders = await _supabase
+      await _supabase
           .from('pedidos')
-          .select('id')
+          .delete()
           .eq('mesa_id', tableId)
-          .eq('status', 'open');
-
-      if (openOrders.isNotEmpty) {
-        final orderIds = openOrders.map((order) => order['id'] as int).toList();
-        await _supabase.from('pedidos').delete().inFilter('id', orderIds);
-      }
+          .neq('status', 'completed');
 
       await updateStatus(tableId, 'livre');
       return true;
@@ -205,7 +190,6 @@ class TableProvider with ChangeNotifier {
     }
     
     try {
-      // 1. Cria a transação na tabela 'transacoes'
       final transactionResponse = await _supabase.from('transacoes').insert({
         'table_number': table.tableNumber,
         'total_amount': totalAmount,
@@ -214,19 +198,16 @@ class TableProvider with ChangeNotifier {
       }).select().single();
 
       final transactionId = transactionResponse['id'];
-
-      // 2. Atualiza todos os pedidos abertos da mesa para o status 'closed'
-      // e os vincula ao ID da transação recém-criada.
+      
       await _supabase
           .from('pedidos')
           .update({
-            'status': 'closed',
+            'status': 'completed',
             'transaction_id': transactionId,
           })
           .eq('mesa_id', table.id)
-          .eq('status', 'open');
+          .neq('status', 'completed');
 
-      // 3. Libera a mesa
       await updateStatus(table.id, 'livre');
       return true;
     } catch (error) {
