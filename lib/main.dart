@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:villabistromobile/providers/cart_provider.dart';
-import 'package:villabistromobile/providers/navigation_provider.dart'; // Importe o provider
+import 'package:villabistromobile/providers/navigation_provider.dart';
 import 'package:villabistromobile/providers/printer_provider.dart';
 import 'package:villabistromobile/providers/product_provider.dart';
 import 'package:villabistromobile/providers/table_provider.dart';
@@ -14,6 +14,9 @@ import 'package:villabistromobile/screens/splash_screen.dart';
 import 'package:villabistromobile/screens/login_screen.dart';
 import 'package:villabistromobile/screens/onboarding_screen.dart';
 import 'package:villabistromobile/screens/responsive_layout.dart';
+import 'package:villabistromobile/providers/report_provider.dart';
+import 'package:villabistromobile/providers/saved_report_provider.dart';
+import 'package:villabistromobile/providers/spreadsheet_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,10 +39,10 @@ void main() async {
         ChangeNotifierProvider(create: (context) => ProductProvider()),
         ChangeNotifierProvider(create: (context) => TransactionProvider()),
         ChangeNotifierProvider(create: (context) => PrinterProvider()),
-        ChangeNotifierProvider(create: (context) => KdsProvider()), // ADICIONADO AQUI
-
-        
-        // ADICIONE ESTA LINHA FALTANTE
+        ChangeNotifierProvider(create: (context) => KdsProvider()),
+        ChangeNotifierProvider(create: (context) => ReportProvider()),
+        ChangeNotifierProvider(create: (context) => SavedReportProvider()),
+        ChangeNotifierProvider(create: (context) => SpreadsheetProvider()),
         ChangeNotifierProvider(create: (context) => NavigationProvider()),
       ],
       child: const MyApp(),

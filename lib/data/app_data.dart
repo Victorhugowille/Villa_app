@@ -1,5 +1,26 @@
 import 'package:flutter/material.dart';
 
+// NOVO MODELO ADICIONADO NO FINAL
+class SavedReport {
+  final int id;
+  final String name;
+  final DateTime createdAt;
+
+  SavedReport({
+    required this.id,
+    required this.name,
+    required this.createdAt,
+  });
+
+  factory SavedReport.fromJson(Map<String, dynamic> json) {
+    return SavedReport(
+      id: json['id'],
+      name: json['name'],
+      createdAt: DateTime.parse(json['created_at']),
+    );
+  }
+}
+
 class Category {
   final int id;
   final String name;
@@ -141,7 +162,6 @@ class Order {
       items.fold(0.0, (sum, item) => sum + (item.product.price * item.quantity));
 }
 
-
 class Transaction {
   final int id;
   final int tableNumber;
@@ -170,6 +190,33 @@ class Transaction {
       paymentMethod: jsonData['payment_method'] ?? 'N/A',
       discount: (jsonData['discount'] as num?)?.toDouble() ?? 0.0,
       surcharge: (jsonData['surcharge'] as num?)?.toDouble() ?? 0.0,
+    );
+  }
+}
+
+class CustomSpreadsheet {
+  final int? id;
+  final String name;
+  final List<List<String>> sheetData;
+  final DateTime createdAt;
+
+  CustomSpreadsheet({
+    this.id,
+    required this.name,
+    required this.sheetData,
+    required this.createdAt,
+  });
+
+  factory CustomSpreadsheet.fromJson(Map<String, dynamic> json) {
+    List<List<String>> data = (json['sheet_data'] as List)
+        .map((row) => (row as List).map((cell) => cell.toString()).toList())
+        .toList();
+
+    return CustomSpreadsheet(
+      id: json['id'],
+      name: json['name'],
+      sheetData: data,
+      createdAt: DateTime.parse(json['created_at']),
     );
   }
 }

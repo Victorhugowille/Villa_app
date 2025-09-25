@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:villabistromobile/providers/kds_provider.dart';
 import 'package:villabistromobile/providers/navigation_provider.dart';
+import 'package:villabistromobile/screens/excel_generator_screen.dart';
 import 'package:villabistromobile/screens/kds_screen.dart';
 import 'package:villabistromobile/screens/kitchen_printer_screen.dart';
 import 'package:villabistromobile/screens/management_screen.dart';
@@ -37,7 +38,7 @@ class SideMenu extends StatelessWidget {
             child: const Text(
               'VillaBistrô',
               style: TextStyle(
-                  color: Color.fromARGB(255, 8, 60, 10), fontSize: 24),
+                  color: Colors.white, fontSize: 24),
             ),
           ),
           ListTile(
@@ -61,6 +62,12 @@ class SideMenu extends StatelessWidget {
             leading: const Icon(Icons.receipt_long),
             title: const Text('Movimentação'),
             onTap: () => _navigateTo(context, const TransactionsReportScreen(), 'Relatório de Movimentação'),
+          ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.grid_on_outlined),
+            title: const Text('Planilhas'),
+            onTap: () => _navigateTo(context, const ExcelGeneratorScreen(), 'Planilhas'),
           ),
           const Divider(),
           ListTile(

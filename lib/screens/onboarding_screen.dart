@@ -15,7 +15,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('seenOnboarding', true);
     if (mounted) {
-      Navigator.of(context).pushReplacementNamed('/home');
+      // Corrigido para ir para a tela de login após o onboarding
+      Navigator.of(context).pushReplacementNamed('/login');
     }
   }
 
@@ -85,7 +86,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Image.asset(imagePath, height: 250),
+          Image.asset(imagePath, height: 250),
           const SizedBox(height: 40),
           Text(title, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: theme.colorScheme.onBackground)),
           const SizedBox(height: 16),

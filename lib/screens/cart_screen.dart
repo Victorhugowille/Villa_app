@@ -14,7 +14,6 @@ class CartScreen extends StatelessWidget {
     final cart = Provider.of<CartProvider>(context);
     final theme = Theme.of(context);
 
-    // O WIDGET AGORA RETORNA DIRETAMENTE O CONTEÚDO, SEM SCAFFOLD
     return SafeArea(
       child: Column(
         children: <Widget>[
@@ -120,8 +119,7 @@ class CartScreen extends StatelessWidget {
                       child: Text('FAZER PEDIDO',
                           style: TextStyle(color: theme.primaryColor)),
                       onPressed: () async {
-                        final isDesktop =
-                            MediaQuery.of(context).size.width > 800;
+                        final navProvider = Provider.of<NavigationProvider>(context, listen: false);
 
                         await Provider.of<TableProvider>(context,
                                 listen: false)
@@ -130,17 +128,8 @@ class CartScreen extends StatelessWidget {
                           items: cart.itemsAsList,
                         );
                         cart.clearCart();
-
-                        if (context.mounted) {
-                          if (isDesktop) {
-                            Provider.of<NavigationProvider>(context,
-                                    listen: false)
-                                .popToHome();
-                          } else {
-                            Navigator.of(context)
-                                .popUntil((route) => route.isFirst);
-                          }
-                        }
+                        
+                        navProvider.popToHome();
                       },
                     )
                   ],
