@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -23,7 +24,7 @@ class PrintingService {
       onLayout: (format) async => pdfBytes,
     );
   }
-  
+
   Future<void> printReceiptPdf({
     required List<app_data.Order> orders,
     required String tableNumber,
@@ -78,9 +79,14 @@ class PrintingService {
   ) async {
     final pdf = pw.Document();
 
+    // Carrega a imagem do logo dos assets
+    final ByteData imageData = await rootBundle.load('assets/images/logoVilla.jpg');
+    final Uint8List imageBytes = imageData.buffer.asUint8List();
+    final image = pw.MemoryImage(imageBytes);
+
     final pageFormat = paperSize == '80'
         ? const PdfPageFormat(
-            80 * PdfPageFormat.mm, 
+            80 * PdfPageFormat.mm,
             double.infinity,
             marginLeft: 2 * PdfPageFormat.mm,
             marginRight: 2 * PdfPageFormat.mm,
@@ -88,7 +94,7 @@ class PrintingService {
             marginBottom: 2 * PdfPageFormat.mm,
           )
         : const PdfPageFormat(
-            57 * PdfPageFormat.mm, 
+            57 * PdfPageFormat.mm,
             double.infinity,
             marginLeft: 1.5 * PdfPageFormat.mm,
             marginRight: 1.5 * PdfPageFormat.mm,
@@ -110,11 +116,11 @@ class PrintingService {
         build: (pw.Context context) {
           return pw.Column(
             children: [
+              // Substitui o texto 'VillaBistrô' pela imagem
               pw.Container(
                 width: double.infinity,
-                alignment: _getAlignment(settings.headerStyle.alignment),
-                child: pw.Text('VillaBistrô',
-                    style: _getTextStyle(settings.headerStyle)),
+                alignment: pw.Alignment.center,
+                child: pw.Image(image, height: 40), // Ajuste a altura conforme necessário
               ),
               pw.SizedBox(height: 5),
               pw.Center(child: pw.Text('----------------------------------')),
@@ -167,6 +173,11 @@ class PrintingService {
   Future<Uint8List> _generateReceiptPdfBytes(List<app_data.Order> orders,
       String tableNumber, double totalAmount, ReceiptTemplateSettings settings) async {
     final pdf = pw.Document();
+    
+    // Carrega a imagem do logo dos assets (para o recibo também)
+    final ByteData imageData = await rootBundle.load('assets/images/logoVilla.jpg');
+    final Uint8List imageBytes = imageData.buffer.asUint8List();
+    final image = pw.MemoryImage(imageBytes);
 
     pw.TextStyle _getTextStyle(PrintStyle style) {
       return pw.TextStyle(
@@ -189,10 +200,11 @@ class PrintingService {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
+              // Substitui o texto 'VILLA BISTRO' pela imagem
               pw.Container(
                 width: double.infinity,
-                alignment: _getAlignment(settings.headerStyle.alignment),
-                child: pw.Text('VILLA BISTRO', style: _getTextStyle(settings.headerStyle)),
+                alignment: pw.Alignment.center,
+                child: pw.Image(image, height: 40), // Ajuste a altura
               ),
               if (settings.subtitleText.isNotEmpty)
                 pw.Container(
@@ -200,7 +212,7 @@ class PrintingService {
                   alignment: _getAlignment(settings.subtitleStyle.alignment),
                   child: pw.Text(settings.subtitleText, style: _getTextStyle(settings.subtitleStyle)),
                 ),
-               if (settings.addressText.isNotEmpty)
+                if (settings.addressText.isNotEmpty)
                 pw.Container(
                   width: double.infinity,
                   alignment: _getAlignment(settings.addressStyle.alignment),

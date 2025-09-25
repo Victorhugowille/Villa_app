@@ -46,6 +46,9 @@ flutter_launcher_icons:
   ios: true
   image_path: "assets/images/logoVilla.jpg"
   min_sdk_android: 21
+  windows:
+    generate: true
+    icon_size: 48 # Opcional, tamanho padrão é 48
 
 flutter_native_splash:
   color: "#1C3A2F"
