@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-// NOVO MODELO ADICIONADO NO FINAL
 class SavedReport {
   final int id;
   final String name;
@@ -217,6 +216,73 @@ class CustomSpreadsheet {
       name: json['name'],
       sheetData: data,
       createdAt: DateTime.parse(json['created_at']),
+    );
+  }
+}
+
+class Estabelecimento {
+  final String? id;
+  final String nomeFantasia;
+  final String cnpj;
+  final String telefone;
+  final String rua;
+  final String numero;
+  final String bairro;
+  final String cidade;
+  final String estado;
+
+  Estabelecimento({
+    this.id,
+    required this.nomeFantasia,
+    required this.cnpj,
+    required this.telefone,
+    required this.rua,
+    required this.numero,
+    required this.bairro,
+    required this.cidade,
+    required this.estado,
+  });
+
+  factory Estabelecimento.fromJson(Map<String, dynamic> json) {
+    return Estabelecimento(
+      id: json['id'],
+      nomeFantasia: json['nome_fantasia'] ?? '',
+      cnpj: json['cnpj'] ?? '',
+      telefone: json['telefone'] ?? '',
+      rua: json['rua'] ?? '',
+      numero: json['numero'] ?? '',
+      bairro: json['bairro'] ?? '',
+      cidade: json['cidade'] ?? '',
+      estado: json['estado'] ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      if (id != null) 'id': id,
+      'nome_fantasia': nomeFantasia,
+      'cnpj': cnpj,
+      'telefone': telefone,
+      'rua': rua,
+      'numero': numero,
+      'bairro': bairro,
+      'cidade': cidade,
+      'estado': estado,
+    };
+  }
+}
+class Adicional {
+  final int id;
+  final String name;
+  final double price;
+
+  Adicional({required this.id, required this.name, required this.price});
+
+  factory Adicional.fromJson(Map<String, dynamic> json) {
+    return Adicional(
+      id: json['id'],
+      name: json['name'],
+      price: (json['price'] as num).toDouble(),
     );
   }
 }

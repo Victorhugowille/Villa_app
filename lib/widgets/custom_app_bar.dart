@@ -1,3 +1,4 @@
+// lib/widgets/custom_app_bar.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:villabistromobile/providers/navigation_provider.dart';
@@ -15,12 +16,14 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
 
     return AppBar(
       title: Text(title),
-      leading: isDesktop && navProvider.canPop
-          ? IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () => navProvider.pop(context),
-            )
-          : null,
+      leading: isDesktop
+          ? (navProvider.canPop
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () => navProvider.pop(),
+                )
+              : null)
+          : null, // No mobile, deixa o AppBar decidir (botão de voltar padrão)
       actions: actions,
     );
   }

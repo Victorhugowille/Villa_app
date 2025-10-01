@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:villabistromobile/providers/transaction_provider.dart';
+import 'package:villabistromobile/widgets/charts/daily_revenue_bar_chart.dart';
+import 'package:villabistromobile/widgets/charts/payment_method_pie_chart.dart';
 
 class TransactionsReportScreen extends StatefulWidget {
   const TransactionsReportScreen({super.key});
@@ -10,13 +12,16 @@ class TransactionsReportScreen extends StatefulWidget {
   State<TransactionsReportScreen> createState() => _TransactionsReportScreenState();
 }
 
-class _TransactionsReportScreenState extends State<TransactionsReportScreen> {
+class _TransactionsReportScreenState extends State<TransactionsReportScreen>
+    with SingleTickerProviderStateMixin {
   late DateTime _startDate;
   late DateTime _endDate;
+  late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 3, vsync: this);
     final provider = Provider.of<TransactionProvider>(context, listen: false);
     _startDate = provider.startDate;
     _endDate = provider.endDate;
@@ -24,6 +29,12 @@ class _TransactionsReportScreenState extends State<TransactionsReportScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       provider.fetchDailyTransactions();
     });
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<void> _selectDate(BuildContext context, bool isStartDate) async {
@@ -56,13 +67,11 @@ class _TransactionsReportScreenState extends State<TransactionsReportScreen> {
     final DateFormat formatter = DateFormat('dd/MM/yyyy');
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(''),
-      ),
       body: Column(
         children: [
           _buildDateSelector(context, formatter, theme),
-          _buildSummaryCard(transactionProvider, theme),
+          _buildSummaryCards(transactionProvider, theme),
+          const SizedBox(height: 8),
           Expanded(
             child: transactionProvider.isLoading
                 ? Center(child: CircularProgressIndicator(color: theme.primaryColor))
@@ -70,9 +79,39 @@ class _TransactionsReportScreenState extends State<TransactionsReportScreen> {
                     ? const Center(
                         child: Text('Nenhuma transação encontrada para o período selecionado.'),
                       )
-                    : _buildTransactionList(transactionProvider, theme),
+                    : Column(
+                        children: [
+                          TabBar(
+                            controller: _tabController,
+                            tabs: const [
+                              Tab(icon: Icon(Icons.pie_chart), text: 'Pagamentos'),
+                              Tab(icon: Icon(Icons.bar_chart), text: 'Faturamento'),
+                              Tab(icon: Icon(Icons.list_alt), text: 'Detalhes'),
+                            ],
+                          ),
+                          Expanded(
+                            child: TabBarView(
+                              controller: _tabController,
+                              children: [
+                                _buildChartCard(PaymentMethodPieChart(revenueByPaymentMethod: transactionProvider.revenueByPaymentMethod)),
+                                _buildChartCard(DailyRevenueBarChart(dailyRevenue: transactionProvider.dailyRevenue)),
+                                _buildTransactionList(transactionProvider, theme),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildChartCard(Widget chart) {
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+        child: chart,
       ),
     );
   }
@@ -81,9 +120,10 @@ class _TransactionsReportScreenState extends State<TransactionsReportScreen> {
     return Padding(
       padding: const EdgeInsets.all(12.0),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           _buildDateButton('De:', formatter.format(_startDate), () => _selectDate(context, true), theme),
+          const SizedBox(width: 20),
           _buildDateButton('Até:', formatter.format(_endDate), () => _selectDate(context, false), theme),
         ],
       ),
@@ -92,47 +132,50 @@ class _TransactionsReportScreenState extends State<TransactionsReportScreen> {
 
   Widget _buildDateButton(String label, String dateText, VoidCallback onPressed, ThemeData theme) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(color: theme.colorScheme.onBackground.withOpacity(0.7))),
-        const SizedBox(height: 4),
-        ElevatedButton(
-          onPressed: onPressed,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: theme.cardColor,
-            foregroundColor: theme.colorScheme.onSurface,
-          ),
-          child: Text(dateText),
-        ),
+        Text(label),
+        ElevatedButton(onPressed: onPressed, child: Text(dateText)),
       ],
     );
   }
 
-  Widget _buildSummaryCard(TransactionProvider provider, ThemeData theme) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12),
-      color: theme.primaryColor.withOpacity(0.1),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            Column(
-              children: [
-                Text('Faturamento Total', style: TextStyle(color: theme.colorScheme.onBackground.withOpacity(0.7))),
-                const SizedBox(height: 4),
-                Text('R\$ ${provider.totalRevenue.toStringAsFixed(2)}', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: theme.colorScheme.onBackground)),
-              ],
+  Widget _buildSummaryCards(TransactionProvider provider, ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12.0),
+      child: Row(
+        children: [
+          Expanded(
+            child: Card(
+              color: theme.primaryColor.withOpacity(0.1),
+              child: Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Column(
+                  children: [
+                    Text('Faturamento Total', style: TextStyle(fontSize: 14, color: theme.colorScheme.onBackground.withOpacity(0.7))),
+                    const SizedBox(height: 4),
+                    Text('R\$ ${provider.totalRevenue.toStringAsFixed(2)}', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: theme.colorScheme.onBackground)),
+                  ],
+                ),
+              ),
             ),
-            Column(
-              children: [
-                Text('Nº de Transações', style: TextStyle(color: theme.colorScheme.onBackground.withOpacity(0.7))),
-                const SizedBox(height: 4),
-                Text('${provider.transactions.length}', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: theme.colorScheme.onBackground)),
-              ],
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Card(
+              color: theme.colorScheme.secondary.withOpacity(0.1),
+              child: Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Column(
+                  children: [
+                    Text('Nº de Transações', style: TextStyle(fontSize: 14, color: theme.colorScheme.onBackground.withOpacity(0.7))),
+                    const SizedBox(height: 4),
+                    Text('${provider.transactions.length}', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: theme.colorScheme.onBackground)),
+                  ],
+                ),
+              ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -144,7 +187,7 @@ class _TransactionsReportScreenState extends State<TransactionsReportScreen> {
       itemBuilder: (ctx, index) {
         final transaction = provider.transactions[index];
         return Card(
-          margin: const EdgeInsets.symmetric(vertical: 5),
+          margin: const EdgeInsets.symmetric(vertical: 4),
           child: ListTile(
             leading: CircleAvatar(
               backgroundColor: theme.primaryColor,

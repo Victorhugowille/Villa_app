@@ -1,6 +1,6 @@
 {
-    "name": "villamobile",
-    "short_name": "villamobile",
+    "name": "villabistromobile",
+    "short_name": "villabistromobile",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

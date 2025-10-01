@@ -112,7 +112,7 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
       ? FloatingActionButton.extended(
           onPressed: () {
             final cart = Provider.of<CartProvider>(context, listen: false);
-            final nav = Provider.of<NavigationProvider>(context, listen: false);
+            Provider.of<NavigationProvider>(context, listen: false);
 
             cart.addItemsFromSelection(_selection, widget.products);
 
@@ -124,8 +124,7 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
               ),
             );
 
-            nav.pop(context);
-          },
+         Provider.of<NavigationProvider>(context, listen: false).pop();          },
           icon: const Icon(Icons.shopping_cart_checkout),
           label: const Text('ATUALIZAR CARRINHO'),
         )

@@ -1,15 +1,17 @@
 import 'dart:async';
-import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
 import 'package:villabistromobile/models/print_style_settings.dart';
+import 'package:villabistromobile/providers/navigation_provider.dart';
 import 'package:villabistromobile/providers/printer_provider.dart';
 import 'package:villabistromobile/data/app_data.dart' as app_data;
+import 'package:villabistromobile/screens/kitchen_printer_screen.dart';
+import 'package:villabistromobile/services/printing_service.dart';
 import 'package:villabistromobile/widgets/custom_app_bar.dart';
 
 class PrintLayoutEditorScreen extends StatefulWidget {
@@ -21,7 +23,6 @@ class PrintLayoutEditorScreen extends StatefulWidget {
 }
 
 class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
-  late PrintTemplateSettings _currentSettings;
   late TextEditingController _footerController;
   Timer? _debounce;
 
@@ -30,9 +31,7 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
     super.initState();
     final providerSettings =
         Provider.of<PrinterProvider>(context, listen: false).templateSettings;
-    _currentSettings =
-        PrintTemplateSettings.fromJson(json.decode(json.encode(providerSettings.toJson())));
-    _footerController = TextEditingController(text: _currentSettings.footerText);
+    _footerController = TextEditingController(text: providerSettings.footerText);
   }
 
   @override
@@ -42,166 +41,89 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
     super.dispose();
   }
 
-  void _autoSaveSettings() {
+  void _autoSaveSettings(PrintTemplateSettings settings) {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
     _debounce = Timer(const Duration(milliseconds: 500), () {
       Provider.of<PrinterProvider>(context, listen: false)
-          .saveTemplateSettings(_currentSettings);
+          .saveTemplateSettings(settings);
     });
   }
 
   void _resetToDefaults() {
-    setState(() {
-      _currentSettings = PrintTemplateSettings.defaults();
-      _footerController.text = _currentSettings.footerText;
-    });
-    _autoSaveSettings();
+    final newSettings = PrintTemplateSettings.defaults();
+    Provider.of<PrinterProvider>(context, listen: false).saveTemplateSettings(newSettings);
+    _footerController.text = newSettings.footerText;
   }
   
-  pw.Alignment _getAlignment(pw.CrossAxisAlignment crossAxisAlignment) {
-    switch (crossAxisAlignment) {
-      case pw.CrossAxisAlignment.start:
-        return pw.Alignment.centerLeft;
-      case pw.CrossAxisAlignment.center:
-        return pw.Alignment.center;
-      case pw.CrossAxisAlignment.end:
-        return pw.Alignment.centerRight;
-      default:
-        return pw.Alignment.centerLeft;
-    }
-  }
-
-  pw.TextStyle _getTextStyle(PrintStyle style) {
-    return pw.TextStyle(
-      fontWeight: style.isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
-      fontSize: style.fontSize,
+  Future<Uint8List> _generatePreviewPdfBytes(PdfPageFormat format, PrintTemplateSettings settings) async {
+    final printingService = PrintingService();
+    return printingService.getKitchenOrderPdfBytes(
+      items: [
+        app_data.CartItem(product: app_data.Product(id: 1, name: 'Produto Exemplo 1', price: 10.0, categoryId: 1, categoryName: 'Bebidas', displayOrder: 1, isSoldOut: false), quantity: 2),
+        app_data.CartItem(product: app_data.Product(id: 2, name: 'Produto Exemplo 2', price: 15.0, categoryId: 1, categoryName: 'Bebidas', displayOrder: 2, isSoldOut: false), quantity: 1),
+      ],
+      tableNumber: 'XX',
+      orderId: 999,
+      paperSize: '58',
+      templateSettings: settings,
     );
-  }
-
-  Future<Uint8List> _generatePreviewPdfBytes(PdfPageFormat format) async {
-    final mockItems = [
-      app_data.CartItem(
-        product: app_data.Product(id: 1, name: 'Produto Exemplo 1', price: 10.0, categoryId: 1, categoryName: 'Bebidas', displayOrder: 1, isSoldOut: false),
-        quantity: 2,
-      ),
-      app_data.CartItem(
-        product: app_data.Product(id: 2, name: 'Produto Exemplo 2', price: 15.0, categoryId: 1, categoryName: 'Bebidas', displayOrder: 2, isSoldOut: false),
-        quantity: 1,
-      ),
-    ];
-
-    final doc = pw.Document();
-    final settings = _currentSettings;
-
-    doc.addPage(
-      pw.Page(
-        pageFormat: format.copyWith(
-            marginLeft: 1.5 * PdfPageFormat.mm,
-            marginRight: 1.5 * PdfPageFormat.mm,
-            marginTop: 2 * PdfPageFormat.mm,
-            marginBottom: 2 * PdfPageFormat.mm,
-        ),
-        orientation: pw.PageOrientation.portrait,
-        build: (context) {
-          return pw.Column(
-            children: [
-              pw.Container(
-                width: double.infinity,
-                alignment: _getAlignment(settings.headerStyle.alignment),
-                child: pw.Text('VillaBistrô',
-                    style: _getTextStyle(settings.headerStyle)),
-              ),
-              pw.SizedBox(height: 5),
-              pw.Center(child: pw.Text('----------------------------------')),
-              pw.SizedBox(height: 5),
-              pw.Container(
-                width: double.infinity,
-                alignment: _getAlignment(settings.tableStyle.alignment),
-                child: pw.Text('MESA XX',
-                    style: _getTextStyle(settings.tableStyle)),
-              ),
-              pw.SizedBox(height: 5),
-              pw.Container(
-                width: double.infinity,
-                alignment: _getAlignment(settings.orderInfoStyle.alignment),
-                child: pw.Text(
-                  'Pedido #999 - ${DateFormat('HH:mm').format(DateTime.now())}',
-                  style: _getTextStyle(settings.orderInfoStyle),
-                ),
-              ),
-              pw.SizedBox(height: 5),
-              pw.Center(child: pw.Text('----------------------------------')),
-              pw.SizedBox(height: 5),
-              for (final item in mockItems)
-                pw.Container(
-                  width: double.infinity,
-                  alignment: _getAlignment(settings.itemStyle.alignment),
-                  padding: const pw.EdgeInsets.symmetric(vertical: 2),
-                  child: pw.Text(
-                    '(${item.quantity}) ${item.product.name}',
-                    style: _getTextStyle(settings.itemStyle),
-                  ),
-                ),
-              if (settings.footerText.isNotEmpty)
-                pw.Padding(
-                  padding: const pw.EdgeInsets.only(top: 10),
-                  child: pw.Container(
-                    width: double.infinity,
-                    alignment: _getAlignment(settings.footerStyle.alignment),
-                    child: pw.Text(settings.footerText, style: _getTextStyle(settings.footerStyle)),
-                  ),
-                ),
-            ],
-          );
-        },
-      ),
-    );
-    
-    return doc.save();
   }
 
   @override
   Widget build(BuildContext context) {
     final isWideScreen = MediaQuery.of(context).size.width > 800;
 
-    return Scaffold(
-      appBar: CustomAppBar(
-        title: 'Layout da Impressão (Cozinha)',
-        actions: [
-          if (!isWideScreen)
-            IconButton(
-              icon: const Icon(Icons.preview_outlined),
-              tooltip: 'Visualizar',
-              onPressed: () async {
-                final format = const PdfPageFormat(
-                  57 * PdfPageFormat.mm, 
-                  250 * PdfPageFormat.mm,
-                  marginLeft: 1.5 * PdfPageFormat.mm,
-                  marginRight: 1.5 * PdfPageFormat.mm,
-                  marginTop: 2 * PdfPageFormat.mm,
-                  marginBottom: 2 * PdfPageFormat.mm,
-                );
-                final pdfBytes = await _generatePreviewPdfBytes(format);
-                await Printing.layoutPdf(onLayout: (format) async => pdfBytes);
-              },
-            ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Redefinir Padrão',
-            onPressed: _resetToDefaults,
+    return Consumer<PrinterProvider>(
+      builder: (context, printerProvider, child) {
+        final currentSettings = printerProvider.templateSettings;
+
+        return Scaffold(
+          appBar: CustomAppBar(
+            title: 'Layout da Impressão (Cozinha)',
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.print_outlined),
+                tooltip: 'Ir para Estação de Impressão',
+                onPressed: () {
+                  Provider.of<NavigationProvider>(context, listen: false).navigateTo(
+                    context,
+                    const KitchenPrinterScreen(),
+                    'Estação de Impressão',
+                  );
+                },
+              ),
+              if (!isWideScreen)
+                IconButton(
+                  icon: const Icon(Icons.preview_outlined),
+                  tooltip: 'Visualizar',
+                  onPressed: () async {
+                    final format = const PdfPageFormat(
+                        57 * PdfPageFormat.mm, 
+                        250 * PdfPageFormat.mm,
+                    );
+                    final pdfBytes = await _generatePreviewPdfBytes(format, currentSettings);
+                    await Printing.layoutPdf(onLayout: (format) async => pdfBytes);
+                  },
+                ),
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                tooltip: 'Redefinir Padrão',
+                onPressed: _resetToDefaults,
+              ),
+            ],
           ),
-        ],
-      ),
-      body: isWideScreen ? _buildWideLayout() : _buildNarrowLayout(),
+          body: isWideScreen ? _buildWideLayout(currentSettings) : _buildNarrowLayout(currentSettings),
+        );
+      },
     );
   }
 
-  Widget _buildWideLayout() {
+  Widget _buildWideLayout(PrintTemplateSettings currentSettings) {
     return Row(
       children: [
         Expanded(
           flex: 1,
-          child: _buildControlsPanel(),
+          child: _buildControlsPanel(currentSettings),
         ),
         const VerticalDivider(width: 1),
         Expanded(
@@ -227,7 +149,8 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
                       borderRadius: BorderRadius.circular(8.0),
                       child: PdfPreview(
                         build: (format) => _generatePreviewPdfBytes(
-                          format.copyWith(width: 58 * PdfPageFormat.mm)
+                          format.copyWith(width: 58 * PdfPageFormat.mm),
+                          currentSettings,
                         ),
                         canChangeOrientation: false,
                         canChangePageFormat: false,
@@ -247,41 +170,87 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
     );
   }
   
-  Widget _buildNarrowLayout() {
-    return _buildControlsPanel();
+  Widget _buildNarrowLayout(PrintTemplateSettings currentSettings) {
+    return _buildControlsPanel(currentSettings);
   }
 
-  Widget _buildControlsPanel() {
+  Widget _buildControlsPanel(PrintTemplateSettings currentSettings) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         children: [
-          _buildStyleEditor('Cabeçalho (Nome do Local)', _currentSettings.headerStyle, (newStyle) {
-            setState(() => _currentSettings = _currentSettings.copyWith(headerStyle: newStyle));
-            _autoSaveSettings();
+          _buildLogoEditor(currentSettings),
+          _buildStyleEditor('Nome do Local (se não houver logo)', currentSettings.headerStyle, (newStyle) {
+            _autoSaveSettings(currentSettings.copyWith(headerStyle: newStyle));
           }),
-          _buildStyleEditor('Número da Mesa', _currentSettings.tableStyle, (newStyle) {
-            setState(() => _currentSettings = _currentSettings.copyWith(tableStyle: newStyle));
-            _autoSaveSettings();
+          _buildStyleEditor('Número da Mesa', currentSettings.tableStyle, (newStyle) {
+            _autoSaveSettings(currentSettings.copyWith(tableStyle: newStyle));
           }),
-          _buildStyleEditor('Informações do Pedido', _currentSettings.orderInfoStyle, (newStyle) {
-            setState(() => _currentSettings = _currentSettings.copyWith(orderInfoStyle: newStyle));
-            _autoSaveSettings();
+          _buildStyleEditor('Informações do Pedido', currentSettings.orderInfoStyle, (newStyle) {
+            _autoSaveSettings(currentSettings.copyWith(orderInfoStyle: newStyle));
           }),
-          _buildStyleEditor('Itens do Pedido', _currentSettings.itemStyle, (newStyle) {
-            setState(() => _currentSettings = _currentSettings.copyWith(itemStyle: newStyle));
-            _autoSaveSettings();
+          _buildStyleEditor('Itens do Pedido', currentSettings.itemStyle, (newStyle) {
+            _autoSaveSettings(currentSettings.copyWith(itemStyle: newStyle));
           }),
           _buildTextAndStyleEditor('Rodapé', _footerController, (newStyle) {
-            setState(() => _currentSettings = _currentSettings.copyWith(footerStyle: newStyle));
-            _autoSaveSettings();
-          }, _currentSettings.footerStyle),
+             _autoSaveSettings(currentSettings.copyWith(footerStyle: newStyle));
+          }, currentSettings.footerStyle, (newText) {
+             _autoSaveSettings(currentSettings.copyWith(footerText: newText));
+          }),
         ],
       ),
     );
   }
 
-  Widget _buildTextAndStyleEditor(String title, TextEditingController controller, ValueChanged<PrintStyle> onStyleChanged, PrintStyle style) {
+  Widget _buildLogoEditor(PrintTemplateSettings currentSettings) {
+    final printerProvider = Provider.of<PrinterProvider>(context, listen: false);
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Logo da Impressão', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const Divider(),
+            const SizedBox(height: 8),
+            Center(
+              child: currentSettings.logoPath != null && currentSettings.logoPath!.isNotEmpty && File(currentSettings.logoPath!).existsSync()
+                  ? Image.file(File(currentSettings.logoPath!), height: 80, errorBuilder: (c, e, s) => const Icon(Icons.error, color: Colors.red))
+                  : Image.asset('assets/images/logoVilla.jpg', height: 80),
+            ),
+            const SizedBox(height: 16),
+            Center(
+              child: ElevatedButton(
+                onPressed: () async {
+                  await printerProvider.pickAndSaveLogo();
+                },
+                child: const Text('Trocar Imagem'),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text('Altura do Logo na Impressão'),
+           Slider(
+              value: currentSettings.logoHeight,
+              min: 20,
+              max: 100,
+              divisions: 8,
+              label: currentSettings.logoHeight.round().toString(),
+              onChanged: (double value) {
+                printerProvider.updateLogoHeight(value);
+              },
+              onChangeEnd: (double value) {
+                _autoSaveSettings(currentSettings.copyWith(logoHeight: value));
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextAndStyleEditor(String title, TextEditingController controller, ValueChanged<PrintStyle> onStyleChanged, PrintStyle style, ValueChanged<String> onTextChanged) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       child: Padding(
@@ -294,12 +263,7 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
             TextField(
               controller: controller,
               decoration: const InputDecoration(labelText: 'Texto'),
-              onChanged: (value) {
-                setState(() {
-                  _currentSettings = _currentSettings.copyWith(footerText: value);
-                });
-                _autoSaveSettings();
-              },
+              onChanged: onTextChanged,
             ),
             const SizedBox(height: 16),
             _buildStyleControls(onStyleChanged, style),
@@ -331,87 +295,67 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-         Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Tamanho da Fonte'),
-                Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.remove),
-                      onPressed: () => onUpdate(style.copyWith(
-                          fontSize: (style.fontSize - 1).clamp(6.0, 30.0))),
-                    ),
-                    Text(style.fontSize.toStringAsFixed(0)),
-                    IconButton(
-                      icon: const Icon(Icons.add),
-                      onPressed: () => onUpdate(style.copyWith(
-                          fontSize: (style.fontSize + 1).clamp(6.0, 30.0))),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text('Tamanho da Fonte'),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Negrito'),
-                Switch(
-                  value: style.isBold,
-                  onChanged: (isBold) =>
-                      onUpdate(style.copyWith(isBold: isBold)),
+                IconButton(
+                  icon: const Icon(Icons.remove),
+                  onPressed: () => onUpdate(style.copyWith(
+                      fontSize: (style.fontSize - 1).clamp(6.0, 30.0))),
+                ),
+                Text(style.fontSize.toStringAsFixed(0)),
+                IconButton(
+                  icon: const Icon(Icons.add),
+                  onPressed: () => onUpdate(style.copyWith(
+                      fontSize: (style.fontSize + 1).clamp(6.0, 30.0))),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            const Text('Alinhamento'),
-            const SizedBox(height: 8),
-            SegmentedButton<pw.CrossAxisAlignment>(
-              segments: const [
-                ButtonSegment(
-                    value: pw.CrossAxisAlignment.start,
-                    icon: Icon(Icons.format_align_left),
-                    label: Text('Esq.')),
-                ButtonSegment(
-                    value: pw.CrossAxisAlignment.center,
-                    icon: Icon(Icons.format_align_center),
-                    label: Text('Centro')),
-                ButtonSegment(
-                    value: pw.CrossAxisAlignment.end,
-                    icon: Icon(Icons.format_align_right),
-                    label: Text('Dir.')),
-              ],
-              selected: {style.alignment},
-              onSelectionChanged: (newSelection) =>
-                  onUpdate(style.copyWith(alignment: newSelection.first)),
-              style: ButtonStyle(
-                padding: MaterialStateProperty.all<EdgeInsets>(
-                  const EdgeInsets.symmetric(horizontal: 8),
-                ),
-              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text('Negrito'),
+            Switch(
+              value: style.isBold,
+              onChanged: (isBold) =>
+                  onUpdate(style.copyWith(isBold: isBold)),
             ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        const Text('Alinhamento'),
+        const SizedBox(height: 8),
+        SegmentedButton<pw.CrossAxisAlignment>(
+          segments: const [
+            ButtonSegment(
+                value: pw.CrossAxisAlignment.start,
+                icon: Icon(Icons.format_align_left),
+                label: Text('Esq.')),
+            ButtonSegment(
+                value: pw.CrossAxisAlignment.center,
+                icon: Icon(Icons.format_align_center),
+                label: Text('Centro')),
+            ButtonSegment(
+                value: pw.CrossAxisAlignment.end,
+                icon: Icon(Icons.format_align_right),
+                label: Text('Dir.')),
+          ],
+          selected: {style.alignment},
+          onSelectionChanged: (newSelection) =>
+              onUpdate(style.copyWith(alignment: newSelection.first)),
+          style: ButtonStyle(
+            padding: MaterialStateProperty.all<EdgeInsets>(
+              const EdgeInsets.symmetric(horizontal: 8),
+            ),
+          ),
+        ),
       ],
-    );
-  }
-}
-
-extension on PrintTemplateSettings {
-  PrintTemplateSettings copyWith({
-    PrintStyle? headerStyle,
-    PrintStyle? tableStyle,
-    PrintStyle? orderInfoStyle,
-    PrintStyle? itemStyle,
-    String? footerText,
-    PrintStyle? footerStyle,
-  }) {
-    return PrintTemplateSettings(
-      headerStyle: headerStyle ?? this.headerStyle,
-      tableStyle: tableStyle ?? this.tableStyle,
-      orderInfoStyle: orderInfoStyle ?? this.orderInfoStyle,
-      itemStyle: itemStyle ?? this.itemStyle,
-      footerText: footerText ?? this.footerText,
-      footerStyle: footerStyle ?? this.footerStyle,
     );
   }
 }

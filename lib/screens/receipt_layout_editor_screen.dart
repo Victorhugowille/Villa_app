@@ -1,15 +1,14 @@
+// lib/screens/receipt_layout_editor_screen.dart
 import 'dart:async';
-import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
-import 'package:villabistromobile/models/print_style_settings.dart';
-import 'package:villabistromobile/providers/printer_provider.dart';
 import 'package:villabistromobile/data/app_data.dart' as app_data;
+import 'package:villabistromobile/models/print_style_settings.dart';
+import 'package:villabistromobile/providers/estabelecimento_provider.dart';
+import 'package:villabistromobile/providers/printer_provider.dart';
+import 'package:villabistromobile/services/printing_service.dart';
 import 'package:villabistromobile/widgets/custom_app_bar.dart';
 
 class ReceiptLayoutEditorScreen extends StatefulWidget {
@@ -21,22 +20,34 @@ class ReceiptLayoutEditorScreen extends StatefulWidget {
 }
 
 class _ReceiptLayoutEditorScreenState extends State<ReceiptLayoutEditorScreen> {
-  late ReceiptTemplateSettings _currentSettings;
   late TextEditingController _subtitleController;
   late TextEditingController _addressController;
   late TextEditingController _phoneController;
   late TextEditingController _finalMessageController;
   Timer? _debounce;
+  bool _isInit = true;
 
   @override
   void initState() {
     super.initState();
-    final providerSettings = Provider.of<PrinterProvider>(context, listen: false).receiptTemplateSettings;
-    _currentSettings = ReceiptTemplateSettings.fromJson(json.decode(json.encode(providerSettings.toJson())));
-    _subtitleController = TextEditingController(text: _currentSettings.subtitleText);
-    _addressController = TextEditingController(text: _currentSettings.addressText);
-    _phoneController = TextEditingController(text: _currentSettings.phoneText);
-    _finalMessageController = TextEditingController(text: _currentSettings.finalMessageText);
+    _subtitleController = TextEditingController();
+    _addressController = TextEditingController();
+    _phoneController = TextEditingController();
+    _finalMessageController = TextEditingController();
+  }
+
+  @override
+  void didChangeDependencies() {
+    if (_isInit) {
+      final settings =
+          Provider.of<PrinterProvider>(context, listen: false).receiptTemplateSettings;
+      _subtitleController.text = settings.subtitleText;
+      _addressController.text = settings.addressText;
+      _phoneController.text = settings.phoneText;
+      _finalMessageController.text = settings.finalMessageText;
+      _isInit = false;
+    }
+    super.didChangeDependencies();
   }
 
   @override
@@ -49,403 +60,173 @@ class _ReceiptLayoutEditorScreenState extends State<ReceiptLayoutEditorScreen> {
     super.dispose();
   }
 
-  void _autoSaveSettings() {
+  void _autoSaveSettings(ReceiptTemplateSettings settings) {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
     _debounce = Timer(const Duration(milliseconds: 500), () {
-      Provider.of<PrinterProvider>(context, listen: false).saveReceiptTemplateSettings(_currentSettings);
+      Provider.of<PrinterProvider>(context, listen: false)
+          .saveReceiptTemplateSettings(settings);
     });
   }
 
   void _resetToDefaults() {
-    setState(() {
-      _currentSettings = ReceiptTemplateSettings.defaults();
-      _subtitleController.text = _currentSettings.subtitleText;
-      _addressController.text = _currentSettings.addressText;
-      _phoneController.text = _currentSettings.phoneText;
-      _finalMessageController.text = _currentSettings.finalMessageText;
-    });
-    _autoSaveSettings();
+    final newSettings = ReceiptTemplateSettings.defaults();
+    Provider.of<PrinterProvider>(context, listen: false)
+        .saveReceiptTemplateSettings(newSettings);
+    _subtitleController.text = newSettings.subtitleText;
+    _addressController.text = newSettings.addressText;
+    _phoneController.text = newSettings.phoneText;
+    _finalMessageController.text = newSettings.finalMessageText;
   }
-  
-  pw.Alignment _getAlignment(pw.CrossAxisAlignment crossAxisAlignment) {
-    switch (crossAxisAlignment) {
-      case pw.CrossAxisAlignment.start:
-        return pw.Alignment.centerLeft;
-      case pw.CrossAxisAlignment.center:
-        return pw.Alignment.center;
-      case pw.CrossAxisAlignment.end:
-        return pw.Alignment.centerRight;
-      default:
-        return pw.Alignment.centerLeft;
+
+  void _useEstabelecimentoData() {
+    final estabelecimento =
+        Provider.of<EstabelecimentoProvider>(context, listen: false)
+            .estabelecimento;
+    if (estabelecimento != null) {
+      final settings = Provider.of<PrinterProvider>(context, listen: false)
+          .receiptTemplateSettings;
+
+      final newSubtitle = 'CNPJ: ${estabelecimento.cnpj}';
+      final newAddress =
+          '${estabelecimento.rua}, ${estabelecimento.numero}, ${estabelecimento.bairro}, ${estabelecimento.cidade}-${estabelecimento.estado}';
+      final newPhone = 'Telefone: ${estabelecimento.telefone}';
+
+      _subtitleController.text = newSubtitle;
+      _addressController.text = newAddress;
+      _phoneController.text = newPhone;
+
+      final newSettings = settings.copyWith(
+          subtitleText: newSubtitle,
+          addressText: newAddress,
+          phoneText: newPhone);
+      Provider.of<PrinterProvider>(context, listen: false)
+          .saveReceiptTemplateSettings(newSettings);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Dados do estabelecimento aplicados!')));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Nenhum dado de estabelecimento encontrado para aplicar.')));
     }
   }
 
-  pw.TextStyle _getTextStyle(PrintStyle style) {
-    return pw.TextStyle(
-      fontWeight: style.isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
-      fontSize: style.fontSize,
+  Future<Uint8List> _generatePreviewPdfBytes(
+      ReceiptTemplateSettings settings) async {
+    final printingService = PrintingService();
+    final estabelecimentoProvider =
+        Provider.of<EstabelecimentoProvider>(context, listen: false);
+    return printingService.getReceiptPdfBytes(
+      orders: [
+        app_data.Order(
+          id: 1,
+          items: [
+            app_data.CartItem(
+                product: app_data.Product(
+                    id: 1,
+                    name: 'Produto Exemplo 1',
+                    price: 10.0,
+                    categoryId: 1,
+                    categoryName: 'Bebidas',
+                    displayOrder: 1,
+                    isSoldOut: false),
+                quantity: 2),
+          ],
+          timestamp: DateTime.now(),
+          status: 'completed',
+          type: 'mesa',
+        )
+      ],
+      tableNumber: 'XX',
+      totalAmount: 20.0,
+      settings: settings,
+      companyName: estabelecimentoProvider.estabelecimento?.nomeFantasia ?? 'Nome da Empresa',
     );
-  }
-
-  Future<Uint8List> _generatePreviewPdfBytes(PdfPageFormat format) async {
-    final mockOrder = app_data.Order(
-      id: 1,
-      status: 'closed',
-      timestamp: DateTime.now(),
-      type: 'mesa',
-      items: [
-         app_data.CartItem(product: app_data.Product(id: 1, name: 'Produto Exemplo 1', price: 10.0, categoryId: 1, categoryName: 'Bebidas', displayOrder: 1, isSoldOut: false), quantity: 2),
-         app_data.CartItem(product: app_data.Product(id: 2, name: 'Produto Exemplo 2', price: 15.0, categoryId: 1, categoryName: 'Bebidas', displayOrder: 2, isSoldOut: false), quantity: 1),
-      ]
-    );
-    
-    final doc = pw.Document();
-    final settings = _currentSettings;
-
-    doc.addPage(
-      pw.Page(
-        pageFormat: format.copyWith(
-            marginLeft: 2 * PdfPageFormat.mm,
-            marginRight: 2 * PdfPageFormat.mm,
-            marginTop: 2 * PdfPageFormat.mm,
-            marginBottom: 2 * PdfPageFormat.mm
-        ),
-        build: (pw.Context context) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Container(
-                width: double.infinity,
-                alignment: _getAlignment(settings.headerStyle.alignment),
-                child: pw.Text('VILLA BISTRO', style: _getTextStyle(settings.headerStyle)),
-              ),
-              if (settings.subtitleText.isNotEmpty)
-                pw.Container(
-                  width: double.infinity,
-                  alignment: _getAlignment(settings.subtitleStyle.alignment),
-                  child: pw.Text(settings.subtitleText, style: _getTextStyle(settings.subtitleStyle)),
-                ),
-               if (settings.addressText.isNotEmpty)
-                pw.Container(
-                  width: double.infinity,
-                  alignment: _getAlignment(settings.addressStyle.alignment),
-                  child: pw.Text(settings.addressText, style: _getTextStyle(settings.addressStyle)),
-                ),
-              if (settings.phoneText.isNotEmpty)
-                pw.Container(
-                  width: double.infinity,
-                  alignment: _getAlignment(settings.phoneStyle.alignment),
-                  child: pw.Text(settings.phoneText, style: _getTextStyle(settings.phoneStyle)),
-                ),
-              pw.SizedBox(height: 5),
-              pw.Container(
-                width: double.infinity,
-                alignment: _getAlignment(settings.infoStyle.alignment),
-                child: pw.Text('Conferência - Mesa XX', style: _getTextStyle(settings.infoStyle)),
-              ),
-              pw.Container(
-                width: double.infinity,
-                alignment: _getAlignment(settings.infoStyle.alignment),
-                child: pw.Text(DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now()), style: _getTextStyle(settings.infoStyle)),
-              ),
-              pw.Divider(height: 12),
-              pw.Column(
-                children: mockOrder.items.map((item) {
-                  return pw.Row(
-                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Expanded(
-                        child: pw.Text(
-                          '${item.quantity}x ${item.product.name}',
-                          style: _getTextStyle(settings.itemStyle),
-                        ),
-                      ),
-                      pw.Text(
-                        'R\$ ${(item.product.price * item.quantity).toStringAsFixed(2)}',
-                        style: _getTextStyle(settings.itemStyle),
-                      ),
-                    ],
-                  );
-                }).toList(),
-              ),
-              pw.Divider(height: 12),
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Text('Total:',
-                      style: _getTextStyle(settings.totalStyle)),
-                  pw.Text('R\$ ${mockOrder.total.toStringAsFixed(2)}',
-                      style: _getTextStyle(settings.totalStyle)),
-                ],
-              ),
-              pw.SizedBox(height: 20),
-              if (settings.finalMessageText.isNotEmpty)
-                pw.Container(
-                  width: double.infinity,
-                  alignment: _getAlignment(settings.finalMessageStyle.alignment),
-                  child: pw.Text(settings.finalMessageText, style: _getTextStyle(settings.finalMessageStyle)),
-                ),
-            ],
-          );
-        },
-      ),
-    );
-    return doc.save();
   }
 
   @override
   Widget build(BuildContext context) {
-    final isWideScreen = MediaQuery.of(context).size.width > 800;
-
-    return Scaffold(
-      appBar: CustomAppBar(
-        title: 'Layout da Impressão (Conferência)',
-        actions: [
-          if (!isWideScreen)
-            IconButton(
-              icon: const Icon(Icons.preview_outlined),
-              tooltip: 'Visualizar',
-              onPressed: () async {
-                final format = const PdfPageFormat(
-                  57 * PdfPageFormat.mm, 
-                  250 * PdfPageFormat.mm,
-                  marginLeft: 2 * PdfPageFormat.mm,
-                  marginRight: 2 * PdfPageFormat.mm,
-                  marginTop: 2 * PdfPageFormat.mm,
-                  marginBottom: 2 * PdfPageFormat.mm,
-                );
-                final pdfBytes = await _generatePreviewPdfBytes(format);
-                await Printing.layoutPdf(onLayout: (format) async => pdfBytes);
-              },
-            ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Redefinir Padrão',
-            onPressed: _resetToDefaults,
+    return Consumer<PrinterProvider>(
+      builder: (context, printerProvider, child) {
+        final settings = printerProvider.receiptTemplateSettings;
+        return Scaffold(
+          appBar: CustomAppBar(
+            title: 'Layout da Impressão (Conferência)',
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.preview_outlined),
+                tooltip: 'Visualizar',
+                onPressed: () async {
+                  final pdfBytes = await _generatePreviewPdfBytes(settings);
+                  await Printing.layoutPdf(
+                      onLayout: (format) async => pdfBytes);
+                },
+              ),
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                tooltip: 'Redefinir Padrão',
+                onPressed: _resetToDefaults,
+              ),
+            ],
           ),
-        ],
-      ),
-      body: isWideScreen ? _buildWideLayout() : _buildNarrowLayout(),
-    );
-  }
-
-  Widget _buildWideLayout() {
-    return Row(
-      children: [
-        Expanded(
-          flex: 1,
-          child: _buildControlsPanel(),
-        ),
-        const VerticalDivider(width: 1),
-        Expanded(
-          flex: 1,
-          child: Container(
-            color: Colors.blueGrey.shade50,
+          body: SingleChildScrollView(
             padding: const EdgeInsets.all(16.0),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  'Pré-visualização em Tempo Real',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.black),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.storefront),
+                  label: const Text('Usar Dados do Estabelecimento'),
+                  onPressed: _useEstabelecimentoData,
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
                 ),
-                const SizedBox(height: 8),
-                Expanded(
-                  child: Card(
-                    elevation: 4,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8.0),
-                      child: PdfPreview(
-                        build: (format) => _generatePreviewPdfBytes(
-                          format.copyWith(width: 58 * PdfPageFormat.mm)
+                const SizedBox(height: 16),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      children: [
+                        TextField(
+                          controller: _subtitleController,
+                          decoration: const InputDecoration(
+                              labelText: 'Subtítulo (CNPJ)'),
+                          onChanged: (value) => _autoSaveSettings(
+                              settings.copyWith(subtitleText: value)),
                         ),
-                        canChangeOrientation: false,
-                        canChangePageFormat: false,
-                        canDebug: false,
-                        scrollViewDecoration: BoxDecoration(color: Colors.grey[200]),
-                      ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _addressController,
+                          decoration:
+                              const InputDecoration(labelText: 'Endereço'),
+                          onChanged: (value) => _autoSaveSettings(
+                              settings.copyWith(addressText: value)),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _phoneController,
+                          decoration:
+                              const InputDecoration(labelText: 'Telefone'),
+                          onChanged: (value) => _autoSaveSettings(
+                              settings.copyWith(phoneText: value)),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _finalMessageController,
+                          decoration: const InputDecoration(
+                              labelText: 'Mensagem Final'),
+                          onChanged: (value) => _autoSaveSettings(
+                              settings.copyWith(finalMessageText: value)),
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ],
             ),
           ),
-        ),
-      ],
-    );
-  }
-  
-  Widget _buildNarrowLayout() {
-    return _buildControlsPanel();
-  }
-
-  Widget _buildControlsPanel() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        children: [
-          _buildStyleEditor('Cabeçalho (Nome do Local)', _currentSettings.headerStyle, (newStyle) {
-            setState(() => _currentSettings = _currentSettings.copyWith(headerStyle: newStyle));
-            _autoSaveSettings();
-          }),
-          _buildTextAndStyleEditor('Subtítulo (CNPJ)', _subtitleController, (newText) {
-            setState(()=> _currentSettings = _currentSettings.copyWith(subtitleText: newText));
-            _autoSaveSettings();
-          }, _currentSettings.subtitleStyle, (newStyle) {
-            setState(() => _currentSettings = _currentSettings.copyWith(subtitleStyle: newStyle));
-            _autoSaveSettings();
-          }),
-          _buildTextAndStyleEditor('Endereço', _addressController, (newText) {
-            setState(()=> _currentSettings = _currentSettings.copyWith(addressText: newText));
-            _autoSaveSettings();
-          }, _currentSettings.addressStyle, (newStyle) {
-            setState(() => _currentSettings = _currentSettings.copyWith(addressStyle: newStyle));
-            _autoSaveSettings();
-          }),
-          _buildTextAndStyleEditor('Telefone', _phoneController, (newText) {
-            setState(()=> _currentSettings = _currentSettings.copyWith(phoneText: newText));
-            _autoSaveSettings();
-          }, _currentSettings.phoneStyle, (newStyle) {
-            setState(() => _currentSettings = _currentSettings.copyWith(phoneStyle: newStyle));
-            _autoSaveSettings();
-          }),
-          _buildStyleEditor('Info (Mesa e Data)', _currentSettings.infoStyle, (newStyle) {
-            setState(() => _currentSettings = _currentSettings.copyWith(infoStyle: newStyle));
-            _autoSaveSettings();
-          }),
-          _buildStyleEditor('Itens', _currentSettings.itemStyle, (newStyle) {
-            setState(() => _currentSettings = _currentSettings.copyWith(itemStyle: newStyle));
-            _autoSaveSettings();
-          }),
-          _buildStyleEditor('Total', _currentSettings.totalStyle, (newStyle) {
-            setState(() => _currentSettings = _currentSettings.copyWith(totalStyle: newStyle));
-            _autoSaveSettings();
-          }),
-          _buildTextAndStyleEditor('Mensagem Final', _finalMessageController, (newText) {
-            setState(()=> _currentSettings = _currentSettings.copyWith(finalMessageText: newText));
-            _autoSaveSettings();
-          }, _currentSettings.finalMessageStyle, (newStyle) {
-            setState(() => _currentSettings = _currentSettings.copyWith(finalMessageStyle: newStyle));
-            _autoSaveSettings();
-          }),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTextAndStyleEditor(String title, TextEditingController controller, ValueChanged<String> onTextChanged, PrintStyle style, ValueChanged<PrintStyle> onStyleChanged) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            const Divider(),
-            TextField(
-              controller: controller,
-              decoration: const InputDecoration(labelText: 'Texto'),
-              onChanged: onTextChanged,
-            ),
-            const SizedBox(height: 16),
-            _buildStyleControls(onStyleChanged, style),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStyleEditor(
-      String title, PrintStyle style, ValueChanged<PrintStyle> onUpdate) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            const Divider(),
-            _buildStyleControls(onUpdate, style),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStyleControls(ValueChanged<PrintStyle> onUpdate, PrintStyle style) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-         Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Tamanho da Fonte'),
-                Row(
-                  children: [
-                    IconButton(icon: const Icon(Icons.remove), onPressed: () => onUpdate(style.copyWith(fontSize: (style.fontSize - 1).clamp(6.0, 30.0)))),
-                    Text(style.fontSize.toStringAsFixed(0)),
-                    IconButton(icon: const Icon(Icons.add), onPressed: () => onUpdate(style.copyWith(fontSize: (style.fontSize + 1).clamp(6.0, 30.0)))),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Negrito'),
-                Switch(value: style.isBold, onChanged: (isBold) => onUpdate(style.copyWith(isBold: isBold))),
-              ],
-            ),
-            const SizedBox(height: 8),
-            const Text('Alinhamento'),
-            const SizedBox(height: 8),
-            SegmentedButton<pw.CrossAxisAlignment>(
-              segments: const [
-                ButtonSegment(value: pw.CrossAxisAlignment.start, icon: Icon(Icons.format_align_left), label: Text('Esq.')),
-                ButtonSegment(value: pw.CrossAxisAlignment.center, icon: Icon(Icons.format_align_center), label: Text('Centro')),
-                ButtonSegment(value: pw.CrossAxisAlignment.end, icon: Icon(Icons.format_align_right), label: Text('Dir.')),
-              ],
-              selected: {style.alignment},
-              onSelectionChanged: (newSelection) => onUpdate(style.copyWith(alignment: newSelection.first)),
-              style: ButtonStyle(padding: MaterialStateProperty.all<EdgeInsets>(const EdgeInsets.symmetric(horizontal: 8))),
-            ),
-      ],
-    );
-  }
-}
-
-extension on ReceiptTemplateSettings {
-  ReceiptTemplateSettings copyWith({
-    PrintStyle? headerStyle,
-    String? subtitleText,
-    PrintStyle? subtitleStyle,
-    String? addressText,
-    PrintStyle? addressStyle,
-    String? phoneText,
-    PrintStyle? phoneStyle,
-    PrintStyle? infoStyle,
-    PrintStyle? itemStyle,
-    PrintStyle? totalStyle,
-    String? finalMessageText,
-    PrintStyle? finalMessageStyle,
-  }) {
-    return ReceiptTemplateSettings(
-      headerStyle: headerStyle ?? this.headerStyle,
-      subtitleText: subtitleText ?? this.subtitleText,
-      subtitleStyle: subtitleStyle ?? this.subtitleStyle,
-      addressText: addressText ?? this.addressText,
-      addressStyle: addressStyle ?? this.addressStyle,
-      phoneText: phoneText ?? this.phoneText,
-      phoneStyle: phoneStyle ?? this.phoneStyle,
-      infoStyle: infoStyle ?? this.infoStyle,
-      itemStyle: itemStyle ?? this.itemStyle,
-      totalStyle: totalStyle ?? this.totalStyle,
-      finalMessageText: finalMessageText ?? this.finalMessageText,
-      finalMessageStyle: finalMessageStyle ?? this.finalMessageStyle,
+        );
+      },
     );
   }
 }

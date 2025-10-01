@@ -37,7 +37,6 @@ class KdsProvider with ChangeNotifier {
       case KdsFilter.delivery:
         return _allOrders.where((order) => order.type == 'delivery').toList();
       case KdsFilter.all:
-      default:
         return _allOrders;
     }
   }

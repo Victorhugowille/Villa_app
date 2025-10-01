@@ -1,8 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:printing/printing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -85,6 +88,43 @@ class PrinterProvider with ChangeNotifier {
     _addLog('Layout de impressão de conferência salvo.');
   }
 
+  Future<void> pickAndSaveLogo() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+
+    if (pickedFile != null) {
+      try {
+        final directory = await getApplicationDocumentsDirectory();
+        final imagePath = '${directory.path}/custom_logo.png';
+        
+        final imageFile = File(imagePath);
+        await imageFile.writeAsBytes(await pickedFile.readAsBytes());
+
+        _templateSettings = _templateSettings.copyWith(logoPath: imagePath);
+        _receiptTemplateSettings = _receiptTemplateSettings.copyWith(logoPath: imagePath);
+
+         _templateSettings = _templateSettings.copyWith(logoPath: imagePath);
+        _receiptTemplateSettings = _receiptTemplateSettings.copyWith(logoPath: imagePath);
+
+        await saveTemplateSettings(_templateSettings);
+        await saveReceiptTemplateSettings(_receiptTemplateSettings);
+        _addLog('Novo logo salvo com sucesso.');
+      } catch (e) {
+        _addLog('Erro ao salvar o logo: $e');
+      }
+    }
+  }
+  void updateLogoHeight(double newHeight) {
+    if (_templateSettings.logoHeight != newHeight) {
+      _templateSettings = _templateSettings.copyWith(logoHeight: newHeight);
+      notifyListeners();
+    }
+    if (_receiptTemplateSettings.logoHeight != newHeight) {
+      _receiptTemplateSettings = _receiptTemplateSettings.copyWith(logoHeight: newHeight);
+      notifyListeners();
+    }
+  }
+
   void startListening() {
     if (_isListening) return;
     
@@ -96,7 +136,7 @@ class PrinterProvider with ChangeNotifier {
         filter: PostgresChangeFilter(
           type: PostgresChangeFilterType.eq,
           column: 'status',
-          value: 'open',
+          value: 'awaiting_print', 
         ),
         callback: (payload) {
           _handleNewOrder(payload.newRecord);

@@ -1,7 +1,9 @@
+// lib/screens/order_list_screen.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:villabistromobile/data/app_data.dart' as app_data;
+import 'package:villabistromobile/providers/estabelecimento_provider.dart';
 import 'package:villabistromobile/providers/navigation_provider.dart';
 import 'package:villabistromobile/providers/printer_provider.dart';
 import 'package:villabistromobile/providers/table_provider.dart';
@@ -67,6 +69,8 @@ class _OrderListScreenState extends State<OrderListScreen> {
 
     final totalAmount = _calculateTotal(_loadedOrders);
     final printerProvider = Provider.of<PrinterProvider>(context, listen: false);
+    final estabelecimentoProvider =
+        Provider.of<EstabelecimentoProvider>(context, listen: false);
 
     try {
       await _printingService.printReceiptPdf(
@@ -74,6 +78,8 @@ class _OrderListScreenState extends State<OrderListScreen> {
         tableNumber: widget.table.tableNumber.toString(),
         totalAmount: totalAmount,
         settings: printerProvider.receiptTemplateSettings,
+        companyName:
+            estabelecimentoProvider.estabelecimento?.nomeFantasia ?? 'Nome da Empresa',
       );
     } catch (e) {
       if (!mounted) return;

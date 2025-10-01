@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:villabistromobile/data/app_data.dart' as app_data;
+import 'package:collection/collection.dart';
 
 class TransactionProvider with ChangeNotifier {
   final SupabaseClient _supabase = Supabase.instance.client;
@@ -16,6 +17,19 @@ class TransactionProvider with ChangeNotifier {
 
   double get totalRevenue {
     return _transactions.fold(0.0, (sum, item) => sum + item.totalAmount);
+  }
+
+  Map<String, double> get revenueByPaymentMethod {
+    return groupBy(_transactions, (t) => t.paymentMethod)
+        .map((key, value) => MapEntry(key, value.fold(0.0, (sum, item) => sum + item.totalAmount)));
+  }
+
+  Map<DateTime, double> get dailyRevenue {
+    return groupBy(_transactions, (t) => DateTime(t.timestamp.year, t.timestamp.month, t.timestamp.day))
+        .map((key, value) => MapEntry(key, value.fold(0.0, (sum, item) => sum + item.totalAmount)))
+        .entries
+        .sortedBy((entry) => entry.key)
+        .fold({}, (previousValue, element) => previousValue..[element.key] = element.value);
   }
 
   Future<void> fetchTransactionsByDateRange(DateTime start, DateTime end) async {

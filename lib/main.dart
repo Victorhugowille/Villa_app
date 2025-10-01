@@ -11,12 +11,17 @@ import 'package:villabistromobile/providers/transaction_provider.dart';
 import 'package:villabistromobile/providers/theme_provider.dart';
 import 'package:villabistromobile/providers/kds_provider.dart';
 import 'package:villabistromobile/screens/splash_screen.dart';
-import 'package:villabistromobile/screens/login_screen.dart';
+import 'package:villabistromobile/screens/login/login_screen.dart';
 import 'package:villabistromobile/screens/onboarding_screen.dart';
 import 'package:villabistromobile/screens/responsive_layout.dart';
 import 'package:villabistromobile/providers/report_provider.dart';
 import 'package:villabistromobile/providers/saved_report_provider.dart';
 import 'package:villabistromobile/providers/spreadsheet_provider.dart';
+import 'package:villabistromobile/providers/bot_provider.dart';
+import 'package:villabistromobile/providers/estabelecimento_provider.dart';
+import 'package:villabistromobile/providers/company_provider.dart';
+import 'package:villabistromobile/providers/auth_provider.dart';
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,7 +41,7 @@ void main() async {
         ChangeNotifierProvider.value(value: themeProvider),
         ChangeNotifierProvider(create: (context) => CartProvider()),
         ChangeNotifierProvider(create: (context) => TableProvider()),
-        ChangeNotifierProvider(create: (context) => ProductProvider()),
+        ChangeNotifierProvider(create: (context) => ProductProvider(context)),
         ChangeNotifierProvider(create: (context) => TransactionProvider()),
         ChangeNotifierProvider(create: (context) => PrinterProvider()),
         ChangeNotifierProvider(create: (context) => KdsProvider()),
@@ -44,6 +49,10 @@ void main() async {
         ChangeNotifierProvider(create: (context) => SavedReportProvider()),
         ChangeNotifierProvider(create: (context) => SpreadsheetProvider()),
         ChangeNotifierProvider(create: (context) => NavigationProvider()),
+        ChangeNotifierProvider(create: (context) => BotProvider()),
+        ChangeNotifierProvider(create: (context) => EstabelecimentoProvider()),
+        ChangeNotifierProvider(create: (context) => CompanyProvider()),
+        ChangeNotifierProvider(create: (context) => AuthProvider()),
       ],
       child: const MyApp(),
     ),
