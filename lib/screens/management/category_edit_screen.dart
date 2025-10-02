@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:villabistromobile/data/app_data.dart';
 import 'package:villabistromobile/providers/navigation_provider.dart';
-import 'package:villabistromobile/providers/product_provider.dart';
 import 'package:villabistromobile/widgets/icon_picker.dart';
 
 class CategoryEditScreen extends StatefulWidget {

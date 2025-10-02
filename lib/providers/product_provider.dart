@@ -39,11 +39,14 @@ class ProductProvider with ChangeNotifier {
     final companyId = _getCompanyId();
     if (companyId == null) {
       debugPrint("ProductProvider: Tentativa de buscar dados sem companyId. Aguardando...");
-      return; 
+      return;
     }
 
+    if (_isLoading) return;
+
     _isLoading = true;
-    notifyListeners();
+    Future.microtask(notifyListeners);
+
     try {
       final results = await Future.wait([
         _supabase.from('produtos').select('*, categorias(name)').eq('company_id', companyId).order('display_order', ascending: true),
@@ -237,16 +240,16 @@ class ProductProvider with ChangeNotifier {
   Future<String?> _uploadImage(XFile imageFile, String folder, String entityId) async {
     final companyId = _getCompanyId();
     if (companyId == null) throw Exception('Usuário não autenticado para upload.');
-     try {
-       final fileExt = imageFile.path.split('.').last;
-       final path = '$companyId/$folder/$entityId.$fileExt';
+      try {
+        final fileExt = imageFile.path.split('.').last;
+        final path = '$companyId/$folder/$entityId.$fileExt';
 
-       await _supabase.storage.from('product_images').upload(
-         path,
-         File(imageFile.path),
-         fileOptions: const FileOptions(cacheControl: '3600', upsert: true),
-       );
-       return _supabase.storage.from('product_images').getPublicUrl(path);
+        await _supabase.storage.from('product_images').upload(
+          path,
+          File(imageFile.path),
+          fileOptions: const FileOptions(cacheControl: '3600', upsert: true),
+        );
+        return _supabase.storage.from('product_images').getPublicUrl(path);
     } catch (e) {
       debugPrint("Erro no upload da imagem: $e");
       return null;

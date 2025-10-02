@@ -6,7 +6,6 @@ import 'package:provider/provider.dart';
 import 'package:villabistromobile/data/app_data.dart';
 import 'package:villabistromobile/providers/navigation_provider.dart';
 import 'package:villabistromobile/providers/product_provider.dart';
-import 'package:villabistromobile/widgets/custom_app_bar.dart';
 
 class ProductEditScreen extends StatefulWidget {
   final Product? product;
@@ -22,7 +21,7 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
   late double _price;
   late String? _categoryId;
   late bool _isSoldOut;
-  
+
   Product? _currentProduct;
   bool get _isEditMode => _currentProduct != null;
 
@@ -52,16 +51,29 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
     }
     _loadInitialData();
   }
+  
+  @override
+  void setState(fn) {
+    if (mounted) {
+      super.setState(fn);
+      // Garante que os botões (ações) na AppBar do desktop sejam atualizados
+      if (MediaQuery.of(context).size.width > 800) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _registerActions();
+        });
+      }
+    }
+  }
 
   Future<void> _loadInitialData() async {
     setState(() => _isLoading = true);
     final productProvider = Provider.of<ProductProvider>(context, listen: false);
-    
+
     if (productProvider.categories.isEmpty) {
       await productProvider.fetchData();
     }
     _availableCategories = productProvider.categories;
-    
+
     if (_categoryId == null && _availableCategories.isNotEmpty) {
       _categoryId = _availableCategories.first.id;
     }
@@ -69,7 +81,7 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
     if (_isEditMode) {
       _gruposDeAdicionais = await productProvider.getGruposAdicionaisParaProduto(_currentProduct!.id);
     }
-    
+
     if (mounted) {
       setState(() => _isLoading = false);
     }
@@ -89,12 +101,14 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
 
     setState(() => _isSaving = true);
     final productProvider = Provider.of<ProductProvider>(context, listen: false);
+    final navProvider = Provider.of<NavigationProvider>(context, listen: false);
+    final isMobile = MediaQuery.of(context).size.width <= 800;
 
     try {
       if (_isEditMode) {
         await productProvider.updateProduct(_currentProduct!.id, _name, _price, _categoryId!, _isSoldOut, _imageFile);
         if (!mounted) return;
-        Provider.of<NavigationProvider>(context, listen: false).pop();
+        isMobile ? Navigator.of(context).pop() : navProvider.pop();
       } else {
         final productsInCategory = productProvider.products.where((p) => p.categoryId == _categoryId!).length;
         final newProductId = await productProvider.addProduct(_name, _price, _categoryId!, productsInCategory, _isSoldOut, _imageFile);
@@ -103,7 +117,6 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
         final newProduct = productProvider.products.firstWhere((p) => p.id == newProductId, orElse: () => productProvider.products.last);
         setState(() {
           _currentProduct = newProduct;
-          _isSaving = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Produto criado! Agora você pode adicionar grupos.'), backgroundColor: Colors.green));
       }
@@ -111,7 +124,7 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro ao salvar produto: ${e.toString()}')));
     } finally {
-      if (mounted && _isEditMode) {
+      if (mounted) {
         setState(() => _isSaving = false);
       }
     }
@@ -136,11 +149,13 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
     if (confirmed != true) return;
     
     setState(() => _isSaving = true);
+    final navProvider = Provider.of<NavigationProvider>(context, listen: false);
+    final isMobile = MediaQuery.of(context).size.width <= 800;
     
     try {
       await Provider.of<ProductProvider>(context, listen: false).deleteProduct(_currentProduct!.id);
       if (!mounted) return;
-      Provider.of<NavigationProvider>(context, listen: false).pop();
+      isMobile ? Navigator.of(context).pop() : navProvider.pop();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro ao apagar: ${e.toString()}')));
@@ -151,6 +166,116 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
     }
   }
 
+  void _registerActions() {
+    final navProvider = Provider.of<NavigationProvider>(context, listen: false);
+    navProvider.setScreenActions([
+      if (_isEditMode)
+        IconButton(
+          icon: const Icon(Icons.delete_outline),
+          tooltip: 'Apagar Produto',
+          onPressed: _isSaving ? null : _deleteProduct,
+        ),
+      if (_isSaving)
+         const Padding(
+            padding: EdgeInsets.all(12.0),
+            child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)),
+          )
+      else
+        IconButton(
+          icon: const Icon(Icons.save_outlined),
+          tooltip: 'Salvar',
+          onPressed: _saveForm,
+        ),
+    ]);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDesktop = MediaQuery.of(context).size.width > 800;
+
+    Widget formContent = _isLoading
+        ? Center(child: CircularProgressIndicator(color: theme.primaryColor))
+        : Form(
+            key: _formKey,
+            child: ListView(
+              padding: const EdgeInsets.all(16.0),
+              children: <Widget>[
+                _buildImagePicker(theme),
+                const SizedBox(height: 24),
+                TextFormField(
+                  initialValue: _name,
+                  enabled: !_isSaving,
+                  decoration: const InputDecoration(labelText: 'Nome do Produto'),
+                  validator: (v) => (v == null || v.isEmpty) ? 'Insira um nome.' : null,
+                  onSaved: (v) => _name = v!,
+                ),
+                TextFormField(
+                  initialValue: _price > 0 ? _price.toStringAsFixed(2) : '',
+                  enabled: !_isSaving,
+                  decoration: const InputDecoration(labelText: 'Preço'),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  validator: (v) => (v == null || v.isEmpty || double.tryParse(v.replaceAll(',', '.')) == null)
+                      ? 'Insira um preço válido.'
+                      : null,
+                  onSaved: (v) => _price = double.parse(v!.replaceAll(',', '.')),
+                ),
+                DropdownButtonFormField<String>(
+                  value: _categoryId,
+                  items: _availableCategories
+                      .map((c) => DropdownMenuItem<String>(value: c.id, child: Text(c.name)))
+                      .toList(),
+                  onChanged: _isSaving ? null : (v) => setState(() => _categoryId = v),
+                  validator: (v) => (v == null) ? 'Selecione uma categoria.' : null,
+                  decoration: const InputDecoration(labelText: 'Categoria'),
+                ),
+                const SizedBox(height: 16),
+                SwitchListTile(
+                  title: const Text('Produto Esgotado'),
+                  value: _isSoldOut,
+                  onChanged: _isSaving ? null : (value) => setState(() => _isSoldOut = value),
+                  activeColor: theme.primaryColor,
+                ),
+                const SizedBox(height: 24),
+                const Divider(),
+                _buildGruposAdicionaisSection(theme),
+              ],
+            ),
+          );
+
+    if (isDesktop) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _registerActions();
+      });
+      return formContent;
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(_isEditMode ? 'Editar Produto' : 'Adicionar Produto'),
+        actions: [
+          if (_isEditMode)
+            IconButton(
+              icon: const Icon(Icons.delete_outline),
+              tooltip: 'Apagar Produto',
+              onPressed: _isSaving ? null : _deleteProduct,
+            ),
+          if (_isSaving)
+            const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2,)),
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.save_outlined),
+              tooltip: 'Salvar',
+              onPressed: _saveForm,
+            ),
+        ],
+      ),
+      body: formContent,
+    );
+  }
   void _showGrupoDialog({GrupoAdicional? grupo}) {
     final isEditing = grupo != null;
     final nameController = TextEditingController(text: grupo?.name ?? '');
@@ -299,118 +424,6 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
     );
   }
 
-  // lib/screens/management/product_edit_screen.dart
-
-@override
-Widget build(BuildContext context) {
-  final theme = Theme.of(context);
-  final isDesktop = MediaQuery.of(context).size.width > 800;
-
-  // Conteúdo principal do formulário, usado em ambos os layouts
-  Widget formContent = _isLoading
-      ? Center(child: CircularProgressIndicator(color: theme.primaryColor))
-      : Form(
-          key: _formKey,
-          child: ListView(
-            padding: const EdgeInsets.all(16.0),
-            children: <Widget>[
-              _buildImagePicker(theme),
-              const SizedBox(height: 24),
-              TextFormField(
-                initialValue: _name,
-                enabled: !_isSaving,
-                decoration: const InputDecoration(labelText: 'Nome do Produto'),
-                validator: (v) => (v == null || v.isEmpty) ? 'Insira um nome.' : null,
-                onSaved: (v) => _name = v!,
-              ),
-              TextFormField(
-                initialValue: _price > 0 ? _price.toStringAsFixed(2) : '',
-                enabled: !_isSaving,
-                decoration: const InputDecoration(labelText: 'Preço'),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                validator: (v) => (v == null || v.isEmpty || double.tryParse(v.replaceAll(',', '.')) == null)
-                    ? 'Insira um preço válido.'
-                    : null,
-                onSaved: (v) => _price = double.parse(v!.replaceAll(',', '.')),
-              ),
-              DropdownButtonFormField<String>(
-                value: _categoryId,
-                items: _availableCategories
-                    .map((c) => DropdownMenuItem<String>(value: c.id, child: Text(c.name)))
-                    .toList(),
-                onChanged: _isSaving ? null : (v) => setState(() => _categoryId = v),
-                validator: (v) => (v == null) ? 'Selecione uma categoria.' : null,
-                decoration: const InputDecoration(labelText: 'Categoria'),
-              ),
-              const SizedBox(height: 16),
-              SwitchListTile(
-                title: const Text('Produto Esgotado'),
-                value: _isSoldOut,
-                onChanged: _isSaving ? null : (value) => setState(() => _isSoldOut = value),
-                activeColor: theme.primaryColor,
-              ),
-              const SizedBox(height: 24),
-              const Divider(),
-              _buildGruposAdicionaisSection(theme),
-            ],
-          ),
-        );
-
-  // LAYOUT PARA DESKTOP
-  if (isDesktop) {
-    return Column(
-      children: [
-        // Barra de ações customizada para o desktop
-        Container(
-          color: theme.appBarTheme.backgroundColor ?? theme.colorScheme.surface,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              if (_isEditMode)
-                IconButton(
-                  icon: const Icon(Icons.delete_outline),
-                  tooltip: 'Apagar Produto',
-                  onPressed: _isSaving ? null : _deleteProduct,
-                ),
-              const SizedBox(width: 8),
-              IconButton(
-                icon: const Icon(Icons.save_outlined),
-                tooltip: 'Salvar',
-                onPressed: _isSaving ? null : _saveForm,
-              ),
-            ],
-          ),
-        ),
-        const Divider(height: 1, thickness: 1),
-        // CORREÇÃO: Adiciona o conteúdo do formulário abaixo da barra de ações
-        Expanded(
-          child: formContent,
-        ),
-      ],
-    );
-  }
-
-  // LAYOUT PARA MOBILE (com Scaffold e AppBar próprios)
-  return Scaffold(
-    appBar: CustomAppBar(
-      actions: [
-        if (_isEditMode)
-          IconButton(
-            icon: const Icon(Icons.delete_outline),
-            tooltip: 'Apagar Produto',
-            onPressed: _isSaving ? null : _deleteProduct,
-          ),
-        IconButton(
-          icon: const Icon(Icons.save_outlined),
-          tooltip: 'Salvar',
-          onPressed: _isSaving ? null : _saveForm,
-        ),
-      ],
-    ),
-    body: formContent,
-  );
-}
   Widget _buildGruposAdicionaisSection(ThemeData theme) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
