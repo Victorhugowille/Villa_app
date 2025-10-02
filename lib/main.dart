@@ -1,4 +1,3 @@
-// lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -24,7 +23,7 @@ import 'package:villabistromobile/providers/transaction_provider.dart';
 // SCREENS
 import 'package:villabistromobile/screens/login/login_screen.dart';
 import 'package:villabistromobile/screens/onboarding_screen.dart';
-import 'package:villabistromobile/screens/responsive_layout.dart'; // Import adicionado
+import 'package:villabistromobile/screens/responsive_layout.dart';
 import 'package:villabistromobile/screens/splash_screen.dart';
 
 void main() async {
@@ -40,30 +39,8 @@ void main() async {
   await themeProvider.loadTheme();
 
   runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider.value(value: themeProvider),
-        ChangeNotifierProvider(create: (context) => AuthProvider()),
-        ChangeNotifierProvider(create: (context) => CompanyProvider()),
-        ChangeNotifierProvider(create: (context) => NavigationProvider()),
-        ChangeNotifierProvider(create: (context) => CartProvider()),
-        ChangeNotifierProvider(create: (context) => TableProvider()),
-        ChangeNotifierProvider(create: (context) => TransactionProvider()),
-        ChangeNotifierProvider(create: (context) => PrinterProvider()),
-        ChangeNotifierProvider(create: (context) => KdsProvider()),
-        ChangeNotifierProvider(create: (context) => ReportProvider()),
-        ChangeNotifierProvider(create: (context) => SavedReportProvider()),
-        ChangeNotifierProvider(create: (context) => SpreadsheetProvider()),
-        ChangeNotifierProvider(create: (context) => BotProvider()),
-        ChangeNotifierProvider(create: (context) => EstabelecimentoProvider()),
-        ChangeNotifierProxyProvider<AuthProvider, ProductProvider>(
-          create: (context) => ProductProvider(context.read<AuthProvider>()),
-          update: (context, auth, previousProductProvider) {
-            previousProductProvider!.updateAuthProvider(auth);
-            return previousProductProvider;
-          },
-        ),
-      ],
+    ChangeNotifierProvider.value(
+      value: themeProvider,
       child: const MyApp(),
     ),
   );
@@ -74,28 +51,81 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<ThemeProvider>(
-      builder: (context, themeProvider, child) {
-        return MaterialApp(
-          title: 'Villa Bistro Mobile',
-          debugShowCheckedModeBanner: false,
-          theme: themeProvider.getTheme,
-          localizationsDelegates: const [
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-          ],
-          supportedLocales: const [
-            Locale('pt', 'BR'),
-          ],
-          home: const SplashScreen(),
-          routes: {
-            '/onboarding': (context) => const OnboardingScreen(),
-            '/login': (context) => const LoginScreen(),
-            '/home': (context) => const ResponsiveLayout(),
+    return MultiProvider(
+      providers: [
+        // Providers Independentes
+        ChangeNotifierProvider(create: (context) => NavigationProvider()),
+        ChangeNotifierProvider(create: (context) => CartProvider()),
+        ChangeNotifierProvider(create: (context) => ReportProvider()),
+        ChangeNotifierProvider(create: (context) => SavedReportProvider()),
+        ChangeNotifierProvider(create: (context) => SpreadsheetProvider()),
+        ChangeNotifierProvider(create: (context) => BotProvider()),
+        ChangeNotifierProvider(create: (context) => EstabelecimentoProvider()),
+        ChangeNotifierProvider(create: (context) => CompanyProvider()),
+
+        // Provider Principal de Autenticação
+        ChangeNotifierProvider(create: (context) => AuthProvider()),
+
+        // Providers que DEPENDEM do AuthProvider
+        ChangeNotifierProxyProvider<AuthProvider, PrinterProvider>(
+          create: (context) => PrinterProvider(context.read<AuthProvider>()),
+          update: (context, auth, previous) {
+            previous!.updateAuthProvider(auth);
+            return previous;
           },
-        );
-      },
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, ProductProvider>(
+          create: (context) => ProductProvider(context.read<AuthProvider>()),
+          update: (context, auth, previous) {
+            previous!.updateAuthProvider(auth);
+            return previous;
+          },
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, TableProvider>(
+          create: (context) => TableProvider(context.read<AuthProvider>()),
+          update: (context, auth, previous) {
+            previous!.updateAuthProvider(auth);
+            return previous;
+          },
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, TransactionProvider>(
+          create: (context) => TransactionProvider(context.read<AuthProvider>()),
+          update: (context, auth, previous) {
+            previous!.updateAuthProvider(auth);
+            return previous;
+          },
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, KdsProvider>(
+          create: (context) => KdsProvider(context.read<AuthProvider>()),
+          update: (context, auth, previous) {
+            previous!.updateAuthProvider(auth);
+            return previous;
+          },
+        ),
+      ],
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, child) {
+          return MaterialApp(
+            title: 'Villa Bistro Mobile',
+            debugShowCheckedModeBanner: false,
+            theme: themeProvider.getTheme,
+            localizationsDelegates: const [
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: const [
+              Locale('pt', 'BR'),
+            ],
+            home: const SplashScreen(),
+            routes: {
+              '/onboarding': (context) => const OnboardingScreen(),
+              '/login': (context) => const LoginScreen(),
+              '/home': (context) => const ResponsiveLayout(),
+            },
+          );
+        },
+      ),
     );
   }
 }

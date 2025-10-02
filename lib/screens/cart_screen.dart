@@ -14,7 +14,6 @@ class CartScreen extends StatelessWidget {
     final cart = Provider.of<CartProvider>(context, listen: false);
     final navProvider = Provider.of<NavigationProvider>(context, listen: false);
     final tableProvider = Provider.of<TableProvider>(context, listen: false);
-    final theme = Theme.of(context);
     final isDesktop = MediaQuery.of(context).size.width > 800;
 
     if (cart.items.isEmpty) return;

@@ -1,8 +1,6 @@
-// lib/widgets/side_menu.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:villabistromobile/providers/company_provider.dart';
-import 'package:villabistromobile/providers/kds_provider.dart';
 import 'package:villabistromobile/providers/navigation_provider.dart';
 import 'package:villabistromobile/screens/bot_management_screen.dart';
 import 'package:villabistromobile/screens/configuracao/configuracao_screen.dart';
@@ -24,7 +22,7 @@ class SideMenu extends StatelessWidget {
     if (isDesktop) {
       navProvider.setScreen(screen, title);
     } else {
-      Navigator.of(context).pop(); // Fecha o drawer
+      Navigator.of(context).pop();
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => screen),
       );
@@ -75,14 +73,8 @@ class SideMenu extends StatelessWidget {
           ListTile(
             leading: const Icon(Icons.view_kanban_outlined),
             title: const Text('Painel de Pedidos (KDS)'),
-            onTap: () => _navigateTo(
-              context,
-              ChangeNotifierProvider(
-                create: (_) => KdsProvider(),
-                child: const KdsScreen(),
-              ),
-              'Painel de Pedidos (KDS)',
-            ),
+            onTap: () =>
+                _navigateTo(context, const KdsScreen(), 'Painel de Pedidos (KDS)'),
           ),
           const Divider(),
           if (companyProvider.role == 'owner') ...[

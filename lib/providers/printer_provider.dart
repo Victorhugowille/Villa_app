@@ -1,4 +1,3 @@
-// lib/providers/printer_provider.dart
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -12,11 +11,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:villabistromobile/data/app_data.dart' as app_data;
 import 'package:villabistromobile/models/print_style_settings.dart';
+import 'package:villabistromobile/providers/auth_provider.dart';
 import 'package:villabistromobile/services/printing_service.dart';
 
 class PrinterProvider with ChangeNotifier {
   final SupabaseClient _supabase = Supabase.instance.client;
   final PrintingService _printingService = PrintingService();
+  AuthProvider? _authProvider;
   RealtimeChannel? _orderChannel;
 
   bool _isListening = false;
@@ -35,8 +36,16 @@ class PrinterProvider with ChangeNotifier {
   List<String> _logMessages = [];
   List<String> get logMessages => _logMessages;
 
-  PrinterProvider() {
+  PrinterProvider(this._authProvider) {
     _loadSettings();
+  }
+
+  void updateAuthProvider(AuthProvider newAuthProvider) {
+    _authProvider = newAuthProvider;
+  }
+
+  String? _getCompanyId() {
+    return _authProvider?.companyId;
   }
 
   Future<void> _loadSettings() async {
@@ -123,9 +132,10 @@ class PrinterProvider with ChangeNotifier {
   }
 
   void startListening() {
-    if (_isListening) return;
+    final companyId = _getCompanyId();
+    if (_isListening || companyId == null) return;
     
-    _orderChannel = _supabase.channel('public:pedidos');
+    _orderChannel = _supabase.channel('public:pedidos:company_id=eq.$companyId');
     _orderChannel!.onPostgresChanges(
         event: PostgresChangeEvent.insert,
         schema: 'public',
@@ -190,14 +200,14 @@ class PrinterProvider with ChangeNotifier {
   Future<void> _routeAndPrintOrder(
       List<app_data.CartItem> items, String tableNumber, String orderId) async {
     final groupedBySettings = groupBy(
-        items, (item) => _categoryPrinterSettings[item.product.categoryId]);
+        items, (item) => _categoryPrinterSettings[item.product!.categoryId]);
 
     bool allPrintedSuccessfully = true;
 
     for (final settings in groupedBySettings.keys) {
       if (settings == null || settings['name'] == null) {
         _addLog(
-            'Pedido #$orderId contém itens de categorias não configuradas.');
+            'Pedido #$orderId contém itens de categorias sem impressora configurada.');
         continue;
       }
 
@@ -214,7 +224,7 @@ class PrinterProvider with ChangeNotifier {
           await _printingService.printKitchenOrder(
             items: itemsForPrinter,
             tableNumber: tableNumber,
-            orderId: int.parse(orderId),
+            orderId: int.tryParse(orderId.substring(0, 8), radix: 16) ?? 0,
             printer: selectedPrinter,
             paperSize: paperSize,
             templateSettings: _templateSettings,
@@ -232,13 +242,12 @@ class PrinterProvider with ChangeNotifier {
       }
     }
     
-    if (allPrintedSuccessfully) {
-      try {
-        await _supabase.from('pedidos').update({'status': 'printed'}).eq('id', orderId);
-        _addLog('Pedido #$orderId marcado como impresso no banco de dados.');
-      } catch (e) {
-        _addLog('Falha ao atualizar o status do pedido #$orderId: $e');
-      }
+    // MUDANÇA: Atualiza o status para 'production' após a tentativa de impressão
+    try {
+      await _supabase.from('pedidos').update({'status': 'production'}).eq('id', orderId);
+      _addLog('Pedido #$orderId atualizado para "Em Produção".');
+    } catch (e) {
+      _addLog('Falha ao atualizar o status do pedido #$orderId: $e');
     }
   }
 

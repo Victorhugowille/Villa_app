@@ -124,9 +124,6 @@ class _EstabelecimentoScreenState extends State<EstabelecimentoScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Dados do Estabelecimento'),
-      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(

@@ -1,4 +1,3 @@
-// lib/screens/order_list_screen.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -20,7 +19,6 @@ class OrderListScreen extends StatefulWidget {
 
 class _OrderListScreenState extends State<OrderListScreen> {
   late Future<List<app_data.Order>> _ordersFuture;
-  List<app_data.Order> _loadedOrders = [];
   final PrintingService _printingService = PrintingService();
 
   @override
@@ -29,7 +27,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
     _loadOrders();
   }
 
-  void _loadOrders() {
+  Future<void> _loadOrders() async {
     setState(() {
       _ordersFuture = Provider.of<TableProvider>(context, listen: false)
           .getOrdersForTable(widget.table.id);
@@ -51,12 +49,8 @@ class _OrderListScreenState extends State<OrderListScreen> {
     }
   }
 
-  double _calculateTotal(List<app_data.Order> orders) {
-    return orders.fold(0.0, (sum, order) => sum + order.total);
-  }
-
-  void _triggerPrintReceipt() async {
-    if (_loadedOrders.isEmpty) {
+  void _triggerPrintReceipt(List<app_data.Order> loadedOrders) async {
+    if (loadedOrders.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -66,14 +60,15 @@ class _OrderListScreenState extends State<OrderListScreen> {
       return;
     }
 
-    final totalAmount = _calculateTotal(_loadedOrders);
+    final totalAmount =
+        loadedOrders.fold(0.0, (sum, order) => sum + order.total);
     final printerProvider = Provider.of<PrinterProvider>(context, listen: false);
     final estabelecimentoProvider =
         Provider.of<EstabelecimentoProvider>(context, listen: false);
 
     try {
       await _printingService.printReceiptPdf(
-        orders: _loadedOrders,
+        orders: loadedOrders,
         tableNumber: widget.table.tableNumber.toString(),
         totalAmount: totalAmount,
         settings: printerProvider.receiptTemplateSettings,
@@ -89,15 +84,17 @@ class _OrderListScreenState extends State<OrderListScreen> {
       );
     }
   }
-  
-  void _registerActions() {
+
+  // Função para registrar os botões de ação na AppBar do modo Desktop
+  void _registerActions(List<app_data.Order> loadedOrders) {
     final navProvider = Provider.of<NavigationProvider>(context, listen: false);
     navProvider.setScreenActions([
-      IconButton(
-        icon: const Icon(Icons.print),
-        tooltip: 'Imprimir Conferência',
-        onPressed: _triggerPrintReceipt,
-      )
+      if (loadedOrders.isNotEmpty)
+        IconButton(
+          icon: const Icon(Icons.print),
+          tooltip: 'Imprimir Conferência',
+          onPressed: () => _triggerPrintReceipt(loadedOrders),
+        )
     ]);
   }
 
@@ -107,123 +104,213 @@ class _OrderListScreenState extends State<OrderListScreen> {
     final navProvider = Provider.of<NavigationProvider>(context, listen: false);
     final isDesktop = MediaQuery.of(context).size.width > 800;
 
-    Widget bodyContent = FutureBuilder<List<app_data.Order>>(
+    return FutureBuilder<List<app_data.Order>>(
       future: _ordersFuture,
       builder: (context, snapshot) {
+        // Registra as ações da AppBar do Desktop assim que os dados carregam
+        if (isDesktop && snapshot.hasData) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _registerActions(snapshot.data ?? []);
+          });
+        }
+
+        Widget bodyContent;
+
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(
+          bodyContent = Center(
               child: CircularProgressIndicator(color: theme.primaryColor));
-        }
-        if (snapshot.hasError) {
-          return Center(child: Text('Erro: ${snapshot.error}'));
-        }
-        _loadedOrders = snapshot.data ?? [];
-
-        final totalAmount = _calculateTotal(_loadedOrders);
-
-        if (_loadedOrders.isEmpty) {
-          return const Center(child: Text('Nenhum pedido para esta mesa.'));
+        } else if (snapshot.hasError) {
+          bodyContent = Center(
+              child: Text('Erro ao carregar pedidos: ${snapshot.error}'));
         } else {
-          return Column(
-            children: [
-              Expanded(
-                child: ListView.builder(
-                  itemCount: _loadedOrders.length,
-                  itemBuilder: (ctx, index) {
-                    final order = _loadedOrders[index];
-                    return Card(
-                      margin: const EdgeInsets.symmetric(
-                          horizontal: 15, vertical: 6),
-                      child: ExpansionTile(
-                        title: Text(
-                            'Pedido #${order.id} - ${DateFormat('HH:mm').format(order.timestamp)}'),
-                        subtitle:
-                            Text('Total: R\$ ${order.total.toStringAsFixed(2)}'),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete_outline,
-                              color: Colors.red),
-                          onPressed: () => _deleteOrder(order.id),
-                        ),
-                        children: order.items.map((item) {
-                          return ListTile(
-                            dense: true,
-                            title: Text('${item.quantity}x ${item.product.name}'),
-                            trailing: Text(
-                                'R\$ ${(item.product.price * item.quantity).toStringAsFixed(2)}'),
-                          );
-                        }).toList(),
-                      ),
-                    );
-                  },
-                ),
+          final loadedOrders = snapshot.data ?? [];
+
+          if (loadedOrders.isEmpty) {
+            bodyContent = Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.receipt_long_outlined,
+                      size: 80, color: Colors.grey.shade400),
+                  const SizedBox(height: 16),
+                  const Text('Nenhum pedido ativo para esta mesa.',
+                      style: TextStyle(fontSize: 16)),
+                ],
               ),
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Total da Mesa:',
-                        style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: theme.colorScheme.onBackground)),
-                    Text('R\$ ${totalAmount.toStringAsFixed(2)}',
-                        style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: theme.primaryColor)),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16)),
-                    onPressed: totalAmount > 0
-                        ? () {
-                            navProvider.navigateTo(
-                              context,
-                              PaymentScreen(
-                                table: widget.table,
-                                totalAmount: totalAmount,
-                                orders: _loadedOrders,
-                              ),
-                              'Pagamento - Mesa ${widget.table.tableNumber}',
-                            );
-                          }
-                        : null,
-                    child: const Text('FECHAR CONTA'),
+            );
+          } else {
+            final totalAmount =
+                loadedOrders.fold(0.0, (sum, order) => sum + order.total);
+            bodyContent = Column(
+              children: [
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: _loadOrders,
+                    child: ListView.builder(
+                      padding: const EdgeInsets.all(8),
+                      itemCount: loadedOrders.length,
+                      itemBuilder: (ctx, index) {
+                        final order = loadedOrders[index];
+                        return _buildOrderCard(order, theme);
+                      },
+                    ),
                   ),
                 ),
-              )
-            ],
+                _buildFooter(totalAmount, loadedOrders, navProvider, theme),
+              ],
+            );
+          }
+        }
+
+        if (isDesktop) {
+          return bodyContent;
+        } else {
+          return Scaffold(
+            appBar: AppBar(
+              title: Text('Pedidos - Mesa ${widget.table.tableNumber}'),
+              actions: [
+                if (snapshot.hasData && snapshot.data!.isNotEmpty)
+                  IconButton(
+                    icon: const Icon(Icons.print),
+                    tooltip: 'Imprimir Conferência',
+                    onPressed: () => _triggerPrintReceipt(snapshot.data!),
+                  )
+              ],
+            ),
+            body: bodyContent,
           );
         }
       },
     );
+  }
 
-    if (isDesktop) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _registerActions();
-      });
-      return bodyContent;
-    } else {
-      return Scaffold(
-        appBar: AppBar(
-          title: Text('Pedidos - Mesa ${widget.table.tableNumber}'),
-          actions: [
-             IconButton(
-              icon: const Icon(Icons.print),
-              tooltip: 'Imprimir Conferência',
-              onPressed: _triggerPrintReceipt,
-            )
-          ],
+  Widget _buildOrderCard(app_data.Order order, ThemeData theme) {
+    final String orderIdDisplay =
+        order.id.length > 8 ? order.id.substring(0, 8) : order.id;
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Column(
+        children: [
+          ListTile(
+            title: Text(
+              'Pedido #$orderIdDisplay',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle:
+                Text(DateFormat('dd/MM/yyyy HH:mm').format(order.timestamp)),
+            trailing: IconButton(
+              icon: Icon(Icons.delete_outline, color: Colors.red.shade400),
+              onPressed: () => _deleteOrder(order.id),
+            ),
+          ),
+          const Divider(height: 1, indent: 16, endIndent: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Column(
+              children: order.items.map((item) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Flexible(
+                          child: Text(
+                              '${item.quantity}x ${item.product?.name ?? "Produto removido"}')),
+                      Text(
+                          'R\$ ${((item.product?.price ?? 0.0) * item.quantity).toStringAsFixed(2)}'),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          const Divider(height: 1, indent: 16, endIndent: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                const Text('Subtotal do Pedido: ',
+                    style: TextStyle(fontWeight: FontWeight.w500)),
+                Text(
+                  'R\$ ${order.total.toStringAsFixed(2)}',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFooter(double totalAmount, List<app_data.Order> loadedOrders,
+      NavigationProvider navProvider, ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            spreadRadius: 0,
+            blurRadius: 10,
+            offset: const Offset(0, -5),
+          ),
+        ],
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(16),
+          topRight: Radius.circular(16),
         ),
-        body: bodyContent,
-      );
-    }
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Total da Mesa:',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
+              Text(
+                'R\$ ${totalAmount.toStringAsFixed(2)}',
+                style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: theme.primaryColor),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.payment),
+              label: const Text('FECHAR CONTA'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                textStyle:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              onPressed: totalAmount > 0
+                  ? () {
+                      navProvider.navigateTo(
+                        context,
+                        PaymentScreen(
+                          table: widget.table,
+                          totalAmount: totalAmount,
+                          orders: loadedOrders,
+                        ),
+                        'Pagamento - Mesa ${widget.table.tableNumber}',
+                      );
+                    }
+                  : null,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

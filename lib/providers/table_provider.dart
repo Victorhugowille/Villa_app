@@ -1,10 +1,11 @@
-// lib/providers/table_provider.dart
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:villabistromobile/data/app_data.dart' as app_data;
+import 'package:villabistromobile/providers/auth_provider.dart';
 
 class TableProvider with ChangeNotifier {
   final SupabaseClient _supabase = Supabase.instance.client;
+  AuthProvider? _authProvider;
   final String _tableMesa = 'mesas';
 
   List<app_data.Table> _tables = [];
@@ -15,16 +16,39 @@ class TableProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
-  TableProvider() {
-    fetchAndSetTables();
+  TableProvider(this._authProvider) {
+    if (_authProvider?.companyId != null) {
+      fetchAndSetTables();
+    }
+  }
+
+  void updateAuthProvider(AuthProvider newAuthProvider) {
+    final oldCompanyId = _authProvider?.companyId;
+    _authProvider = newAuthProvider;
+    final newCompanyId = newAuthProvider.companyId;
+
+    if (newCompanyId != null && newCompanyId != oldCompanyId) {
+      fetchAndSetTables();
+    }
+  }
+
+  String? _getCompanyId() {
+    return _authProvider?.companyId;
   }
 
   Future<void> fetchAndSetTables() async {
+    final companyId = _getCompanyId();
+    if (companyId == null) return;
+
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
     try {
-      final data = await _supabase.from(_tableMesa).select().order('numero', ascending: true);
+      final data = await _supabase
+          .from(_tableMesa)
+          .select()
+          .eq('company_id', companyId)
+          .order('numero', ascending: true);
       _tables = data.map((item) => app_data.Table.fromJson(item)).toList();
     } catch (error) {
       _errorMessage = "Erro ao buscar mesas: $error";
@@ -34,186 +58,184 @@ class TableProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> addTable(int tableNumber) async {
-    try {
-      final response = await _supabase.from(_tableMesa).insert({'numero': tableNumber}).select().single();
-      _tables.add(app_data.Table.fromJson(response));
-      _tables.sort((a, b) => a.tableNumber.compareTo(b.tableNumber));
-      notifyListeners();
-      return true;
-    } catch (error) {
-      debugPrint("Erro ao adicionar mesa: $error");
-      return false;
-    }
-  }
+  Future<void> addNextTable({int maxRetries = 3}) async {
+    final companyId = _getCompanyId();
+    if (companyId == null) throw Exception('Empresa não encontrada.');
 
-  Future<bool> updateTable(String tableId, int newNumber) async {
-    try {
-      final response = await _supabase.from(_tableMesa).update({'numero': newNumber}).eq('id', tableId).select().single();
-      final index = _tables.indexWhere((t) => t.id == tableId);
-      if (index != -1) {
-        _tables[index] = app_data.Table.fromJson(response);
-        _tables.sort((a, b) => a.tableNumber.compareTo(b.tableNumber));
-        notifyListeners();
+    for (int attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        final response = await _supabase
+            .from(_tableMesa)
+            .select('numero')
+            .eq('company_id', companyId)
+            .order('numero', ascending: false)
+            .limit(1)
+            .maybeSingle();
+
+        int nextNumber = 1;
+        if (response != null && response['numero'] != null) {
+          nextNumber = (response['numero'] as int) + 1;
+        }
+
+        await _supabase
+            .from(_tableMesa)
+            .insert({'numero': nextNumber, 'company_id': companyId});
+
+        await fetchAndSetTables();
+        return; // Sucesso, sai da função.
+
+      } on PostgrestException catch (error) {
+        if (error.code == '23505' && attempt < maxRetries - 1) {
+          await Future.delayed(const Duration(milliseconds: 100)); // Espera antes de tentar de novo
+          continue; // Tenta o loop novamente
+        }
+        rethrow;
+      } catch (error) {
+        rethrow;
       }
-      return true;
-    } catch (error) {
-      debugPrint("Erro ao atualizar mesa: $error");
-      return false;
     }
+    throw Exception('Não foi possível adicionar a mesa após $maxRetries tentativas.');
   }
 
-  Future<bool> deleteTable(String tableId) async {
-    final index = _tables.indexWhere((t) => t.id == tableId);
-    if (index == -1) return false;
-
-    final tableToRemove = _tables[index];
-    _tables.removeAt(index);
-    notifyListeners();
-
-    try {
-      await _supabase.from(_tableMesa).delete().eq('id', tableId);
-      return true;
-    } catch (error) {
-      _tables.insert(index, tableToRemove);
-      notifyListeners();
-      debugPrint("Erro ao excluir mesa: $error");
-      return false;
-    }
+  Future<void> updateTable(String tableId, int newNumber) async {
+    await _supabase
+        .from(_tableMesa)
+        .update({'numero': newNumber})
+        .eq('id', tableId);
+    await fetchAndSetTables();
   }
 
-  Future<bool> updateStatus(String tableId, String newStatus) async {
-    try {
-      await _supabase.from(_tableMesa).update({'status': newStatus}).eq('id', tableId);
-      final index = _tables.indexWhere((t) => t.id == tableId);
-      if (index != -1) {
-        final updatedTable = app_data.Table(
-            id: _tables[index].id,
-            tableNumber: _tables[index].tableNumber,
-            isOccupied: newStatus == 'ocupada');
-        _tables[index] = updatedTable;
-        notifyListeners();
-      }
-      return true;
-    } catch (error) {
-      debugPrint("Erro ao atualizar status da mesa: $error");
-      return false;
+  Future<void> deleteHighestTable() async {
+    final companyId = _getCompanyId();
+    if (companyId == null) throw Exception('Empresa não encontrada.');
+
+    final response = await _supabase
+        .from(_tableMesa)
+        .select('id, numero, status')
+        .eq('company_id', companyId)
+        .order('numero', ascending: false)
+        .limit(1)
+        .maybeSingle();
+    
+    if (response == null) {
+      throw Exception('Não há mesas para excluir.');
     }
+
+    if (response['status'] == 'ocupada') {
+      throw Exception('A mesa de maior número (Mesa ${response['numero']}) está ocupada e não pode ser excluída.');
+    }
+
+    await _supabase.from(_tableMesa).delete().eq('id', response['id']);
+    await fetchAndSetTables();
   }
 
-  Future<bool> placeOrder({required String tableId, required List<app_data.CartItem> items}) async {
-    final userId = _supabase.auth.currentUser?.id;
-    if (userId == null) {
-      debugPrint("Erro: Usuário não autenticado para fazer pedido.");
-      return false;
-    }
+  Future<void> updateStatus(String tableId, String newStatus) async {
+    await _supabase
+        .from(_tableMesa)
+        .update({'status': newStatus})
+        .eq('id', tableId);
+    await fetchAndSetTables();
+  }
 
-    try {
-      final orderResponse = await _supabase
-          .from('pedidos')
-          .insert({
-            'mesa_id': tableId, 
-            'status': 'production', 
-            'type': 'mesa',
-            'user_id': userId,
-          })
-          .select()
-          .single();
-      final orderId = orderResponse['id'];
+  Future<void> placeOrder(
+      {required String tableId, required List<app_data.CartItem> items}) async {
+    final companyId = _getCompanyId();
+    if (companyId == null) throw Exception('Empresa não encontrada.');
 
-      final itemsToInsert = items
-          .map((cartItem) => {
-                'pedido_id': orderId,
-                'produto_id': cartItem.product.id,
-                'quantidade': cartItem.quantity,
-              })
-          .toList();
+    final orderResponse = await _supabase
+        .from('pedidos')
+        .insert({
+          'mesa_id': tableId,
+          'status': 'awaiting_print',
+          'type': 'mesa',
+          'company_id': companyId,
+        })
+        .select()
+        .single();
+    final orderId = orderResponse['id'];
 
-      await _supabase.from('itens_pedido').insert(itemsToInsert);
-      await updateStatus(tableId, 'ocupada');
-      return true;
-    } catch (error) {
-      debugPrint("Erro ao fazer pedido: $error");
-      return false;
-    }
+    final itemsToInsert = items
+        .map((cartItem) => {
+              'pedido_id': orderId,
+              'produto_id': cartItem.product!.id,
+              'quantidade': cartItem.quantity,
+            })
+        .toList();
+
+    await _supabase.from('itens_pedido').insert(itemsToInsert);
+    await updateStatus(tableId, 'ocupada');
   }
 
   Future<List<app_data.Order>> getOrdersForTable(String tableId) async {
+    final companyId = _getCompanyId();
+    if (companyId == null) return [];
+
     try {
       final response = await _supabase
           .from('pedidos')
-          .select('*, itens_pedido(*, produtos(*, categorias(name)))')
+          .select('*, itens_pedido!inner(*, produtos!inner(*, categorias(name)))')
           .eq('mesa_id', tableId)
+          .eq('company_id', companyId)
           .neq('status', 'completed');
 
-      return response.map((orderData) => app_data.Order.fromJson(orderData)).toList();
+      return response
+          .map((orderData) => app_data.Order.fromJson(orderData))
+          .toList();
     } catch (error) {
       debugPrint("Erro ao buscar pedidos: $error");
       return [];
     }
   }
 
-  Future<bool> clearTable(String tableId) async {
-    try {
-      await _supabase
-          .from('pedidos')
-          .delete()
-          .eq('mesa_id', tableId)
-          .neq('status', 'completed');
+  Future<void> clearTable(String tableId) async {
+    final companyId = _getCompanyId();
+    if (companyId == null) return;
+    
+    await _supabase
+        .from('pedidos')
+        .delete()
+        .eq('mesa_id', tableId)
+        .eq('company_id', companyId)
+        .neq('status', 'completed');
 
-      await updateStatus(tableId, 'livre');
-      return true;
-    } catch (error) {
-      debugPrint("Erro ao limpar a mesa: $error");
-      return false;
-    }
+    await updateStatus(tableId, 'livre');
   }
 
-  Future<bool> deleteOrder(String orderId) async {
-    try {
-      await _supabase.from('pedidos').delete().eq('id', orderId);
-      return true;
-    } catch (error) {
-      debugPrint("Erro ao deletar pedido: $error");
-      return false;
-    }
+  Future<void> deleteOrder(String orderId) async {
+    await _supabase.from('pedidos').delete().eq('id', orderId);
   }
 
-  Future<bool> closeAccount({
+  Future<void> closeAccount({
     required app_data.Table table,
     required double totalAmount,
     required String paymentMethod,
   }) async {
-    final userId = _supabase.auth.currentUser?.id;
-    if (userId == null) {
-      debugPrint("Erro: Usuário não autenticado para fechar a conta.");
-      return false;
-    }
-    
-    try {
-      final transactionResponse = await _supabase.from('transacoes').insert({
-        'table_number': table.tableNumber,
-        'total_amount': totalAmount,
-        'payment_method': paymentMethod,
-        'user_id': userId,
-      }).select().single();
+    final companyId = _getCompanyId();
+    if (companyId == null) throw Exception('Empresa não encontrada.');
 
-      final transactionId = transactionResponse['id'];
-      
-      await _supabase
-          .from('pedidos')
-          .update({
-            'status': 'completed',
-            'transaction_id': transactionId,
-          })
-          .eq('mesa_id', table.id)
-          .neq('status', 'completed');
+    final transactionResponse = await _supabase
+        .from('transacoes')
+        .insert({
+          'table_number': table.tableNumber,
+          'total_amount': totalAmount,
+          'payment_method': paymentMethod,
+          'company_id': companyId,
+        })
+        .select()
+        .single();
 
-      await updateStatus(table.id, 'livre');
-      return true;
-    } catch (error) {
-      debugPrint("Erro ao fechar conta: $error");
-      return false;
-    }
+    final transactionId = transactionResponse['id'];
+
+    await _supabase
+        .from('pedidos')
+        .update({
+          'status': 'completed',
+          'transaction_id': transactionId,
+        })
+        .eq('mesa_id', table.id)
+        .eq('company_id', companyId)
+        .neq('status', 'completed');
+
+    await updateStatus(table.id, 'livre');
   }
 }

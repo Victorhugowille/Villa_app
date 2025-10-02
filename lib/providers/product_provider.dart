@@ -1,4 +1,3 @@
-// lib/providers/product_provider.dart
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -38,7 +37,7 @@ class ProductProvider with ChangeNotifier {
   Future<void> fetchData() async {
     final companyId = _getCompanyId();
     if (companyId == null) {
-      debugPrint("ProductProvider: Tentativa de buscar dados sem companyId. Aguardando...");
+      debugPrint("ProductProvider: Tentativa de buscar dados sem companyId.");
       return;
     }
 
@@ -78,7 +77,6 @@ class ProductProvider with ChangeNotifier {
         'icon_font_family': icon.fontFamily,
         'company_id': companyId,
       });
-      await fetchData();
     } on PostgrestException catch (error) {
       if (error.code == '23505') {
         throw Exception('Uma categoria com este nome já existe.');
@@ -98,7 +96,6 @@ class ProductProvider with ChangeNotifier {
         'icon_code_point': icon.codePoint,
         'icon_font_family': icon.fontFamily,
       }).eq('id', id).eq('company_id', companyId);
-      await fetchData();
     } catch(error) {
       throw Exception('Falha ao atualizar categoria.');
     }
@@ -109,7 +106,6 @@ class ProductProvider with ChangeNotifier {
     if (companyId == null) throw Exception('Usuário não autenticado.');
     try {
       await _supabase.from('categorias').delete().eq('id', id).eq('company_id', companyId);
-      await fetchData();
     } catch (error) {
       throw Exception('Falha ao deletar categoria. Verifique se ela não está sendo usada por algum produto.');
     }
@@ -138,7 +134,11 @@ class ProductProvider with ChangeNotifier {
         'name': name,
         'produto_id': produtoId,
         'company_id': companyId,
-      }).select().single();
+      }).select().maybeSingle();
+      
+      if (newGrupo == null) {
+        throw Exception('Falha ao criar grupo: não foi possível obter o retorno do banco de dados.');
+      }
       
       if (imageFile != null) {
         final newGrupoId = newGrupo['id'].toString();
@@ -163,7 +163,7 @@ class ProductProvider with ChangeNotifier {
       }
       await _supabase.from('grupos_adicionais').update(updates).eq('id', id);
     } catch (e) {
-       throw Exception('Falha ao atualizar grupo de adicionais.');
+      throw Exception('Falha ao atualizar grupo de adicionais.');
     }
   }
 
@@ -189,7 +189,11 @@ class ProductProvider with ChangeNotifier {
         'price': price,
         'grupo_id': grupoId,
         'company_id': companyId,
-      }).select().single();
+      }).select().maybeSingle();
+
+      if (newAdicional == null) {
+        throw Exception('Falha ao criar adicional: não foi possível obter o retorno do banco de dados.');
+      }
 
       if (imageFile != null) {
         final newAdicionalId = newAdicional['id'].toString();
@@ -267,7 +271,11 @@ class ProductProvider with ChangeNotifier {
         'display_order': displayOrder,
         'is_sold_out': isSoldOut,
         'company_id': companyId,
-      }).select().single();
+      }).select().maybeSingle();
+
+      if (newProduct == null) {
+        throw Exception('Falha ao criar produto: não foi possível obter o retorno do banco de dados.');
+      }
 
       final newProductId = newProduct['id'].toString();
 
@@ -277,7 +285,6 @@ class ProductProvider with ChangeNotifier {
           await _supabase.from('produtos').update({'image_url': imageUrl}).eq('id', newProductId);
         }
       }
-      await fetchData();
       return newProductId;
     } catch (error) {
       debugPrint('ERRO DETALHADO AO ADICIONAR PRODUTO: $error');
@@ -304,7 +311,6 @@ class ProductProvider with ChangeNotifier {
       }
 
       await _supabase.from('produtos').update(updates).eq('id', id).eq('company_id', companyId);
-      await fetchData();
     } catch (error) {
       throw Exception('Falha ao atualizar produto.');
     }
@@ -315,7 +321,6 @@ class ProductProvider with ChangeNotifier {
     if (companyId == null) throw Exception('Usuário não autenticado.');
     try {
       await _supabase.from('produtos').delete().eq('id', id).eq('company_id', companyId);
-      await fetchData();
     } catch (error) {
       throw Exception('Falha ao deletar produto.');
     }
@@ -328,7 +333,6 @@ class ProductProvider with ChangeNotifier {
       }).toList();
 
       await _supabase.from('produtos').upsert(updates);
-      await fetchData();
     } catch(error) {
       throw Exception('Falha ao reordenar produtos.');
     }

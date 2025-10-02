@@ -10,59 +10,66 @@ serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
-
   try {
     const supabaseAdmin = createClient(
-      Deno.env.get('PROJECT_URL')!,
-      Deno.env.get('SERVICE_ROLE_KEY')!
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    // Pega o ID da solicitação do corpo da requisição
-    const { request_id } = await req.json();
+    // Agora esperamos também o 'role' vindo do app
+    const { request_id, role } = await req.json(); 
     if (!request_id) throw new Error("Request ID é obrigatório.");
+    if (!role || (role !== 'employee' && role !== 'owner')) {
+      throw new Error("O cargo (role) é inválido ou não foi fornecido. Deve ser 'employee' ou 'owner'.");
+    }
 
-    // Busca os dados da solicitação original
     const { data: request, error: requestError } = await supabaseAdmin
-      .from('join_requests')
-      .select('*')
-      .eq('id', request_id)
-      .single();
+      .from('join_requests').select('*').eq('id', request_id).maybeSingle();
 
     if (requestError) throw requestError;
+    if (!request) throw new Error(`Solicitação com ID ${request_id} não encontrada.`);
     if (request.status !== 'pending') throw new Error("Esta solicitação já foi processada.");
 
-    // 1. Cria o novo usuário no sistema de autenticação do Supabase
-    const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
+    let userId: string;
+    const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers({
       email: request.requester_email,
-      password: request.requester_password,
-      email_confirm: true, // Já marca o e-mail como confirmado
+      page: 1,
+      perPage: 1,
     });
 
-    if (authError) throw authError;
+    if (listError) throw listError;
+    const existingUser = users.length > 0 ? users[0] : null;
+    
+    if (existingUser) {
+      userId = existingUser.id;
+    } else {
+      const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+        email: request.requester_email,
+        password: request.requester_password,
+        email_confirm: true,
+      });
+      if (createError) throw createError;
+      userId = newUser.user.id;
+    }
 
-    // 2. Cria o perfil para o novo usuário na tabela 'profiles'
     const { error: profileError } = await supabaseAdmin.from('profiles').insert({
-      user_id: authUser.user.id,
+      user_id: userId,
       company_id: request.target_company_id,
-      role: 'employee', // Ou o cargo padrão que você quiser
+      role: role, // <-- USAMOS O CARGO RECEBIDO AQUI
       phone_number: request.requester_phone,
     });
 
     if (profileError) {
-      // Se der erro ao criar o perfil, apaga o usuário recém-criado para não deixar lixo
-      await supabaseAdmin.auth.admin.deleteUser(authUser.user.id);
+      if (!existingUser) {
+        await supabaseAdmin.auth.admin.deleteUser(userId);
+      }
       throw profileError;
     }
 
-    // 3. Atualiza o status da solicitação para 'approved'
-    await supabaseAdmin
-      .from('join_requests')
-      .update({ status: 'approved' })
-      .eq('id', request.id);
+    await supabaseAdmin.from('join_requests').update({ status: 'approved' }).eq('id', request.id);
 
-    return new Response(JSON.stringify({ message: "Usuário aprovado e criado com sucesso!" }), { headers: corsHeaders });
-
+    return new Response(JSON.stringify({ message: "Usuário aprovado com sucesso!" }), { headers: corsHeaders });
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: corsHeaders });
+    return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: corsHeaders });
   }
 })

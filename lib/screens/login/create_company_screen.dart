@@ -26,6 +26,15 @@ class _CreateCompanyScreenState extends State<CreateCompanyScreen> {
       mask: '(##) #####-####', filter: {"#": RegExp(r'[0-9]')});
 
   @override
+  void initState() {
+    super.initState();
+    _emailController.text = 'tedsteste@gmail.com';
+    _passwordController.text = '123456';
+    _phoneController.text = '(45) 88888-8888';
+    _companyNameController.text = '90.231.234/0001-56';
+    _cnpjController.text = 'teds';
+  }
+  @override
   void dispose() {
     _companyNameController.dispose();
     _cnpjController.dispose();
@@ -58,7 +67,7 @@ class _CreateCompanyScreenState extends State<CreateCompanyScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-                'Solicitação enviada com sucesso! Verifique seu e-mail.'),
+                'Solicitação enviada com sucesso! aguarde alguma resposta do suporte.'),
             backgroundColor: Colors.green,
           ),
         );

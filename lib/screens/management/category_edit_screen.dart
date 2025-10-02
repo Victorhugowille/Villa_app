@@ -1,8 +1,8 @@
-// lib/screens/management/category_edit_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:villabistromobile/data/app_data.dart';
 import 'package:villabistromobile/providers/navigation_provider.dart';
+import 'package:villabistromobile/providers/product_provider.dart';
 import 'package:villabistromobile/widgets/icon_picker.dart';
 
 class CategoryEditScreen extends StatefulWidget {
@@ -42,20 +42,51 @@ class _CategoryEditScreenState extends State<CategoryEditScreen> {
     );
   }
 
-  void _saveForm() async {
-    // ... (lógica do método continua a mesma)
+  Future<void> _saveForm() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+    _formKey.currentState!.save();
+
+    setState(() => _isLoading = true);
+    final productProvider = Provider.of<ProductProvider>(context, listen: false);
+
+    try {
+      if (_isEditMode) {
+        await productProvider.updateCategory(widget.category!.id, _name, _icon);
+      } else {
+        await productProvider.addCategory(_name, _icon);
+      }
+      if (mounted) {
+        Navigator.of(context).pop(); // Apenas fecha a tela
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   void _registerActions() {
     final navProvider = Provider.of<NavigationProvider>(context, listen: false);
     navProvider.setScreenActions([
-       if (_isLoading)
+      if (_isLoading)
         const Padding(
           padding: EdgeInsets.all(8.0),
           child: CircularProgressIndicator(strokeWidth: 2),
         )
       else
-        IconButton(onPressed: _saveForm, icon: const Icon(Icons.save), tooltip: 'Salvar'),
+        IconButton(
+            onPressed: _saveForm, icon: const Icon(Icons.save), tooltip: 'Salvar'),
     ]);
   }
 
@@ -127,7 +158,7 @@ class _CategoryEditScreenState extends State<CategoryEditScreen> {
     );
 
     if (isDesktop) {
-       WidgetsBinding.instance.addPostFrameCallback((_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
         _registerActions();
       });
       return content;
