@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 
 class AuthProvider with ChangeNotifier {
   final SupabaseClient _supabase = Supabase.instance.client;
@@ -29,8 +30,8 @@ class AuthProvider with ChangeNotifier {
         _loadUserProfile();
       } else {
         _companyId = null;
+        notifyListeners();
       }
-      notifyListeners();
     });
   }
 
@@ -40,10 +41,11 @@ class AuthProvider with ChangeNotifier {
       final response = await _supabase
           .from('profiles')
           .select('company_id')
-          .eq('id', _user!.id)
+          .eq('user_id', _user!.id)
           .single();
       _companyId = response['company_id'] as String?;
     } catch (e) {
+      debugPrint("AuthProvider - Erro ao carregar perfil: $e");
       _companyId = null;
     }
     notifyListeners();

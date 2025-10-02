@@ -1,9 +1,9 @@
+// lib/screens/payment_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:villabistromobile/data/app_data.dart' as app_data;
 import 'package:villabistromobile/providers/navigation_provider.dart';
 import 'package:villabistromobile/providers/table_provider.dart';
-import 'package:villabistromobile/widgets/custom_app_bar.dart';
 
 class PaymentScreen extends StatefulWidget {
   final app_data.Table table;
@@ -42,7 +42,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   void _finalizePayment() async {
     setState(() => _isLoading = true);
-    final isDesktop = MediaQuery.of(context).size.width > 800;
     try {
       await Provider.of<TableProvider>(context, listen: false).closeAccount(
         table: widget.table,
@@ -50,9 +49,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
         paymentMethod: _paymentMethod,
       );
       if (mounted) {
-        if (isDesktop) {
-          Provider.of<NavigationProvider>(context, listen: false).popToHome();
-        } else {
+        // Volta para a tela de seleção de mesas após o pagamento
+        Provider.of<NavigationProvider>(context, listen: false).popToHome();
+        
+        // No celular, precisa de um pop extra para fechar a tela atual
+        if(MediaQuery.of(context).size.width <= 800) {
           Navigator.of(context).popUntil((route) => route.isFirst);
         }
       }
@@ -68,34 +69,66 @@ class _PaymentScreenState extends State<PaymentScreen> {
       }
     }
   }
+  
+  void _registerActions() {
+    final navProvider = Provider.of<NavigationProvider>(context, listen: false);
+    navProvider.setScreenActions([
+      if (_isLoading)
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16.0),
+          child: CircularProgressIndicator(),
+        )
+      else
+        Padding(
+          padding: const EdgeInsets.only(right: 8.0),
+          child: ElevatedButton.icon(
+            onPressed: _finalizePayment,
+            icon: const Icon(Icons.check_circle_outline),
+            label: const Text('Finalizar Pagamento'),
+          ),
+        ),
+    ]);
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDesktop = MediaQuery.of(context).size.width > 800;
+
+    Widget bodyContent = SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSummaryRow('Subtotal', widget.totalAmount, theme),
+          _buildModifierInput(_discountController, 'Desconto', theme),
+          _buildModifierInput(_surchargeController, 'Acréscimo', theme),
+          const SizedBox(height: 8),
+          _buildSummaryRow('Total a Pagar', finalAmount, theme, isFinal: true),
+          const SizedBox(height: 24),
+          Text('Forma de Pagamento',
+              style: TextStyle(
+                  color: theme.colorScheme.onBackground,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold)),
+          _buildPaymentMethodSelector(theme),
+        ],
+      ),
+    );
+
+    if (isDesktop) {
+       WidgetsBinding.instance.addPostFrameCallback((_) {
+        // setState é necessário aqui para reconstruir as ações quando _isLoading muda
+        if (mounted) setState(() => _registerActions());
+      });
+      return bodyContent;
+    }
+
     return Scaffold(
-      appBar: CustomAppBar(
-        title: 'Pagamento - Mesa ${widget.table.tableNumber}',
+      appBar: AppBar(
+        title: const Text('Pagamento'),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildSummaryRow('Subtotal', widget.totalAmount, theme),
-            _buildModifierInput(_discountController, 'Desconto', theme),
-            _buildModifierInput(_surchargeController, 'Acréscimo', theme),
-            const SizedBox(height: 8),
-            _buildSummaryRow('Total a Pagar', finalAmount, theme, isFinal: true),
-            const SizedBox(height: 24),
-            Text('Forma de Pagamento',
-                style: TextStyle(
-                    color: theme.colorScheme.onBackground,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold)),
-            _buildPaymentMethodSelector(theme),
-          ],
-        ),
-      ),
+      body: bodyContent,
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.all(16.0),
         child: _isLoading

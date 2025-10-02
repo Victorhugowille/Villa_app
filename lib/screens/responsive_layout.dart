@@ -1,50 +1,19 @@
+// lib/screens/responsive_layout.dart
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:villabistromobile/providers/navigation_provider.dart';
-import 'package:villabistromobile/widgets/side_menu.dart';
+import 'package:villabistromobile/screens/main_screen.dart';
+import 'package:villabistromobile/screens/table_selection_screen.dart';
 
 class ResponsiveLayout extends StatelessWidget {
   const ResponsiveLayout({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isDesktop = constraints.maxWidth > 800;
-        final navProvider = Provider.of<NavigationProvider>(context);
+    final double screenWidth = MediaQuery.of(context).size.width;
 
-        if (isDesktop) {
-          return Scaffold(
-            body: Row(
-              children: [
-                const SideMenu(),
-                Expanded(
-                  child: Column(
-                    children: [
-                      AppBar(
-                        title: Text(navProvider.currentTitle),
-                        automaticallyImplyLeading: false,
-                      ),
-                      Expanded(
-                        child: navProvider.currentScreen,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          );
-        } else {
-          // Layout para Mobile
-          return Scaffold(
-            appBar: AppBar(
-              title: Text(navProvider.currentTitle),
-            ),
-            drawer: const SideMenu(),
-            body: navProvider.currentScreen,
-          );
-        }
-      },
-    );
+    if (screenWidth > 800) {
+      return const MainScreen();
+    } else {
+      return const TableSelectionScreen();
+    }
   }
 }

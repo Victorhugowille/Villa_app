@@ -118,14 +118,14 @@ class _ReceiptLayoutEditorScreenState extends State<ReceiptLayoutEditorScreen> {
     return printingService.getReceiptPdfBytes(
       orders: [
         app_data.Order(
-          id: 1,
+          id: '1',
           items: [
             app_data.CartItem(
                 product: app_data.Product(
-                    id: 1,
+                    id: '1',
                     name: 'Produto Exemplo 1',
                     price: 10.0,
-                    categoryId: 1,
+                    categoryId: '1',
                     categoryName: 'Bebidas',
                     displayOrder: 1,
                     isSoldOut: false),
@@ -150,7 +150,6 @@ class _ReceiptLayoutEditorScreenState extends State<ReceiptLayoutEditorScreen> {
         final settings = printerProvider.receiptTemplateSettings;
         return Scaffold(
           appBar: CustomAppBar(
-            title: 'Layout da Impressão (Conferência)',
             actions: [
               IconButton(
                 icon: const Icon(Icons.preview_outlined),

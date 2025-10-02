@@ -1,3 +1,4 @@
+// lib/screens/management/table_management_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:villabistromobile/providers/table_provider.dart';
@@ -63,7 +64,7 @@ class _TableManagementScreenState extends State<TableManagementScreen> {
     );
   }
 
-  void _deleteTable(BuildContext context, int tableId) async {
+  void _deleteTable(BuildContext context, String tableId) async {
     try {
       await Provider.of<TableProvider>(context, listen: false).deleteTable(tableId);
       if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Mesa excluída com sucesso!')));

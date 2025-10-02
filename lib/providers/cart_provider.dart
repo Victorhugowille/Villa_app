@@ -2,20 +2,18 @@ import 'package:flutter/foundation.dart';
 import 'package:villabistromobile/data/app_data.dart' as app_data;
 
 class CartProvider with ChangeNotifier {
-  final Map<int, app_data.CartItem> _items = {};
+  final Map<String, app_data.CartItem> _items = {};
 
-  Map<int, app_data.CartItem> get items => {..._items};
+  Map<String, app_data.CartItem> get items => {..._items};
 
   List<app_data.CartItem> get itemsAsList {
     return _items.values.toList();
   }
 
-  // Retorna o número de produtos únicos no carrinho
   int get itemCount {
     return _items.length;
   }
 
-  // NOVO: Retorna a soma de todas as quantidades de itens
   int get totalItemsQuantity {
     return _items.values.fold(0, (sum, item) => sum + item.quantity);
   }
@@ -46,7 +44,7 @@ class CartProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  void removeSingleItem(int productId) {
+  void removeSingleItem(String productId) {
     if (!_items.containsKey(productId)) return;
     if (_items[productId]!.quantity > 1) {
       _items.update(
@@ -62,7 +60,7 @@ class CartProvider with ChangeNotifier {
   }
 
   void addItemsFromSelection(
-      Map<int, int> selection, List<app_data.Product> products) {
+      Map<String, int> selection, List<app_data.Product> products) {
     selection.forEach((productId, quantity) {
       if (quantity > 0) {
         final product = products.firstWhere((p) => p.id == productId);
@@ -75,16 +73,15 @@ class CartProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  void removeItem(int productId) {
+  void removeItem(String productId) {
     _items.remove(productId);
     notifyListeners();
   }
 
-  int getItemQuantity(int productId) {
+  int getItemQuantity(String productId) {
     return _items.containsKey(productId) ? _items[productId]!.quantity : 0;
   }
 
-  // Método 'clear()' removido para evitar duplicidade.
   void clearCart() {
     _items.clear();
     notifyListeners();

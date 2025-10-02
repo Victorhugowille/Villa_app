@@ -1,51 +1,122 @@
+// lib/screens/management/product_management_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:villabistromobile/data/app_data.dart';
 import 'package:villabistromobile/providers/navigation_provider.dart';
 import 'package:villabistromobile/providers/product_provider.dart';
 import 'package:villabistromobile/screens/management/product_edit_screen.dart';
-import 'package:villabistromobile/widgets/custom_app_bar.dart';
+import 'package:villabistromobile/widgets/product_details.dart';
+import 'package:villabistromobile/widgets/product_list.dart';
 
-class ProductManagementScreen extends StatelessWidget {
+class ProductManagementScreen extends StatefulWidget {
   const ProductManagementScreen({super.key});
 
   @override
+  State<ProductManagementScreen> createState() =>
+      _ProductManagementScreenState();
+}
+
+class _ProductManagementScreenState extends State<ProductManagementScreen> {
+  Product? _selectedProduct;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _refreshData();
+    });
+  }
+
+  Future<void> _refreshData() async {
+    await Provider.of<ProductProvider>(context, listen: false).fetchData();
+  }
+
+  void _registerActions() {
+    final navProvider = Provider.of<NavigationProvider>(context, listen: false);
+    final actions = [
+      IconButton(
+        icon: const Icon(Icons.add),
+        tooltip: 'Adicionar Produto',
+        onPressed: () {
+          setState(() {
+            _selectedProduct = null;
+          });
+          navProvider.navigateTo(
+              context, const ProductEditScreen(), 'Adicionar Produto');
+        },
+      ),
+    ];
+    navProvider.setScreenActions(actions);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final isDesktop = MediaQuery.of(context).size.width > 800;
     final navProvider = Provider.of<NavigationProvider>(context, listen: false);
 
-    return Scaffold(
-      appBar: CustomAppBar(
-        title: 'Gerenciar Produtos',
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            tooltip: 'Adicionar Produto',
-            onPressed: () {
-              navProvider.navigateTo(context, const ProductEditScreen(), 'Novo Produto');
-            },
+    if (isDesktop) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _registerActions();
+      });
+      return Row(
+        children: [
+          SizedBox(
+            width: 380,
+            child: ProductList(
+              selectedProduct: _selectedProduct,
+              onProductSelected: (product) {
+                setState(() {
+                  _selectedProduct = product;
+                });
+              },
+            ),
+          ),
+          const VerticalDivider(width: 1, thickness: 1),
+          Expanded(
+            child: ProductDetails(
+              product: _selectedProduct,
+              key: ValueKey(_selectedProduct?.id),
+            ),
           ),
         ],
-      ),
-      body: Consumer<ProductProvider>(
-        builder: (context, productProvider, child) {
-          if (productProvider.isLoading) {
-            return const Center(child: CircularProgressIndicator());
+      );
+    }
+
+    // Layout para Mobile
+    Widget bodyContent = Consumer<ProductProvider>(
+      builder: (context, productProvider, child) {
+        if (productProvider.products.isEmpty && productProvider.isLoading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final categories = productProvider.categories;
+        final products = productProvider.products;
+        final List<dynamic> groupedItems = [];
+
+        for (var category in categories) {
+          final productsInCategory =
+              products.where((p) => p.categoryId == category.id).toList();
+          if (productsInCategory.isNotEmpty) {
+            groupedItems.add(category);
+            groupedItems.addAll(productsInCategory);
           }
+        }
 
-          final categories = productProvider.categories;
-          final products = productProvider.products;
-          final List<dynamic> groupedItems = [];
+        if (groupedItems.isEmpty) {
+          return RefreshIndicator(
+            onRefresh: _refreshData,
+            child: ListView(
+              children: [
+                SizedBox(height: MediaQuery.of(context).size.height / 3),
+                const Center(child: Text('Nenhum produto encontrado.')),
+              ],
+            ),
+          );
+        }
 
-          for (var category in categories) {
-            final productsInCategory =
-                products.where((p) => p.categoryId == category.id).toList();
-            if (productsInCategory.isNotEmpty) {
-              groupedItems.add(category);
-              groupedItems.addAll(productsInCategory);
-            }
-          }
-
-          return ListView.builder(
+        return RefreshIndicator(
+          onRefresh: _refreshData,
+          child: ListView.builder(
             itemCount: groupedItems.length,
             itemBuilder: (ctx, index) {
               final item = groupedItems[index];
@@ -100,9 +171,26 @@ class ProductManagementScreen extends StatelessWidget {
 
               return const SizedBox.shrink();
             },
-          );
-        },
+          ),
+        );
+      },
+    );
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Gerenciar Produtos'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add),
+            tooltip: 'Adicionar Produto',
+            onPressed: () {
+              navProvider.navigateTo(
+                  context, const ProductEditScreen(), 'Adicionar Produto');
+            },
+          ),
+        ],
       ),
+      body: bodyContent,
     );
   }
 }

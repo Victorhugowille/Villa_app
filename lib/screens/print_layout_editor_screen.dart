@@ -1,3 +1,4 @@
+// lib/screens/print_layout_editor_screen.dart
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
@@ -59,8 +60,8 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
     final printingService = PrintingService();
     return printingService.getKitchenOrderPdfBytes(
       items: [
-        app_data.CartItem(product: app_data.Product(id: 1, name: 'Produto Exemplo 1', price: 10.0, categoryId: 1, categoryName: 'Bebidas', displayOrder: 1, isSoldOut: false), quantity: 2),
-        app_data.CartItem(product: app_data.Product(id: 2, name: 'Produto Exemplo 2', price: 15.0, categoryId: 1, categoryName: 'Bebidas', displayOrder: 2, isSoldOut: false), quantity: 1),
+        app_data.CartItem(product: app_data.Product(id: '1', name: 'Produto Exemplo 1', price: 10.0, categoryId: '1', categoryName: 'Bebidas', displayOrder: 1, isSoldOut: false), quantity: 2),
+        app_data.CartItem(product: app_data.Product(id: '2', name: 'Produto Exemplo 2', price: 15.0, categoryId: '1', categoryName: 'Bebidas', displayOrder: 2, isSoldOut: false), quantity: 1),
       ],
       tableNumber: 'XX',
       orderId: 999,
@@ -79,7 +80,6 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
 
         return Scaffold(
           appBar: CustomAppBar(
-            title: 'Layout da Impressão (Cozinha)',
             actions: [
               IconButton(
                 icon: const Icon(Icons.print_outlined),

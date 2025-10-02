@@ -1,10 +1,11 @@
+// lib/screens/product_selection_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:villabistromobile/data/app_data.dart' as app_data;
 import 'package:villabistromobile/providers/cart_provider.dart';
 import 'package:villabistromobile/providers/navigation_provider.dart';
 import 'package:villabistromobile/screens/cart_screen.dart';
-import 'package:villabistromobile/widgets/custom_app_bar.dart';
+import 'package:villabistromobile/widgets/side_menu.dart';
 
 class ProductSelectionScreen extends StatefulWidget {
   final app_data.Table table;
@@ -23,7 +24,7 @@ class ProductSelectionScreen extends StatefulWidget {
 }
 
 class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
-  late Map<int, int> _selection;
+  late Map<String, int> _selection;
 
   @override
   void initState() {
@@ -35,7 +36,7 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
     };
   }
 
-  void _updateSelection(int productId, int quantity) {
+  void _updateSelection(String productId, int quantity) {
     setState(() {
       _selection[productId] = quantity;
     });
@@ -109,26 +110,30 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
     );
 
     FloatingActionButton? fab = _totalSelectedItems > 0
-      ? FloatingActionButton.extended(
-          onPressed: () {
-            final cart = Provider.of<CartProvider>(context, listen: false);
-            Provider.of<NavigationProvider>(context, listen: false);
+        ? FloatingActionButton.extended(
+            onPressed: () {
+              final cart = Provider.of<CartProvider>(context, listen: false);
+              
+              cart.addItemsFromSelection(_selection, widget.products);
 
-            cart.addItemsFromSelection(_selection, widget.products);
-
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                    '$_totalSelectedItems tipo(s) de item atualizado(s) no carrinho.'),
-                backgroundColor: theme.primaryColor,
-              ),
-            );
-
-         Provider.of<NavigationProvider>(context, listen: false).pop();          },
-          icon: const Icon(Icons.shopping_cart_checkout),
-          label: const Text('ATUALIZAR CARRINHO'),
-        )
-      : null;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                      '$_totalSelectedItems tipo(s) de item atualizado(s) no carrinho.'),
+                  backgroundColor: theme.primaryColor,
+                ),
+              );
+              
+              if(isDesktop) {
+                 Provider.of<NavigationProvider>(context, listen: false).pop();
+              } else {
+                 Navigator.of(context).pop();
+              }
+            },
+            icon: const Icon(Icons.shopping_cart_checkout),
+            label: const Text('ATUALIZAR CARRINHO'),
+          )
+        : null;
     
     if (isDesktop) {
         return Stack(
@@ -145,8 +150,9 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
     }
 
     return Scaffold(
-      appBar: CustomAppBar(
-        title: widget.category.name,
+      drawer: const SideMenu(),
+      appBar: AppBar(
+        title: Text(widget.category.name),
         actions: [
           Consumer<CartProvider>(
             builder: (_, cart, ch) => Stack(
@@ -155,8 +161,7 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
                 IconButton(
                   icon: const Icon(Icons.shopping_cart_outlined, size: 28),
                   onPressed: () {
-                    final cartScreen = CartScreen(table: widget.table);
-                    Provider.of<NavigationProvider>(context, listen: false).navigateTo(context, cartScreen, 'Carrinho - Mesa ${widget.table.tableNumber}');
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => CartScreen(table: widget.table)));
                   },
                 ),
                 if (cart.totalItemsQuantity > 0)

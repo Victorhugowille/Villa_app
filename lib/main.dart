@@ -1,27 +1,31 @@
+// lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+
+// PROVIDERS
+import 'package:villabistromobile/providers/auth_provider.dart';
+import 'package:villabistromobile/providers/bot_provider.dart';
 import 'package:villabistromobile/providers/cart_provider.dart';
+import 'package:villabistromobile/providers/company_provider.dart';
+import 'package:villabistromobile/providers/estabelecimento_provider.dart';
+import 'package:villabistromobile/providers/kds_provider.dart';
 import 'package:villabistromobile/providers/navigation_provider.dart';
 import 'package:villabistromobile/providers/printer_provider.dart';
 import 'package:villabistromobile/providers/product_provider.dart';
-import 'package:villabistromobile/providers/table_provider.dart';
-import 'package:villabistromobile/providers/transaction_provider.dart';
-import 'package:villabistromobile/providers/theme_provider.dart';
-import 'package:villabistromobile/providers/kds_provider.dart';
-import 'package:villabistromobile/screens/splash_screen.dart';
-import 'package:villabistromobile/screens/login/login_screen.dart';
-import 'package:villabistromobile/screens/onboarding_screen.dart';
-import 'package:villabistromobile/screens/responsive_layout.dart';
 import 'package:villabistromobile/providers/report_provider.dart';
 import 'package:villabistromobile/providers/saved_report_provider.dart';
 import 'package:villabistromobile/providers/spreadsheet_provider.dart';
-import 'package:villabistromobile/providers/bot_provider.dart';
-import 'package:villabistromobile/providers/estabelecimento_provider.dart';
-import 'package:villabistromobile/providers/company_provider.dart';
-import 'package:villabistromobile/providers/auth_provider.dart';
+import 'package:villabistromobile/providers/table_provider.dart';
+import 'package:villabistromobile/providers/theme_provider.dart';
+import 'package:villabistromobile/providers/transaction_provider.dart';
 
+// SCREENS
+import 'package:villabistromobile/screens/login/login_screen.dart';
+import 'package:villabistromobile/screens/onboarding_screen.dart';
+import 'package:villabistromobile/screens/responsive_layout.dart'; // Import adicionado
+import 'package:villabistromobile/screens/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -39,20 +43,26 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: themeProvider),
+        ChangeNotifierProvider(create: (context) => AuthProvider()),
+        ChangeNotifierProvider(create: (context) => CompanyProvider()),
+        ChangeNotifierProvider(create: (context) => NavigationProvider()),
         ChangeNotifierProvider(create: (context) => CartProvider()),
         ChangeNotifierProvider(create: (context) => TableProvider()),
-        ChangeNotifierProvider(create: (context) => ProductProvider(context)),
         ChangeNotifierProvider(create: (context) => TransactionProvider()),
         ChangeNotifierProvider(create: (context) => PrinterProvider()),
         ChangeNotifierProvider(create: (context) => KdsProvider()),
         ChangeNotifierProvider(create: (context) => ReportProvider()),
         ChangeNotifierProvider(create: (context) => SavedReportProvider()),
         ChangeNotifierProvider(create: (context) => SpreadsheetProvider()),
-        ChangeNotifierProvider(create: (context) => NavigationProvider()),
         ChangeNotifierProvider(create: (context) => BotProvider()),
         ChangeNotifierProvider(create: (context) => EstabelecimentoProvider()),
-        ChangeNotifierProvider(create: (context) => CompanyProvider()),
-        ChangeNotifierProvider(create: (context) => AuthProvider()),
+        ChangeNotifierProxyProvider<AuthProvider, ProductProvider>(
+          create: (context) => ProductProvider(context.read<AuthProvider>()),
+          update: (context, auth, previousProductProvider) {
+            previousProductProvider!.updateAuthProvider(auth);
+            return previousProductProvider;
+          },
+        ),
       ],
       child: const MyApp(),
     ),
@@ -67,7 +77,7 @@ class MyApp extends StatelessWidget {
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, child) {
         return MaterialApp(
-          title: 'VILLABISTROMOBILE',
+          title: 'Villa Bistro Mobile',
           debugShowCheckedModeBanner: false,
           theme: themeProvider.getTheme,
           localizationsDelegates: const [
@@ -78,9 +88,8 @@ class MyApp extends StatelessWidget {
           supportedLocales: const [
             Locale('pt', 'BR'),
           ],
-          initialRoute: '/',
+          home: const SplashScreen(),
           routes: {
-            '/': (context) => const SplashScreen(),
             '/onboarding': (context) => const OnboardingScreen(),
             '/login': (context) => const LoginScreen(),
             '/home': (context) => const ResponsiveLayout(),

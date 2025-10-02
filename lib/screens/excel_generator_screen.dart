@@ -1,9 +1,11 @@
+// lib/screens/excel_generator_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:villabistromobile/providers/spreadsheet_provider.dart';
 import 'package:villabistromobile/screens/saved_spreadsheets_list_screen.dart';
+import 'package:villabistromobile/widgets/side_menu.dart';
 
 class ExcelGeneratorScreen extends StatefulWidget {
   const ExcelGeneratorScreen({super.key});
@@ -26,11 +28,13 @@ class _ExcelGeneratorScreenState extends State<ExcelGeneratorScreen> {
       _syncBodyControllers();
     });
   }
-  
+
   void _syncBodyControllers() {
     final provider = context.read<SpreadsheetProvider>();
     if (_bodyScrollControllers.length != provider.rows) {
-      _bodyScrollControllers.forEach((controller) => controller.dispose());
+      for (var controller in _bodyScrollControllers) {
+        controller.dispose();
+      }
       _bodyScrollControllers.clear();
       for (int i = 0; i < provider.rows; i++) {
         final controller = ScrollController();
@@ -50,15 +54,18 @@ class _ExcelGeneratorScreenState extends State<ExcelGeneratorScreen> {
   void dispose() {
     _nameController.dispose();
     _headerScrollController.dispose();
-    _bodyScrollControllers.forEach((controller) => controller.dispose());
+    for (var controller in _bodyScrollControllers) {
+      controller.dispose();
+    }
     super.dispose();
   }
-  
+
   void _syncHeaderScroll() {
     if (_isSyncing) return;
     _isSyncing = true;
     for (final controller in _bodyScrollControllers) {
-      if (controller.hasClients && controller.offset != _headerScrollController.offset) {
+      if (controller.hasClients &&
+          controller.offset != _headerScrollController.offset) {
         controller.jumpTo(_headerScrollController.offset);
       }
     }
@@ -68,11 +75,14 @@ class _ExcelGeneratorScreenState extends State<ExcelGeneratorScreen> {
   void _syncBodyScroll(ScrollController activeController) {
     if (_isSyncing) return;
     _isSyncing = true;
-    if (_headerScrollController.hasClients && _headerScrollController.offset != activeController.offset) {
+    if (_headerScrollController.hasClients &&
+        _headerScrollController.offset != activeController.offset) {
       _headerScrollController.jumpTo(activeController.offset);
     }
     for (final controller in _bodyScrollControllers) {
-      if (controller != activeController && controller.hasClients && controller.offset != activeController.offset) {
+      if (controller != activeController &&
+          controller.hasClients &&
+          controller.offset != activeController.offset) {
         controller.jumpTo(activeController.offset);
       }
     }
@@ -81,18 +91,20 @@ class _ExcelGeneratorScreenState extends State<ExcelGeneratorScreen> {
 
   Future<void> _saveSheet() async {
     if (_nameController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Por favor, dê um nome ao arquivo.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Por favor, dê um nome ao arquivo.')));
       return;
     }
     final provider = context.read<SpreadsheetProvider>();
     final success = await provider.saveSheet(_nameController.text.trim());
-    
+
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(success ? 'Arquivo salvo com sucesso!' : 'Erro ao salvar o arquivo.'),
+        content:
+            Text(success ? 'Arquivo salvo com sucesso!' : 'Erro ao salvar o arquivo.'),
         backgroundColor: success ? Colors.green : Colors.red,
       ));
-      
+
       if (success) {
         _nameController.clear();
         provider.clearSheet();
@@ -109,11 +121,13 @@ class _ExcelGeneratorScreenState extends State<ExcelGeneratorScreen> {
           content: const SingleChildScrollView(
             child: ListBody(
               children: <Widget>[
-                Text('SOMA COM CHECKBOX', style: TextStyle(fontWeight: FontWeight.bold)),
+                Text('SOMA COM CHECKBOX',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
                 Text('1. Marque as caixas para selecionar as células.'),
                 Text('2. Digite =SOMA em uma célula para ver o resultado.'),
                 SizedBox(height: 16),
-                Text('OPERAÇÕES BÁSICAS (2 valores)', style: TextStyle(fontWeight: FontWeight.bold)),
+                Text('OPERAÇÕES BÁSICAS (2 valores)',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
                 SizedBox(height: 8),
                 Text('Soma: =SUM(A1,B1)'),
                 Text('Subtração: =SUB(A1,B1)'),
@@ -139,18 +153,22 @@ class _ExcelGeneratorScreenState extends State<ExcelGeneratorScreen> {
       context: context,
       firstDate: DateTime(now.year - 5),
       lastDate: now,
-      initialDateRange: DateTimeRange(start: now.subtract(const Duration(days: 7)), end: now),
+      initialDateRange:
+          DateTimeRange(start: now.subtract(const Duration(days: 7)), end: now),
     );
 
     if (dateRange != null && mounted) {
       final provider = context.read<SpreadsheetProvider>();
-      final success = await provider.importTransactions(dateRange.start, dateRange.end.add(const Duration(days: 1)));
+      final success = await provider.importTransactions(
+          dateRange.start, dateRange.end.add(const Duration(days: 1)));
       if (!success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Nenhuma transação encontrada no período selecionado.')),
+          const SnackBar(
+              content: Text('Nenhuma transação encontrada no período selecionado.')),
         );
       } else if (success) {
-        _nameController.text = 'Relatório de ${DateFormat('dd-MM-yy').format(dateRange.start)} a ${DateFormat('dd-MM-yy').format(dateRange.end)}';
+        _nameController.text =
+            'Relatório de ${DateFormat('dd-MM-yy').format(dateRange.start)} a ${DateFormat('dd-MM-yy').format(dateRange.end)}';
       }
     }
   }
@@ -158,21 +176,31 @@ class _ExcelGeneratorScreenState extends State<ExcelGeneratorScreen> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<SpreadsheetProvider>();
+    final isDesktop = MediaQuery.of(context).size.width > 800;
     if (provider.currentSheetId == null) _nameController.clear();
-    
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            _buildToolbar(provider),
-            const SizedBox(height: 10),
-            Expanded(child: _buildSpreadsheet(provider)),
-          ],
-        ),
+
+    Widget bodyContent = Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        children: [
+          _buildToolbar(provider),
+          const SizedBox(height: 10),
+          Expanded(child: _buildSpreadsheet(provider)),
+        ],
       ),
     );
+
+    if (isDesktop) {
+      return bodyContent;
+    } else {
+      return Scaffold(
+        drawer: const SideMenu(),
+        appBar: AppBar(
+          title: const Text('Planilhas'),
+        ),
+        body: bodyContent,
+      );
+    }
   }
 
   Widget _buildToolbar(SpreadsheetProvider provider) {

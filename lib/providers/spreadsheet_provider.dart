@@ -1,3 +1,4 @@
+// lib/providers/spreadsheet_provider.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -13,7 +14,7 @@ class SpreadsheetProvider with ChangeNotifier {
   List<List<TextEditingController>> _controllers = [];
   List<List<FocusNode>> _focusNodes = [];
   List<app_data.CustomSpreadsheet> _savedSheets = [];
-  int? _currentSheetId;
+  String? _currentSheetId;
   
   Set<String> checkedCells = {};
   String? activeCellKey;
@@ -25,7 +26,7 @@ class SpreadsheetProvider with ChangeNotifier {
   List<List<TextEditingController>> get controllers => _controllers;
   List<List<FocusNode>> get focusNodes => _focusNodes;
   List<app_data.CustomSpreadsheet> get savedSheets => _savedSheets;
-  int? get currentSheetId => _currentSheetId;
+  String? get currentSheetId => _currentSheetId;
 
   SpreadsheetProvider() {
     _initializeNodes();
@@ -264,7 +265,7 @@ class SpreadsheetProvider with ChangeNotifier {
     }
   }
 
-  Future<void> loadSheet(int sheetId) async {
+  Future<void> loadSheet(String sheetId) async {
     _isLoading = true;
     notifyListeners();
     try {
@@ -296,7 +297,6 @@ class SpreadsheetProvider with ChangeNotifier {
         return _formulas[key] ?? controller.text;
       }).toList()).toList();
       
-      // MUDANÇA PRINCIPAL AQUI: REMOVIDO O jsonEncode
       final dataToSave = {'name': name, 'sheet_data': sheetData};
       
       if (_currentSheetId == null) {

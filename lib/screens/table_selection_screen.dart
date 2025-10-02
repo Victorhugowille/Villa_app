@@ -1,3 +1,4 @@
+// lib/screens/table_selection_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:villabistromobile/data/app_data.dart' as app_data;
@@ -6,6 +7,7 @@ import 'package:villabistromobile/providers/navigation_provider.dart';
 import 'package:villabistromobile/providers/table_provider.dart';
 import 'package:villabistromobile/screens/category_screen.dart';
 import 'package:villabistromobile/screens/order_list_screen.dart';
+import 'package:villabistromobile/widgets/side_menu.dart';
 
 class TableSelectionScreen extends StatefulWidget {
   const TableSelectionScreen({super.key});
@@ -54,8 +56,9 @@ class _TableSelectionScreenState extends State<TableSelectionScreen> {
                 icon: Icons.visibility,
                 title: 'Visualizar Pedidos',
                 onTap: () {
-                  Provider.of<NavigationProvider>(context, listen: false).navigateTo(
-                      context, OrderListScreen(table: table), 'Pedidos - Mesa ${table.tableNumber}');
+                  Provider.of<NavigationProvider>(context, listen: false)
+                      .navigateTo(context, OrderListScreen(table: table),
+                          'Pedidos - Mesa ${table.tableNumber}');
                 },
               ),
               _buildOptionTile(
@@ -64,7 +67,8 @@ class _TableSelectionScreenState extends State<TableSelectionScreen> {
                 title: 'Adicionar Itens',
                 onTap: () {
                   Provider.of<NavigationProvider>(context, listen: false)
-                      .navigateTo(context, CategoryScreen(table: table), 'Adicionar Itens');
+                      .navigateTo(context, CategoryScreen(table: table),
+                          'Adicionar Itens');
                 },
               ),
               _buildOptionTile(
@@ -92,8 +96,9 @@ class _TableSelectionScreenState extends State<TableSelectionScreen> {
               icon: Icons.visibility,
               title: 'Visualizar Pedidos',
               onTap: () {
-                Provider.of<NavigationProvider>(context, listen: false).navigateTo(
-                    context, OrderListScreen(table: table), 'Pedidos - Mesa ${table.tableNumber}');
+                Provider.of<NavigationProvider>(context, listen: false)
+                    .navigateTo(context, OrderListScreen(table: table),
+                        'Pedidos - Mesa ${table.tableNumber}');
               },
             ),
             _buildOptionTile(
@@ -102,7 +107,8 @@ class _TableSelectionScreenState extends State<TableSelectionScreen> {
               title: 'Fazer um novo pedido',
               onTap: () {
                 Provider.of<NavigationProvider>(context, listen: false)
-                    .navigateTo(context, CategoryScreen(table: table), 'Nova Venda');
+                    .navigateTo(
+                        context, CategoryScreen(table: table), 'Nova Venda');
               },
             ),
             _buildOptionTile(
@@ -172,6 +178,7 @@ class _TableSelectionScreenState extends State<TableSelectionScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = screenWidth > 800;
 
     int crossAxisCount;
     if (screenWidth > 1200) {
@@ -184,19 +191,19 @@ class _TableSelectionScreenState extends State<TableSelectionScreen> {
       crossAxisCount = 2;
     }
 
-    return Consumer<TableProvider>(
+    Widget screenContent = Consumer<TableProvider>(
       builder: (context, tableProvider, child) {
         if (tableProvider.isLoading) {
           return Center(
               child: CircularProgressIndicator(color: theme.primaryColor));
         }
-    
+
         if (tableProvider.tables.isEmpty) {
           return const Center(child: Text('Nenhuma mesa cadastrada.'));
         }
-    
+
         final tables = tableProvider.tables;
-    
+
         return RefreshIndicator(
           onRefresh: () => tableProvider.fetchAndSetTables(),
           child: GridView.builder(
@@ -211,11 +218,10 @@ class _TableSelectionScreenState extends State<TableSelectionScreen> {
             itemBuilder: (context, index) {
               final app_data.Table table = tables[index];
               final bool isOccupied = table.isOccupied;
-    
+
               return Card(
                 elevation: 4,
-                color:
-                    isOccupied ? Colors.red.shade700 : theme.cardColor,
+                color: isOccupied ? Colors.red.shade700 : theme.cardColor,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -253,5 +259,18 @@ class _TableSelectionScreenState extends State<TableSelectionScreen> {
         );
       },
     );
+
+    if (isDesktop) {
+      return screenContent;
+    } else {
+      return Scaffold(
+        drawer: const SideMenu(),
+        appBar: AppBar(
+          title: const Text('Seleção de Mesas'),
+        ),
+        body: screenContent,
+      );
+    }
+    
   }
 }

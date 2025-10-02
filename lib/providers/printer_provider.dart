@@ -1,3 +1,4 @@
+// lib/providers/printer_provider.dart
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -21,8 +22,8 @@ class PrinterProvider with ChangeNotifier {
   bool _isListening = false;
   bool get isListening => _isListening;
 
-  Map<int, Map<String, String>> _categoryPrinterSettings = {};
-  Map<int, Map<String, String>> get categoryPrinterSettings =>
+  Map<String, Map<String, String>> _categoryPrinterSettings = {};
+  Map<String, Map<String, String>> get categoryPrinterSettings =>
       _categoryPrinterSettings;
       
   PrintTemplateSettings _templateSettings = PrintTemplateSettings.defaults();
@@ -45,7 +46,7 @@ class PrinterProvider with ChangeNotifier {
     if (settingsString != null) {
       final decodedData = json.decode(settingsString) as Map<String, dynamic>;
       _categoryPrinterSettings = decodedData.map((key, value) {
-        return MapEntry(int.parse(key), Map<String, String>.from(value));
+        return MapEntry(key, Map<String, String>.from(value));
       });
     }
 
@@ -62,12 +63,10 @@ class PrinterProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> saveSettings(Map<int, Map<String, String>> newSettings) async {
+  Future<void> saveSettings(Map<String, Map<String, String>> newSettings) async {
     _categoryPrinterSettings = newSettings;
     final prefs = await SharedPreferences.getInstance();
-    final encodedData = _categoryPrinterSettings
-        .map((key, value) => MapEntry(key.toString(), value));
-    await prefs.setString('categoryPrinterSettings', json.encode(encodedData));
+    await prefs.setString('categoryPrinterSettings', json.encode(newSettings));
     notifyListeners();
     _addLog('Configurações de impressora salvas.');
   }
@@ -103,9 +102,6 @@ class PrinterProvider with ChangeNotifier {
         _templateSettings = _templateSettings.copyWith(logoPath: imagePath);
         _receiptTemplateSettings = _receiptTemplateSettings.copyWith(logoPath: imagePath);
 
-         _templateSettings = _templateSettings.copyWith(logoPath: imagePath);
-        _receiptTemplateSettings = _receiptTemplateSettings.copyWith(logoPath: imagePath);
-
         await saveTemplateSettings(_templateSettings);
         await saveReceiptTemplateSettings(_receiptTemplateSettings);
         _addLog('Novo logo salvo com sucesso.');
@@ -114,6 +110,7 @@ class PrinterProvider with ChangeNotifier {
       }
     }
   }
+
   void updateLogoHeight(double newHeight) {
     if (_templateSettings.logoHeight != newHeight) {
       _templateSettings = _templateSettings.copyWith(logoHeight: newHeight);
@@ -170,7 +167,7 @@ class PrinterProvider with ChangeNotifier {
   Future<void> _handleNewOrder(Map<String, dynamic> newOrderData) async {
     if (newOrderData.isEmpty) return;
 
-    final orderId = newOrderData['id'];
+    final orderId = newOrderData['id'] as String;
     _addLog('Novo pedido recebido: #$orderId');
 
     try {
@@ -191,7 +188,7 @@ class PrinterProvider with ChangeNotifier {
   }
 
   Future<void> _routeAndPrintOrder(
-      List<app_data.CartItem> items, String tableNumber, int orderId) async {
+      List<app_data.CartItem> items, String tableNumber, String orderId) async {
     final groupedBySettings = groupBy(
         items, (item) => _categoryPrinterSettings[item.product.categoryId]);
 
@@ -217,7 +214,7 @@ class PrinterProvider with ChangeNotifier {
           await _printingService.printKitchenOrder(
             items: itemsForPrinter,
             tableNumber: tableNumber,
-            orderId: orderId,
+            orderId: int.parse(orderId),
             printer: selectedPrinter,
             paperSize: paperSize,
             templateSettings: _templateSettings,

@@ -1,15 +1,18 @@
+// lib/screens/transactions_report_screen.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:villabistromobile/providers/transaction_provider.dart';
 import 'package:villabistromobile/widgets/charts/daily_revenue_bar_chart.dart';
 import 'package:villabistromobile/widgets/charts/payment_method_pie_chart.dart';
+import 'package:villabistromobile/widgets/side_menu.dart';
 
 class TransactionsReportScreen extends StatefulWidget {
   const TransactionsReportScreen({super.key});
 
   @override
-  State<TransactionsReportScreen> createState() => _TransactionsReportScreenState();
+  State<TransactionsReportScreen> createState() =>
+      _TransactionsReportScreenState();
 }
 
 class _TransactionsReportScreenState extends State<TransactionsReportScreen>
@@ -25,7 +28,7 @@ class _TransactionsReportScreenState extends State<TransactionsReportScreen>
     final provider = Provider.of<TransactionProvider>(context, listen: false);
     _startDate = provider.startDate;
     _endDate = provider.endDate;
-    
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       provider.fetchDailyTransactions();
     });
@@ -40,7 +43,7 @@ class _TransactionsReportScreenState extends State<TransactionsReportScreen>
   Future<void> _selectDate(BuildContext context, bool isStartDate) async {
     final provider = Provider.of<TransactionProvider>(context, listen: false);
     final initialDate = isStartDate ? _startDate : _endDate;
-    
+
     final picked = await showDatePicker(
       context: context,
       initialDate: initialDate,
@@ -63,48 +66,64 @@ class _TransactionsReportScreenState extends State<TransactionsReportScreen>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDesktop = MediaQuery.of(context).size.width > 800;
     final transactionProvider = Provider.of<TransactionProvider>(context);
     final DateFormat formatter = DateFormat('dd/MM/yyyy');
 
-    return Scaffold(
-      body: Column(
-        children: [
-          _buildDateSelector(context, formatter, theme),
-          _buildSummaryCards(transactionProvider, theme),
-          const SizedBox(height: 8),
-          Expanded(
-            child: transactionProvider.isLoading
-                ? Center(child: CircularProgressIndicator(color: theme.primaryColor))
-                : transactionProvider.transactions.isEmpty
-                    ? const Center(
-                        child: Text('Nenhuma transação encontrada para o período selecionado.'),
-                      )
-                    : Column(
-                        children: [
-                          TabBar(
+    Widget bodyContent = Column(
+      children: [
+        _buildDateSelector(context, formatter, theme),
+        _buildSummaryCards(transactionProvider, theme),
+        const SizedBox(height: 8),
+        Expanded(
+          child: transactionProvider.isLoading
+              ? Center(child: CircularProgressIndicator(color: theme.primaryColor))
+              : transactionProvider.transactions.isEmpty
+                  ? const Center(
+                      child: Text(
+                          'Nenhuma transação encontrada para o período selecionado.'),
+                    )
+                  : Column(
+                      children: [
+                        TabBar(
+                          controller: _tabController,
+                          tabs: const [
+                            Tab(icon: Icon(Icons.pie_chart), text: 'Pagamentos'),
+                            Tab(icon: Icon(Icons.bar_chart), text: 'Faturamento'),
+                            Tab(icon: Icon(Icons.list_alt), text: 'Detalhes'),
+                          ],
+                        ),
+                        Expanded(
+                          child: TabBarView(
                             controller: _tabController,
-                            tabs: const [
-                              Tab(icon: Icon(Icons.pie_chart), text: 'Pagamentos'),
-                              Tab(icon: Icon(Icons.bar_chart), text: 'Faturamento'),
-                              Tab(icon: Icon(Icons.list_alt), text: 'Detalhes'),
+                            children: [
+                              _buildChartCard(PaymentMethodPieChart(
+                                  revenueByPaymentMethod: transactionProvider
+                                      .revenueByPaymentMethod)),
+                              _buildChartCard(DailyRevenueBarChart(
+                                  dailyRevenue:
+                                      transactionProvider.dailyRevenue)),
+                              _buildTransactionList(transactionProvider, theme),
                             ],
                           ),
-                          Expanded(
-                            child: TabBarView(
-                              controller: _tabController,
-                              children: [
-                                _buildChartCard(PaymentMethodPieChart(revenueByPaymentMethod: transactionProvider.revenueByPaymentMethod)),
-                                _buildChartCard(DailyRevenueBarChart(dailyRevenue: transactionProvider.dailyRevenue)),
-                                _buildTransactionList(transactionProvider, theme),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-          ),
-        ],
-      ),
+                        ),
+                      ],
+                    ),
+        ),
+      ],
     );
+
+    if (isDesktop) {
+      return bodyContent;
+    } else {
+      return Scaffold(
+        drawer: const SideMenu(),
+        appBar: AppBar(
+          title: const Text('Relatório de Movimentação'),
+        ),
+        body: bodyContent,
+      );
+    }
   }
 
   Widget _buildChartCard(Widget chart) {
@@ -116,21 +135,25 @@ class _TransactionsReportScreenState extends State<TransactionsReportScreen>
     );
   }
 
-  Widget _buildDateSelector(BuildContext context, DateFormat formatter, ThemeData theme) {
+  Widget _buildDateSelector(
+      BuildContext context, DateFormat formatter, ThemeData theme) {
     return Padding(
       padding: const EdgeInsets.all(12.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          _buildDateButton('De:', formatter.format(_startDate), () => _selectDate(context, true), theme),
+          _buildDateButton('De:', formatter.format(_startDate),
+              () => _selectDate(context, true), theme),
           const SizedBox(width: 20),
-          _buildDateButton('Até:', formatter.format(_endDate), () => _selectDate(context, false), theme),
+          _buildDateButton('Até:', formatter.format(_endDate),
+              () => _selectDate(context, false), theme),
         ],
       ),
     );
   }
 
-  Widget _buildDateButton(String label, String dateText, VoidCallback onPressed, ThemeData theme) {
+  Widget _buildDateButton(
+      String label, String dateText, VoidCallback onPressed, ThemeData theme) {
     return Column(
       children: [
         Text(label),
@@ -151,9 +174,17 @@ class _TransactionsReportScreenState extends State<TransactionsReportScreen>
                 padding: const EdgeInsets.all(12.0),
                 child: Column(
                   children: [
-                    Text('Faturamento Total', style: TextStyle(fontSize: 14, color: theme.colorScheme.onBackground.withOpacity(0.7))),
+                    Text('Faturamento Total',
+                        style: TextStyle(
+                            fontSize: 14,
+                            color: theme.colorScheme.onBackground
+                                .withOpacity(0.7))),
                     const SizedBox(height: 4),
-                    Text('R\$ ${provider.totalRevenue.toStringAsFixed(2)}', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: theme.colorScheme.onBackground)),
+                    Text('R\$ ${provider.totalRevenue.toStringAsFixed(2)}',
+                        style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.onBackground)),
                   ],
                 ),
               ),
@@ -167,9 +198,17 @@ class _TransactionsReportScreenState extends State<TransactionsReportScreen>
                 padding: const EdgeInsets.all(12.0),
                 child: Column(
                   children: [
-                    Text('Nº de Transações', style: TextStyle(fontSize: 14, color: theme.colorScheme.onBackground.withOpacity(0.7))),
+                    Text('Nº de Transações',
+                        style: TextStyle(
+                            fontSize: 14,
+                            color: theme.colorScheme.onBackground
+                                .withOpacity(0.7))),
                     const SizedBox(height: 4),
-                    Text('${provider.transactions.length}', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: theme.colorScheme.onBackground)),
+                    Text('${provider.transactions.length}',
+                        style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.onBackground)),
                   ],
                 ),
               ),
@@ -191,10 +230,20 @@ class _TransactionsReportScreenState extends State<TransactionsReportScreen>
           child: ListTile(
             leading: CircleAvatar(
               backgroundColor: theme.primaryColor,
-              child: Text('M${transaction.tableNumber}', style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onPrimary)),
+              child: Text('M${transaction.tableNumber}',
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onPrimary)),
             ),
-            title: Text('Total: R\$ ${transaction.totalAmount.toStringAsFixed(2)}', style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
-            subtitle: Text('${transaction.paymentMethod} - ${DateFormat('dd/MM HH:mm').format(transaction.timestamp)}', style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.7))),
+            title: Text(
+                'Total: R\$ ${transaction.totalAmount.toStringAsFixed(2)}',
+                style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.onSurface)),
+            subtitle: Text(
+                '${transaction.paymentMethod} - ${DateFormat('dd/MM HH:mm').format(transaction.timestamp)}',
+                style: TextStyle(
+                    color: theme.colorScheme.onSurface.withOpacity(0.7))),
           ),
         );
       },

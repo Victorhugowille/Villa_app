@@ -129,7 +129,7 @@ class CartScreen extends StatelessWidget {
                         );
                         cart.clearCart();
                         
-                        navProvider.popToHome();
+                        navProvider.pop();
                       },
                     )
                   ],

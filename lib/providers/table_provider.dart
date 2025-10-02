@@ -1,3 +1,4 @@
+// lib/providers/table_provider.dart
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:villabistromobile/data/app_data.dart' as app_data;
@@ -46,7 +47,7 @@ class TableProvider with ChangeNotifier {
     }
   }
 
-  Future<bool> updateTable(int tableId, int newNumber) async {
+  Future<bool> updateTable(String tableId, int newNumber) async {
     try {
       final response = await _supabase.from(_tableMesa).update({'numero': newNumber}).eq('id', tableId).select().single();
       final index = _tables.indexWhere((t) => t.id == tableId);
@@ -62,7 +63,7 @@ class TableProvider with ChangeNotifier {
     }
   }
 
-  Future<bool> deleteTable(int tableId) async {
+  Future<bool> deleteTable(String tableId) async {
     final index = _tables.indexWhere((t) => t.id == tableId);
     if (index == -1) return false;
 
@@ -81,7 +82,7 @@ class TableProvider with ChangeNotifier {
     }
   }
 
-  Future<bool> updateStatus(int tableId, String newStatus) async {
+  Future<bool> updateStatus(String tableId, String newStatus) async {
     try {
       await _supabase.from(_tableMesa).update({'status': newStatus}).eq('id', tableId);
       final index = _tables.indexWhere((t) => t.id == tableId);
@@ -100,7 +101,7 @@ class TableProvider with ChangeNotifier {
     }
   }
 
-  Future<bool> placeOrder({required int tableId, required List<app_data.CartItem> items}) async {
+  Future<bool> placeOrder({required String tableId, required List<app_data.CartItem> items}) async {
     final userId = _supabase.auth.currentUser?.id;
     if (userId == null) {
       debugPrint("Erro: Usuário não autenticado para fazer pedido.");
@@ -137,7 +138,7 @@ class TableProvider with ChangeNotifier {
     }
   }
 
-  Future<List<app_data.Order>> getOrdersForTable(int tableId) async {
+  Future<List<app_data.Order>> getOrdersForTable(String tableId) async {
     try {
       final response = await _supabase
           .from('pedidos')
@@ -152,7 +153,7 @@ class TableProvider with ChangeNotifier {
     }
   }
 
-  Future<bool> clearTable(int tableId) async {
+  Future<bool> clearTable(String tableId) async {
     try {
       await _supabase
           .from('pedidos')
@@ -168,7 +169,7 @@ class TableProvider with ChangeNotifier {
     }
   }
 
-  Future<bool> deleteOrder(int orderId) async {
+  Future<bool> deleteOrder(String orderId) async {
     try {
       await _supabase.from('pedidos').delete().eq('id', orderId);
       return true;

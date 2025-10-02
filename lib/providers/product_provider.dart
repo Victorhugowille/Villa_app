@@ -3,72 +3,77 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:villabistromobile/data/app_data.dart' as app_data;
 import 'package:villabistromobile/providers/auth_provider.dart';
 
 class ProductProvider with ChangeNotifier {
   final SupabaseClient _supabase = Supabase.instance.client;
-  final BuildContext context;
+  AuthProvider? _authProvider;
 
   List<app_data.Product> _products = [];
   List<app_data.Category> _categories = [];
-  List<app_data.Adicional> _adicionais = [];
-  bool isLoading = true;
+  bool _isLoading = false;
 
   List<app_data.Product> get products => _products;
   List<app_data.Category> get categories => _categories;
-  List<app_data.Adicional> get adicionais => _adicionais;
+  bool get isLoading => _isLoading;
 
-  ProductProvider(this.context) {
-    fetchData();
+  ProductProvider(this._authProvider);
+
+  void updateAuthProvider(AuthProvider newAuthProvider) {
+    final oldCompanyId = _authProvider?.companyId;
+    _authProvider = newAuthProvider;
+    final newCompanyId = newAuthProvider.companyId;
+
+    if (newCompanyId != null && newCompanyId != oldCompanyId) {
+      fetchData();
+    }
   }
 
-  String _getCompanyId() {
-    final companyId = Provider.of<AuthProvider>(context, listen: false).companyId;
-    if (companyId == null) {
-      throw Exception('ID da empresa não encontrado. O usuário está logado?');
-    }
-    return companyId;
+  String? _getCompanyId() {
+    return _authProvider?.companyId;
   }
 
   Future<void> fetchData() async {
-    isLoading = true;
+    final companyId = _getCompanyId();
+    if (companyId == null) {
+      debugPrint("ProductProvider: Tentativa de buscar dados sem companyId. Aguardando...");
+      return; 
+    }
+
+    _isLoading = true;
     notifyListeners();
     try {
-      final companyId = _getCompanyId();
       final results = await Future.wait([
         _supabase.from('produtos').select('*, categorias(name)').eq('company_id', companyId).order('display_order', ascending: true),
         _supabase.from('categorias').select().eq('company_id', companyId).order('name', ascending: true),
-        _supabase.from('adicionais').select().eq('company_id', companyId).order('name', ascending: true),
       ]);
 
       final productData = results[0] as List;
       final categoryData = results[1] as List;
-      final adicionalData = results[2] as List;
 
       _products = productData.map((item) => app_data.Product.fromJson(item)).toList();
       _categories = categoryData.map((item) => app_data.Category.fromJson(item)).toList();
-      _adicionais = adicionalData.map((item) => app_data.Adicional.fromJson(item)).toList();
-
     } catch (error) {
-      debugPrint("Erro ao buscar dados: $error");
+      debugPrint("ProductProvider - Erro ao buscar dados: $error");
       _products = [];
       _categories = [];
-      _adicionais = [];
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
-    isLoading = false;
-    notifyListeners();
   }
-  
+
   Future<void> addCategory(String name, IconData icon) async {
+    final companyId = _getCompanyId();
+    if (companyId == null) throw Exception('Usuário não autenticado.');
     try {
       await _supabase.from('categorias').insert({
         'name': name,
         'icon_code_point': icon.codePoint,
         'icon_font_family': icon.fontFamily,
-        'company_id': _getCompanyId(),
+        'company_id': companyId,
       });
       await fetchData();
     } on PostgrestException catch (error) {
@@ -80,83 +85,178 @@ class ProductProvider with ChangeNotifier {
       throw Exception('Falha ao criar categoria.');
     }
   }
-  
-  Future<void> addAdicional(String name, double price) async {
+
+  Future<void> updateCategory(String id, String name, IconData icon) async {
+    final companyId = _getCompanyId();
+    if (companyId == null) throw Exception('Usuário não autenticado.');
     try {
-      await _supabase.from('adicionais').insert({
+      await _supabase.from('categorias').update({
+        'name': name,
+        'icon_code_point': icon.codePoint,
+        'icon_font_family': icon.fontFamily,
+      }).eq('id', id).eq('company_id', companyId);
+      await fetchData();
+    } catch(error) {
+      throw Exception('Falha ao atualizar categoria.');
+    }
+  }
+
+  Future<void> deleteCategory(String id) async {
+    final companyId = _getCompanyId();
+    if (companyId == null) throw Exception('Usuário não autenticado.');
+    try {
+      await _supabase.from('categorias').delete().eq('id', id).eq('company_id', companyId);
+      await fetchData();
+    } catch (error) {
+      throw Exception('Falha ao deletar categoria. Verifique se ela não está sendo usada por algum produto.');
+    }
+  }
+
+  Future<List<app_data.GrupoAdicional>> getGruposAdicionaisParaProduto(String produtoId) async {
+    try {
+      final response = await _supabase
+          .from('grupos_adicionais')
+          .select('*, adicionais(*)')
+          .eq('produto_id', produtoId)
+          .order('name', ascending: true);
+      
+      return response.map((item) => app_data.GrupoAdicional.fromJson(item)).toList();
+    } catch (e) {
+      debugPrint('Erro ao buscar grupos de adicionais: $e');
+      return [];
+    }
+  }
+
+  Future<void> addGrupoAdicional(String name, String produtoId, XFile? imageFile) async {
+    final companyId = _getCompanyId();
+    if (companyId == null) throw Exception('Usuário não autenticado.');
+    try {
+      final newGrupo = await _supabase.from('grupos_adicionais').insert({
+        'name': name,
+        'produto_id': produtoId,
+        'company_id': companyId,
+      }).select().single();
+      
+      if (imageFile != null) {
+        final newGrupoId = newGrupo['id'].toString();
+        final imageUrl = await _uploadImage(imageFile, 'grupos', newGrupoId);
+        if (imageUrl != null) {
+          await _supabase.from('grupos_adicionais').update({'image_url': imageUrl}).eq('id', newGrupoId);
+        }
+      }
+    } catch (e) {
+      throw Exception('Falha ao criar grupo de adicionais.');
+    }
+  }
+  
+  Future<void> updateGrupoAdicional(String id, String name, XFile? imageFile) async {
+    try {
+      final updates = <String, dynamic>{'name': name};
+      if (imageFile != null) {
+        final imageUrl = await _uploadImage(imageFile, 'grupos', id);
+        if (imageUrl != null) {
+          updates['image_url'] = imageUrl;
+        }
+      }
+      await _supabase.from('grupos_adicionais').update(updates).eq('id', id);
+    } catch (e) {
+       throw Exception('Falha ao atualizar grupo de adicionais.');
+    }
+  }
+
+  Future<void> deleteGrupoAdicional(String id) async {
+    try {
+      await _supabase.from('grupos_adicionais').delete().eq('id', id);
+    } catch (e) {
+      throw Exception('Falha ao deletar grupo.');
+    }
+  }
+
+  Future<void> addAdicionalToGrupo({
+    required String name,
+    required double price,
+    required String grupoId,
+    XFile? imageFile,
+  }) async {
+    final companyId = _getCompanyId();
+    if (companyId == null) throw Exception('Usuário não autenticado.');
+    try {
+      final newAdicional = await _supabase.from('adicionais').insert({
         'name': name,
         'price': price,
-        'company_id': _getCompanyId(),
-      });
-      await fetchData();
+        'grupo_id': grupoId,
+        'company_id': companyId,
+      }).select().single();
+
+      if (imageFile != null) {
+        final newAdicionalId = newAdicional['id'].toString();
+        final imageUrl = await _uploadImage(imageFile, 'adicionais', newAdicionalId);
+        if (imageUrl != null) {
+          await _supabase.from('adicionais').update({'image_url': imageUrl}).eq('id', newAdicionalId);
+        }
+      }
     } on PostgrestException catch (error) {
       if (error.code == '23505') {
         throw Exception('Um adicional com este nome já existe.');
       }
       rethrow;
     } catch (error) {
+      debugPrint('ERRO AO ADICIONAR ADICIONAL: $error');
       throw Exception('Falha ao criar adicional.');
     }
   }
 
-  Future<void> updateAdicional(int id, String name, double price) async {
+  Future<void> updateAdicional({
+    required String id,
+    required String name,
+    required double price,
+    XFile? imageFile,
+  }) async {
     try {
-      await _supabase.from('adicionais').update({
-        'name': name,
-        'price': price,
-      }).eq('id', id).eq('company_id', _getCompanyId());
-      await fetchData();
+      final updates = <String, dynamic>{'name': name, 'price': price};
+      if(imageFile != null) {
+        final imageUrl = await _uploadImage(imageFile, 'adicionais', id);
+        if (imageUrl != null) {
+          updates['image_url'] = imageUrl;
+        }
+      }
+      await _supabase.from('adicionais').update(updates).eq('id', id);
     } catch (error) {
       throw Exception('Falha ao atualizar adicional.');
     }
   }
-
-  Future<void> deleteAdicional(int id) async {
+  
+  Future<void> deleteAdicional(String id) async {
     try {
-      await _supabase.from('adicionais').delete().eq('id', id).eq('company_id', _getCompanyId());
-      await fetchData();
+      await _supabase.from('adicionais').delete().eq('id', id);
     } catch (error) {
-      throw Exception('Falha ao deletar adicional. Verifique se ele não está vinculado a um produto.');
-    }
-  }
-  Future<List<int>> getAdicionaisForProduct(int productId) async {
-    try {
-      final response = await _supabase
-          .from('produtos_adicionais')
-          .select('adicional_id')
-          .eq('produto_id', productId);
-      
-      return response.map<int>((item) => item['adicional_id'] as int).toList();
-    } catch (e) {
-      debugPrint('Erro ao buscar adicionais do produto: $e');
-      return [];
+      throw Exception('Falha ao deletar adicional.');
     }
   }
 
-  Future<String?> _uploadProductImage(XFile imageFile, int productId) async {
-    try {
-      final user = _supabase.auth.currentUser;
-      if (user == null) throw Exception('Usuário não autenticado.');
-      
-      final fileExt = imageFile.path.split('.').last;
-      final path = '${_getCompanyId()}/$productId.$fileExt';
+  Future<String?> _uploadImage(XFile imageFile, String folder, String entityId) async {
+    final companyId = _getCompanyId();
+    if (companyId == null) throw Exception('Usuário não autenticado para upload.');
+     try {
+       final fileExt = imageFile.path.split('.').last;
+       final path = '$companyId/$folder/$entityId.$fileExt';
 
-      await _supabase.storage.from('product_images').upload(
-        path,
-        File(imageFile.path),
-        fileOptions: const FileOptions(cacheControl: '3600', upsert: true),
-      );
-
-      return _supabase.storage.from('product_images').getPublicUrl(path);
+       await _supabase.storage.from('product_images').upload(
+         path,
+         File(imageFile.path),
+         fileOptions: const FileOptions(cacheControl: '3600', upsert: true),
+       );
+       return _supabase.storage.from('product_images').getPublicUrl(path);
     } catch (e) {
       debugPrint("Erro no upload da imagem: $e");
       return null;
     }
   }
 
-  Future<void> addProduct(String name, double price, int categoryId, int displayOrder, bool isSoldOut, XFile? imageFile, List<int> adicionalIds) async {
+  Future<String> addProduct(String name, double price, String categoryId, int displayOrder, bool isSoldOut, XFile? imageFile) async {
+    final companyId = _getCompanyId();
+    if (companyId == null) throw Exception('Usuário não autenticado.');
     try {
-      final companyId = _getCompanyId();
       final newProduct = await _supabase.from('produtos').insert({
         'name': name,
         'price': price,
@@ -166,32 +266,27 @@ class ProductProvider with ChangeNotifier {
         'company_id': companyId,
       }).select().single();
 
-      final newProductId = newProduct['id'];
+      final newProductId = newProduct['id'].toString();
 
       if (imageFile != null) {
-        final imageUrl = await _uploadProductImage(imageFile, newProductId);
+        final imageUrl = await _uploadImage(imageFile, 'produtos', newProductId);
         if (imageUrl != null) {
           await _supabase.from('produtos').update({'image_url': imageUrl}).eq('id', newProductId);
         }
       }
-
-      if (adicionalIds.isNotEmpty) {
-        final newLinks = adicionalIds.map((adicionalId) => {
-          'produto_id': newProductId,
-          'adicional_id': adicionalId,
-        }).toList();
-        await _supabase.from('produtos_adicionais').insert(newLinks);
-      }
-
       await fetchData();
+      return newProductId;
     } catch (error) {
+      debugPrint('ERRO DETALHADO AO ADICIONAR PRODUTO: $error');
       throw Exception('Falha ao adicionar produto.');
     }
   }
 
-  Future<void> updateProduct(int id, String name, double price, int categoryId, bool isSoldOut, XFile? imageFile, List<int> adicionalIds) async {
+  Future<void> updateProduct(String id, String name, double price, String categoryId, bool isSoldOut, XFile? imageFile) async {
+    final companyId = _getCompanyId();
+    if (companyId == null) throw Exception('Usuário não autenticado.');
     try {
-      final updates = {
+      final updates = <String, dynamic>{
         'name': name,
         'price': price,
         'category_id': categoryId,
@@ -199,61 +294,30 @@ class ProductProvider with ChangeNotifier {
       };
 
       if (imageFile != null) {
-        final imageUrl = await _uploadProductImage(imageFile, id);
+        final imageUrl = await _uploadImage(imageFile, 'produtos', id);
         if (imageUrl != null) {
           updates['image_url'] = imageUrl;
         }
       }
 
-      await _supabase.from('produtos').update(updates).eq('id', id).eq('company_id', _getCompanyId());
-
-      await _supabase.from('produtos_adicionais').delete().eq('produto_id', id);
-
-      if (adicionalIds.isNotEmpty) {
-        final newLinks = adicionalIds.map((adicionalId) => {
-          'produto_id': id,
-          'adicional_id': adicionalId,
-        }).toList();
-        await _supabase.from('produtos_adicionais').insert(newLinks);
-      }
-      
+      await _supabase.from('produtos').update(updates).eq('id', id).eq('company_id', companyId);
       await fetchData();
     } catch (error) {
       throw Exception('Falha ao atualizar produto.');
     }
   }
   
-  Future<void> deleteProduct(int id) async {
+  Future<void> deleteProduct(String id) async {
+    final companyId = _getCompanyId();
+    if (companyId == null) throw Exception('Usuário não autenticado.');
     try {
-      await _supabase.from('produtos').delete().eq('id', id).eq('company_id', _getCompanyId());
+      await _supabase.from('produtos').delete().eq('id', id).eq('company_id', companyId);
       await fetchData();
     } catch (error) {
       throw Exception('Falha ao deletar produto.');
     }
   }
 
-  Future<void> updateCategory(int id, String name, IconData icon) async {
-    try {
-      await _supabase.from('categorias').update({
-        'name': name,
-        'icon_code_point': icon.codePoint,
-        'icon_font_family': icon.fontFamily,
-      }).eq('id', id).eq('company_id', _getCompanyId());
-      await fetchData();
-    } catch(error) {
-      throw Exception('Falha ao atualizar categoria.');
-    }
-  }
-
-  Future<void> deleteCategory(int id) async {
-    try {
-      await _supabase.from('categorias').delete().eq('id', id).eq('company_id', _getCompanyId());
-      await fetchData();
-    } catch (error) {
-      throw Exception('Falha ao deletar categoria. Verifique se ela não está sendo usada por algum produto.');
-    }
-  }
-  
   Future<void> updateProductOrder(List<app_data.Product> products) async {
     try {
       final updates = products.asMap().entries.map((entry) {

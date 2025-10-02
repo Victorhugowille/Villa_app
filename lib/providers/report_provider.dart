@@ -1,3 +1,4 @@
+// lib/providers/report_provider.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
@@ -54,7 +55,7 @@ class ReportProvider with ChangeNotifier {
 
       for (final transaction in transactions) {
         final row = [
-          IntCellValue(transaction.id),
+          TextCellValue(transaction.id),
           IntCellValue(transaction.tableNumber),
           DoubleCellValue(transaction.totalAmount),
           TextCellValue(transaction.paymentMethod),

@@ -13,26 +13,27 @@ import 'package:villabistromobile/providers/product_provider.dart';
 import 'package:villabistromobile/services/printing_service.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:villabistromobile/data/app_data.dart' as app_data;
+import 'package:villabistromobile/widgets/side_menu.dart';
 
 class PrinterModelScreen extends StatelessWidget {
   const PrinterModelScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
+    final isDesktop = MediaQuery.of(context).size.width > 800;
+
+    Widget bodyContent = const DefaultTabController(
       length: 3,
       child: Scaffold(
-        appBar: AppBar(
-          toolbarHeight: 0,
-          bottom: const TabBar(
-            tabs: [
-              Tab(icon: Icon(Icons.print), text: 'Impressoras'),
-              Tab(icon: Icon(Icons.receipt_long), text: 'Cupom Cliente'),
-              Tab(icon: Icon(Icons.kitchen), text: 'Pedido Cozinha'),
-            ],
-          ),
+        // A AppBar interna é usada para as abas
+        appBar: TabBar(
+          tabs: [
+            Tab(icon: Icon(Icons.print), text: 'Impressoras'),
+            Tab(icon: Icon(Icons.receipt_long), text: 'Cupom Cliente'),
+            Tab(icon: Icon(Icons.kitchen), text: 'Pedido Cozinha'),
+          ],
         ),
-        body: const TabBarView(
+        body: TabBarView(
           children: [
             _CategoryPrinterSettingsTab(),
             _ReceiptLayoutEditorTab(),
@@ -41,10 +42,37 @@ class PrinterModelScreen extends StatelessWidget {
         ),
       ),
     );
+
+    if (isDesktop) {
+      return bodyContent;
+    } else {
+      // No mobile, usamos um DefaultTabController que controla o Scaffold inteiro
+      return DefaultTabController(
+        length: 3,
+        child: Scaffold(
+          drawer: const SideMenu(),
+          appBar: AppBar(
+            title: const Text('Modelos de Impressão'),
+            bottom: const TabBar(
+              tabs: [
+                Tab(text: 'Impressoras'),
+                Tab(text: 'Cupom'),
+                Tab(text: 'Cozinha'),
+              ],
+            ),
+          ),
+          body: const TabBarView(
+            children: [
+              _CategoryPrinterSettingsTab(),
+              _ReceiptLayoutEditorTab(),
+              _KitchenLayoutEditorTab(),
+            ],
+          ),
+        ),
+      );
+    }
   }
 }
-
-// ABA 1: CONFIGURAÇÃO DE IMPRESSORAS POR CATEGORIA
 class _CategoryPrinterSettingsTab extends StatefulWidget {
   const _CategoryPrinterSettingsTab();
 
@@ -56,7 +84,7 @@ class _CategoryPrinterSettingsTab extends StatefulWidget {
 class _CategoryPrinterSettingsTabState
     extends State<_CategoryPrinterSettingsTab> {
   List<Printer> _printers = [];
-  late Map<int, Map<String, String>> _currentSettings;
+  late Map<String, Map<String, String>> _currentSettings;
   bool _isLoading = true;
 
   @override
@@ -82,7 +110,7 @@ class _CategoryPrinterSettingsTabState
 
         setState(() {
           _printers = uniquePrinters;
-          _currentSettings = Map<int, Map<String, String>>.from(providerSettings
+          _currentSettings = Map<String, Map<String, String>>.from(providerSettings
               .map((key, value) =>
                   MapEntry(key, Map<String, String>.from(value))));
           _isLoading = false;
@@ -230,7 +258,6 @@ class _CategoryPrinterSettingsTabState
   }
 }
 
-// ABA 2: EDITOR DE LAYOUT DO CUPOM DE CONFERÊNCIA
 class _ReceiptLayoutEditorTab extends StatefulWidget {
   const _ReceiptLayoutEditorTab();
 
@@ -264,14 +291,14 @@ class __ReceiptLayoutEditorTabState extends State<_ReceiptLayoutEditorTab> {
     return printingService.getReceiptPdfBytes(
       orders: [
         app_data.Order(
-          id: 1,
+          id: '1',
           items: [
             app_data.CartItem(
                 product: app_data.Product(
-                    id: 1,
+                    id: '1',
                     name: 'Produto Exemplo 1',
                     price: 10.0,
-                    categoryId: 1,
+                    categoryId: '1',
                     categoryName: 'Bebidas',
                     displayOrder: 1,
                     isSoldOut: false),
@@ -452,7 +479,6 @@ class __ReceiptLayoutEditorTabState extends State<_ReceiptLayoutEditorTab> {
   }
 }
 
-// ABA 3: EDITOR DE LAYOUT DO PEDIDO DA COZINHA
 class _KitchenLayoutEditorTab extends StatefulWidget {
   const _KitchenLayoutEditorTab();
 
@@ -502,8 +528,8 @@ class __KitchenLayoutEditorTabState extends State<_KitchenLayoutEditorTab> {
     final printingService = PrintingService();
     return printingService.getKitchenOrderPdfBytes(
       items: [
-        app_data.CartItem(product: app_data.Product(id: 1, name: 'Produto Exemplo 1', price: 10.0, categoryId: 1, categoryName: 'Bebidas', displayOrder: 1, isSoldOut: false), quantity: 2),
-        app_data.CartItem(product: app_data.Product(id: 2, name: 'Produto Exemplo 2', price: 15.0, categoryId: 1, categoryName: 'Bebidas', displayOrder: 2, isSoldOut: false), quantity: 1),
+        app_data.CartItem(product: app_data.Product(id: '1', name: 'Produto Exemplo 1', price: 10.0, categoryId: '1', categoryName: 'Bebidas', displayOrder: 1, isSoldOut: false), quantity: 2),
+        app_data.CartItem(product: app_data.Product(id: '2', name: 'Produto Exemplo 2', price: 15.0, categoryId: '1', categoryName: 'Bebidas', displayOrder: 2, isSoldOut: false), quantity: 1),
       ],
       tableNumber: 'XX',
       orderId: 999,
@@ -566,7 +592,7 @@ class __KitchenLayoutEditorTabState extends State<_KitchenLayoutEditorTab> {
                   _autoSaveSettings(settings.copyWith(itemStyle: newStyle))),
           _buildTextAndStyleEditor(
               'Texto de Rodapé',
-              settings.footerText, // Use direct value here
+              settings.footerText, 
               (newText) =>
                   _autoSaveSettings(settings.copyWith(footerText: newText)),
               settings.footerStyle,
@@ -617,8 +643,6 @@ class __KitchenLayoutEditorTabState extends State<_KitchenLayoutEditorTab> {
   }
 }
 
-// WIDGETS GENÉRICOS UTILIZADOS PELAS ABAS DE EDIÇÃO
-
 Widget _buildTextAndStyleEditor(
   String title,
   String initialValue,
@@ -626,7 +650,6 @@ Widget _buildTextAndStyleEditor(
   PrintStyle style,
   ValueChanged<PrintStyle> onStyleChanged,
 ) {
-  // Using a key ensures the controller is re-created when the initialValue changes.
   final controller = TextEditingController(text: initialValue);
 
   return Padding(

@@ -1,7 +1,9 @@
+// lib/screens/kds_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:villabistromobile/data/app_data.dart' as app_data;
 import 'package:villabistromobile/providers/kds_provider.dart';
+import 'package:villabistromobile/widgets/side_menu.dart';
 
 class KdsScreen extends StatefulWidget {
   const KdsScreen({super.key});
@@ -28,8 +30,9 @@ class _KdsScreenState extends State<KdsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Removido o Scaffold daqui! O ResponsiveLayout já o fornece.
-    return Consumer<KdsProvider>(
+    final isDesktop = MediaQuery.of(context).size.width > 800;
+
+    Widget bodyContent = Consumer<KdsProvider>(
       builder: (context, provider, child) {
         if (provider.isLoading) {
           return const Center(child: CircularProgressIndicator());
@@ -38,16 +41,14 @@ class _KdsScreenState extends State<KdsScreen> {
         return Row(
           children: [
             Expanded(
-              // Adicionada uma Key explícita para evitar conflitos se houver reconstruções complexas
               child: OrderColumn(
-                key: const ValueKey('production_column'), 
+                key: const ValueKey('production_column'),
                 title: 'Em produção',
                 color: Colors.orange.shade700,
                 orders: provider.productionOrders,
               ),
             ),
             Expanded(
-              // Adicionada uma Key explícita
               child: OrderColumn(
                 key: const ValueKey('ready_column'),
                 title: 'Prontos para entrega',
@@ -59,6 +60,18 @@ class _KdsScreenState extends State<KdsScreen> {
         );
       },
     );
+
+    if (isDesktop) {
+      return bodyContent;
+    } else {
+      return Scaffold(
+        drawer: const SideMenu(),
+        appBar: AppBar(
+          title: const Text('Painel de Pedidos (KDS)'),
+        ),
+        body: bodyContent,
+      );
+    }
   }
 }
 

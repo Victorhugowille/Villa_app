@@ -4,26 +4,34 @@ import 'package:provider/provider.dart';
 import 'package:villabistromobile/providers/navigation_provider.dart';
 
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
-  final String title;
   final List<Widget>? actions;
 
-  const CustomAppBar({super.key, required this.title, this.actions});
+  const CustomAppBar({super.key, this.actions});
 
   @override
   Widget build(BuildContext context) {
+    final navProvider = context.watch<NavigationProvider>();
     final isDesktop = MediaQuery.of(context).size.width > 800;
-    final navProvider = Provider.of<NavigationProvider>(context);
 
     return AppBar(
-      title: Text(title),
-      leading: isDesktop
-          ? (navProvider.canPop
-              ? IconButton(
-                  icon: const Icon(Icons.arrow_back),
-                  onPressed: () => navProvider.pop(),
-                )
-              : null)
-          : null, // No mobile, deixa o AppBar decidir (botão de voltar padrão)
+      // Damos uma cor sutil para separar do conteúdo
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      elevation: 1,
+      // Força o AppBar a não adicionar um botão de menu/voltar sozinho
+      automaticallyImplyLeading: false,
+      
+      // Título volta a ficar na posição padrão
+      title: Text(navProvider.currentTitle),
+
+      // O botão de voltar customizado para o desktop
+      leading: isDesktop && navProvider.canPop
+          ? IconButton(
+              icon: const Icon(Icons.arrow_back),
+              tooltip: 'Voltar',
+              onPressed: () => navProvider.pop(),
+            )
+          : null, // No mobile ou na primeira tela, não mostra nada
+      
       actions: actions,
     );
   }
