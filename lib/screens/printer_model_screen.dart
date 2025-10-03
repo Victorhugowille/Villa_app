@@ -1,7 +1,6 @@
 // lib/screens/printer_model_screen.dart
 import 'dart:async';
-import 'dart:typed_data';
-
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
@@ -11,9 +10,9 @@ import 'package:villabistromobile/providers/estabelecimento_provider.dart';
 import 'package:villabistromobile/providers/printer_provider.dart';
 import 'package:villabistromobile/providers/product_provider.dart';
 import 'package:villabistromobile/services/printing_service.dart';
-import 'package:pdf/widgets.dart' as pw;
 import 'package:villabistromobile/data/app_data.dart' as app_data;
 import 'package:villabistromobile/widgets/side_menu.dart';
+import 'package:villabistromobile/screens/kitchen_printer_screen.dart';
 
 class PrinterModelScreen extends StatelessWidget {
   const PrinterModelScreen({super.key});
@@ -22,57 +21,47 @@ class PrinterModelScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.of(context).size.width > 800;
 
-    Widget bodyContent = const DefaultTabController(
-      length: 3,
-      child: Scaffold(
-        // A AppBar interna é usada para as abas
-        appBar: TabBar(
-          tabs: [
-            Tab(icon: Icon(Icons.print), text: 'Impressoras'),
-            Tab(icon: Icon(Icons.receipt_long), text: 'Cupom Cliente'),
-            Tab(icon: Icon(Icons.kitchen), text: 'Pedido Cozinha'),
-          ],
-        ),
-        body: TabBarView(
-          children: [
-            _CategoryPrinterSettingsTab(),
-            _ReceiptLayoutEditorTab(),
-            _KitchenLayoutEditorTab(),
-          ],
-        ),
-      ),
-    );
+    final tabs = [
+      const Tab(icon: Icon(Icons.print), text: 'Destinos'),
+      const Tab(icon: Icon(Icons.dvr), text: 'Estação'),
+      const Tab(icon: Icon(Icons.receipt_long), text: 'Cupom Cliente'),
+      const Tab(icon: Icon(Icons.kitchen), text: 'Pedido Cozinha'),
+    ];
+
+    final tabViews = [
+      _CategoryPrinterSettingsTab(),
+      const KitchenPrinterScreen(),
+      _ReceiptLayoutEditorTab(),
+      const _KitchenLayoutEditorTab(),
+    ];
 
     if (isDesktop) {
-      return bodyContent;
-    } else {
-      // No mobile, usamos um DefaultTabController que controla o Scaffold inteiro
       return DefaultTabController(
-        length: 3,
+        length: tabs.length,
+        child: Scaffold(
+          appBar: TabBar(tabs: tabs),
+          body: TabBarView(children: tabViews),
+        ),
+      );
+    } else {
+      return DefaultTabController(
+        length: tabs.length,
         child: Scaffold(
           drawer: const SideMenu(),
           appBar: AppBar(
-            title: const Text('Modelos de Impressão'),
-            bottom: const TabBar(
-              tabs: [
-                Tab(text: 'Impressoras'),
-                Tab(text: 'Cupom'),
-                Tab(text: 'Cozinha'),
-              ],
+            title: const Text('Impressão'),
+            bottom: TabBar(
+              isScrollable: true,
+              tabs: tabs.map((t) => Tab(text: (t.text ?? ''))).toList(),
             ),
           ),
-          body: const TabBarView(
-            children: [
-              _CategoryPrinterSettingsTab(),
-              _ReceiptLayoutEditorTab(),
-              _KitchenLayoutEditorTab(),
-            ],
-          ),
+          body: TabBarView(children: tabViews),
         ),
       );
     }
   }
 }
+
 class _CategoryPrinterSettingsTab extends StatefulWidget {
   const _CategoryPrinterSettingsTab();
 
@@ -85,7 +74,7 @@ class _CategoryPrinterSettingsTabState
     extends State<_CategoryPrinterSettingsTab> {
   List<Printer> _printers = [];
   late Map<String, Map<String, String>> _currentSettings;
-  bool _isLoading = true;
+  bool _isLoadingPrinters = true;
 
   @override
   void initState() {
@@ -94,7 +83,8 @@ class _CategoryPrinterSettingsTabState
   }
 
   Future<void> _loadInitialData() async {
-    setState(() => _isLoading = true);
+    if (!mounted) return;
+    setState(() => _isLoadingPrinters = true);
     try {
       final loadedPrinters = await Printing.listPrinters();
       final uniquePrintersByName = <String, Printer>{};
@@ -110,15 +100,15 @@ class _CategoryPrinterSettingsTabState
 
         setState(() {
           _printers = uniquePrinters;
-          _currentSettings = Map<String, Map<String, String>>.from(providerSettings
-              .map((key, value) =>
+          _currentSettings = Map<String, Map<String, String>>.from(
+              providerSettings.map((key, value) =>
                   MapEntry(key, Map<String, String>.from(value))));
-          _isLoading = false;
+          _isLoadingPrinters = false;
         });
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() => _isLoadingPrinters = false);
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Erro ao carregar impressoras: $e')));
       }
@@ -138,123 +128,134 @@ class _CategoryPrinterSettingsTabState
 
   @override
   Widget build(BuildContext context) {
-    final categories = Provider.of<ProductProvider>(context).categories;
+    final productProvider = Provider.of<ProductProvider>(context);
+    final categories = productProvider.categories;
 
-    return _isLoading
-        ? const Center(child: CircularProgressIndicator())
-        : Column(
-            children: [
-              Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.all(8.0),
-                  itemCount: categories.length,
-                  itemBuilder: (context, index) {
-                    final Category category = categories[index];
-                    final settings = _currentSettings[category.id] ?? {};
-                    final String? selectedPrinterName =
-                        _printers.any((p) => p.name == settings['name'])
-                            ? settings['name']
-                            : null;
-                    final selectedSize = settings['size'] ?? '58';
+    if (_isLoadingPrinters || productProvider.isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-                    final dropdownItems = _printers.map((Printer printer) {
-                      return DropdownMenuItem<String>(
-                        value: printer.name,
-                        child:
-                            Text(printer.name, overflow: TextOverflow.ellipsis),
-                      );
-                    }).toList();
+    if (categories.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24.0),
+          child: Text(
+            'Nenhuma categoria encontrada.\n\nVá para Gestão > Produtos para cadastrar novas categorias.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 16, color: Colors.grey),
+          ),
+        ),
+      );
+    }
 
-                    dropdownItems.insert(
-                        0,
-                        const DropdownMenuItem<String>(
-                          value: null,
-                          child: Text('Nenhuma',
-                              style: TextStyle(fontStyle: FontStyle.italic)),
-                        ));
+    return Column(
+      children: [
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.all(8.0),
+            itemCount: categories.length,
+            itemBuilder: (context, index) {
+              final Category category = categories[index];
+              final settings = _currentSettings[category.id] ?? {};
+              final String? selectedPrinterName =
+                  _printers.any((p) => p.name == settings['name'])
+                      ? settings['name']
+                      : null;
+              final selectedSize = settings['size'] ?? '58';
 
-                    return Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(category.name,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16)),
-                            const SizedBox(height: 8),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text('Impressora:'),
-                                DropdownButton<String?>(
-                                  value: selectedPrinterName,
-                                  items: dropdownItems,
-                                  onChanged: (String? newPrinterName) {
-                                    setState(() {
-                                      if (newPrinterName != null) {
-                                        _currentSettings[category.id] = {
-                                          'name': newPrinterName,
-                                          'size': selectedSize,
-                                        };
-                                      } else {
-                                        _currentSettings.remove(category.id);
-                                      }
-                                    });
-                                  },
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text('Tamanho do Papel:'),
-                                SegmentedButton<String>(
-                                  segments: const [
-                                    ButtonSegment(
-                                        value: '58', label: Text('58mm')),
-                                    ButtonSegment(
-                                        value: '80', label: Text('80mm')),
-                                  ],
-                                  selected: {selectedSize},
-                                  onSelectionChanged:
-                                      (Set<String> newSelection) {
-                                    setState(() {
-                                      final newSize = newSelection.first;
-                                      if (selectedPrinterName != null) {
-                                        _currentSettings[category.id] = {
-                                          'name': selectedPrinterName,
-                                          'size': newSize,
-                                        };
-                                      }
-                                    });
-                                  },
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
+              final dropdownItems = _printers.map((Printer printer) {
+                return DropdownMenuItem<String>(
+                  value: printer.name,
+                  child: Text(printer.name, overflow: TextOverflow.ellipsis),
+                );
+              }).toList();
+
+              dropdownItems.insert(
+                  0,
+                  const DropdownMenuItem<String>(
+                    value: null,
+                    child: Text('Nenhuma',
+                        style: TextStyle(fontStyle: FontStyle.italic)),
+                  ));
+
+              return Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(category.name,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 16)),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Impressora:'),
+                          DropdownButton<String?>(
+                            value: selectedPrinterName,
+                            items: dropdownItems,
+                            onChanged: (String? newPrinterName) {
+                              setState(() {
+                                if (newPrinterName != null) {
+                                  _currentSettings[category.id] = {
+                                    'name': newPrinterName,
+                                    'size': selectedSize,
+                                  };
+                                } else {
+                                  _currentSettings.remove(category.id);
+                                }
+                              });
+                            },
+                          ),
+                        ],
                       ),
-                    );
-                  },
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _saveSettings,
-                    style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16)),
-                    child: const Text('Salvar Configurações'),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Tamanho do Papel:'),
+                          SegmentedButton<String>(
+                            segments: const [
+                              ButtonSegment(value: '58', label: Text('58mm')),
+                              ButtonSegment(value: '80', label: Text('80mm')),
+                            ],
+                            selected: {selectedSize},
+                            onSelectionChanged: (Set<String> newSelection) {
+                              setState(() {
+                                final newSize = newSelection.first;
+                                if (selectedPrinterName != null) {
+                                  _currentSettings[category.id] = {
+                                    'name': selectedPrinterName,
+                                    'size': newSize,
+                                  };
+                                }
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-              ),
-            ],
-          );
+              );
+            },
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _saveSettings,
+              style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16)),
+              child: const Text('Salvar Configurações'),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -283,38 +284,25 @@ class __ReceiptLayoutEditorTabState extends State<_ReceiptLayoutEditorTab> {
     });
   }
 
-  Future<Uint8List> _generatePreviewPdfBytes(
-      ReceiptTemplateSettings settings) async {
-    final printingService = PrintingService();
-    final estabelecimentoProvider =
-        Provider.of<EstabelecimentoProvider>(context, listen: false);
-    return printingService.getReceiptPdfBytes(
+  void _printTest(ReceiptTemplateSettings settings) async {
+    final pdfBytes = await PrintingService().getReceiptPdfBytes(
       orders: [
         app_data.Order(
-          id: '1',
-          items: [
-            app_data.CartItem(
-                product: app_data.Product(
-                    id: '1',
-                    name: 'Produto Exemplo 1',
-                    price: 10.0,
-                    categoryId: '1',
-                    categoryName: 'Bebidas',
-                    displayOrder: 1,
-                    isSoldOut: false),
-                quantity: 2),
-          ],
-          timestamp: DateTime.now(),
-          status: 'completed',
-          type: 'mesa',
-        )
+            id: 'teste-id',
+            items: [
+              app_data.CartItem(product: app_data.Product(id: '1', name: 'Produto Teste 1', price: 10.99, categoryId: 'cat1', categoryName: 'Exemplo', displayOrder: 1, isSoldOut: false), quantity: 2),
+              app_data.CartItem(product: app_data.Product(id: '2', name: 'Produto Teste 2', price: 8.50, categoryId: 'cat1', categoryName: 'Exemplo', displayOrder: 2, isSoldOut: false), quantity: 1),
+            ],
+            timestamp: DateTime.now(),
+            status: 'completed',
+            type: 'mesa')
       ],
-      tableNumber: 'XX',
-      totalAmount: 20.0,
+      tableNumber: '99',
+      totalAmount: 30.48,
       settings: settings,
-      companyName:
-          estabelecimentoProvider.estabelecimento?.nomeFantasia ?? 'Nome da Empresa',
+      companyName: Provider.of<EstabelecimentoProvider>(context, listen: false).estabelecimento?.nomeFantasia ?? 'Sua Empresa',
     );
+    await Printing.layoutPdf(onLayout: (format) => pdfBytes);
   }
 
   @override
@@ -323,27 +311,62 @@ class __ReceiptLayoutEditorTabState extends State<_ReceiptLayoutEditorTab> {
     return Consumer<PrinterProvider>(
       builder: (context, printerProvider, child) {
         final settings = printerProvider.receiptTemplateSettings;
-        return isWideScreen
-            ? Row(
-                children: [
-                  Expanded(flex: 2, child: _buildControlsPanel(settings)),
-                  const VerticalDivider(width: 1),
-                  Expanded(
-                    flex: 1,
-                    child: Container(
-                      color: Colors.blueGrey.shade50,
-                      padding: const EdgeInsets.all(16.0),
-                      child: PdfPreview(
-                        build: (format) => _generatePreviewPdfBytes(settings),
-                        canChangeOrientation: false,
-                        canChangePageFormat: false,
-                        canDebug: false,
-                      ),
-                    ),
-                  ),
+        
+        final previewWidget = PrintingService().buildReceiptWidget(
+          orders: [
+            app_data.Order(
+                id: 'preview-id',
+                items: [
+                  app_data.CartItem(product: app_data.Product(id: '1', name: 'Produto Exemplo 1', price: 10.99, categoryId: 'cat1', categoryName: 'Exemplo', displayOrder: 1, isSoldOut: false), quantity: 2),
+                  app_data.CartItem(product: app_data.Product(id: '2', name: 'Produto 2 com nome longo', price: 8.50, categoryId: 'cat1', categoryName: 'Exemplo', displayOrder: 2, isSoldOut: false), quantity: 1),
                 ],
-              )
-            : _buildControlsPanel(settings);
+                timestamp: DateTime.now(),
+                status: 'completed',
+                type: 'mesa')
+          ],
+          tableNumber: 'XX',
+          totalAmount: 20.49,
+          settings: settings,
+          companyName: Provider.of<EstabelecimentoProvider>(context, listen: false).estabelecimento?.nomeFantasia ?? 'Sua Empresa',
+        );
+
+        if (isWideScreen) {
+          return Row(
+            children: [
+              Expanded(flex: 2, child: _buildControlsPanel(settings)),
+              const VerticalDivider(width: 1),
+              Expanded(
+                flex: 1,
+                child: Container(
+                  color: Colors.blueGrey.shade100,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Card(
+                        elevation: 4,
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          width: 280,
+                          color: Colors.white,
+                          child: previewWidget,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      IconButton(
+                        icon: const Icon(Icons.print_outlined),
+                        iconSize: 40,
+                        tooltip: 'Imprimir Teste',
+                        onPressed: () => _printTest(settings),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+        } else {
+          return _buildControlsPanel(settings);
+        }
       },
     );
   }
@@ -367,6 +390,18 @@ class __ReceiptLayoutEditorTabState extends State<_ReceiptLayoutEditorTab> {
             (newStyle) =>
                 _autoSaveSettings(settings.copyWith(totalStyle: newStyle)),
           ),
+          if (! (MediaQuery.of(context).size.width > 800))
+            Padding(
+              padding: const EdgeInsets.only(top: 24.0),
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.print_outlined),
+                label: const Text("Imprimir Teste"),
+                onPressed: () => _printTest(settings),
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 50),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -383,6 +418,17 @@ class __ReceiptLayoutEditorTabState extends State<_ReceiptLayoutEditorTab> {
             const Text('Logo',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             const Divider(),
+             if (settings.logoPath != null && settings.logoPath!.isNotEmpty && File(settings.logoPath!).existsSync())
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Image.file(
+                    File(settings.logoPath!),
+                    height: 80,
+                    errorBuilder: (c, e, s) => const Icon(Icons.error, color: Colors.red, size: 40),
+                  ),
+                ),
+              ),
             Center(
               child: ElevatedButton.icon(
                 onPressed: () => Provider.of<PrinterProvider>(context, listen: false).pickAndSaveLogo(),
@@ -400,8 +446,6 @@ class __ReceiptLayoutEditorTabState extends State<_ReceiptLayoutEditorTab> {
               label: settings.logoHeight.round().toString(),
               onChanged: (value) {
                 Provider.of<PrinterProvider>(context, listen: false).updateLogoHeight(value);
-              },
-              onChangeEnd: (value) {
                 _autoSaveSettings(settings.copyWith(logoHeight: value));
               },
             ),
@@ -445,7 +489,7 @@ class __ReceiptLayoutEditorTabState extends State<_ReceiptLayoutEditorTab> {
             ),
             const Divider(),
             _buildTextAndStyleEditor(
-              'CNPJ',
+              'Subtítulo (CNPJ)',
               settings.subtitleText,
               (newText) => _autoSaveSettings(settings.copyWith(subtitleText: newText)),
               settings.subtitleStyle,
@@ -465,7 +509,7 @@ class __ReceiptLayoutEditorTabState extends State<_ReceiptLayoutEditorTab> {
               settings.phoneStyle,
               (newStyle) => _autoSaveSettings(settings.copyWith(phoneStyle: newStyle)),
             ),
-            _buildTextAndStyleEditor(
+             _buildTextAndStyleEditor(
               'Mensagem Final',
               settings.finalMessageText,
               (newText) => _autoSaveSettings(settings.copyWith(finalMessageText: newText)),
@@ -489,29 +533,10 @@ class _KitchenLayoutEditorTab extends StatefulWidget {
 
 class __KitchenLayoutEditorTabState extends State<_KitchenLayoutEditorTab> {
   Timer? _debounce;
-  late TextEditingController _footerController;
-
-  @override
-  void initState() {
-    super.initState();
-    final settings =
-        Provider.of<PrinterProvider>(context, listen: false).templateSettings;
-    _footerController = TextEditingController(text: settings.footerText);
-  }
   
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final settings = Provider.of<PrinterProvider>(context).templateSettings;
-    if (_footerController.text != settings.footerText) {
-      _footerController.text = settings.footerText;
-    }
-  }
-
   @override
   void dispose() {
     _debounce?.cancel();
-    _footerController.dispose();
     super.dispose();
   }
 
@@ -523,19 +548,18 @@ class __KitchenLayoutEditorTabState extends State<_KitchenLayoutEditorTab> {
     });
   }
 
-  Future<Uint8List> _generatePreviewPdfBytes(
-      PrintTemplateSettings settings) async {
-    final printingService = PrintingService();
-    return printingService.getKitchenOrderPdfBytes(
+  void _printTest(PrintTemplateSettings settings) async {
+    final pdfBytes = await PrintingService().getKitchenOrderPdfBytes(
       items: [
-        app_data.CartItem(product: app_data.Product(id: '1', name: 'Produto Exemplo 1', price: 10.0, categoryId: '1', categoryName: 'Bebidas', displayOrder: 1, isSoldOut: false), quantity: 2),
-        app_data.CartItem(product: app_data.Product(id: '2', name: 'Produto Exemplo 2', price: 15.0, categoryId: '1', categoryName: 'Bebidas', displayOrder: 2, isSoldOut: false), quantity: 1),
+        app_data.CartItem(product: app_data.Product(id: '1', name: 'Produto Teste 1', price: 10.0, categoryId: '1', categoryName: 'Bebidas', displayOrder: 1, isSoldOut: false), quantity: 2),
+        app_data.CartItem(product: app_data.Product(id: '2', name: 'Produto Teste 2', price: 15.0, categoryId: '1', categoryName: 'Bebidas', displayOrder: 2, isSoldOut: false), quantity: 1),
       ],
-      tableNumber: 'XX',
-      orderId: 999,
-      paperSize: '58',
+      tableNumber: '99',
+      orderId: 'teste-123',
+      paperSize: '58', 
       templateSettings: settings,
     );
+    await Printing.layoutPdf(onLayout: (format) => pdfBytes);
   }
 
   @override
@@ -544,27 +568,54 @@ class __KitchenLayoutEditorTabState extends State<_KitchenLayoutEditorTab> {
     return Consumer<PrinterProvider>(
       builder: (context, printerProvider, child) {
         final settings = printerProvider.templateSettings;
-        return isWideScreen
-            ? Row(
-                children: [
-                  Expanded(flex: 2, child: _buildControlsPanel(settings)),
-                  const VerticalDivider(width: 1),
-                  Expanded(
-                    flex: 1,
-                    child: Container(
-                      color: Colors.blueGrey.shade50,
-                      padding: const EdgeInsets.all(16.0),
-                      child: PdfPreview(
-                        build: (format) => _generatePreviewPdfBytes(settings),
-                        canChangeOrientation: false,
-                        canChangePageFormat: false,
-                        canDebug: false,
+
+        final previewWidget = PrintingService().buildKitchenOrderWidget(
+          items: [
+            app_data.CartItem(product: app_data.Product(id: '1', name: 'Produto Exemplo 1', price: 10.0, categoryId: '1', categoryName: 'Bebidas', displayOrder: 1, isSoldOut: false), quantity: 2),
+            app_data.CartItem(product: app_data.Product(id: '2', name: 'Produto Exemplo 2', price: 15.0, categoryId: '1', categoryName: 'Bebidas', displayOrder: 2, isSoldOut: false), quantity: 1),
+          ],
+          tableNumber: 'XX',
+          orderId: 'preview-123',
+          templateSettings: settings,
+        );
+        
+        if (isWideScreen) {
+          return Row(
+            children: [
+              Expanded(flex: 2, child: _buildControlsPanel(settings)),
+              const VerticalDivider(width: 1),
+              Expanded(
+                flex: 1,
+                child: Container(
+                  color: Colors.blueGrey.shade100,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Card(
+                        elevation: 4,
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          width: 280,
+                          color: Colors.white,
+                          child: previewWidget,
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 16),
+                      IconButton(
+                        icon: const Icon(Icons.print_outlined),
+                        iconSize: 40,
+                        tooltip: 'Imprimir Teste',
+                        onPressed: () => _printTest(settings),
+                      ),
+                    ],
                   ),
-                ],
-              )
-            : _buildControlsPanel(settings);
+                ),
+              ),
+            ],
+          );
+        } else {
+          return _buildControlsPanel(settings);
+        }
       },
     );
   }
@@ -598,6 +649,18 @@ class __KitchenLayoutEditorTabState extends State<_KitchenLayoutEditorTab> {
               settings.footerStyle,
               (newStyle) =>
                   _autoSaveSettings(settings.copyWith(footerStyle: newStyle))),
+          if (! (MediaQuery.of(context).size.width > 800))
+            Padding(
+              padding: const EdgeInsets.only(top: 24.0),
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.print_outlined),
+                label: const Text("Imprimir Teste"),
+                onPressed: () => _printTest(settings),
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 50),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -614,6 +677,17 @@ class __KitchenLayoutEditorTabState extends State<_KitchenLayoutEditorTab> {
             const Text('Logo',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             const Divider(),
+            if (settings.logoPath != null && settings.logoPath!.isNotEmpty && File(settings.logoPath!).existsSync())
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Image.file(
+                    File(settings.logoPath!),
+                    height: 80,
+                    errorBuilder: (c, e, s) => const Icon(Icons.error, color: Colors.red, size: 40),
+                  ),
+                ),
+              ),
             Center(
               child: ElevatedButton.icon(
                 onPressed: () => Provider.of<PrinterProvider>(context, listen: false).pickAndSaveLogo(),
@@ -631,9 +705,7 @@ class __KitchenLayoutEditorTabState extends State<_KitchenLayoutEditorTab> {
               label: settings.logoHeight.round().toString(),
               onChanged: (value) {
                 Provider.of<PrinterProvider>(context, listen: false).updateLogoHeight(value);
-              },
-              onChangeEnd: (value) {
-                _autoSaveSettings(settings.copyWith(logoHeight: value));
+                 _autoSaveSettings(settings.copyWith(logoHeight: value));
               },
             ),
           ],
@@ -651,6 +723,13 @@ Widget _buildTextAndStyleEditor(
   ValueChanged<PrintStyle> onStyleChanged,
 ) {
   final controller = TextEditingController(text: initialValue);
+  
+  // Para evitar múltiplas atualizações, o listener do controller
+  // só deve chamar o onTextChanged.
+  // A UI reconstruirá e pegará o novo valor do controller.
+  controller.addListener(() {
+    onTextChanged(controller.text);
+  });
 
   return Padding(
     padding: const EdgeInsets.only(bottom: 8.0),
@@ -665,7 +744,6 @@ Widget _buildTextAndStyleEditor(
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           ),
-          onChanged: onTextChanged,
         ),
         const SizedBox(height: 8),
         _buildStyleControls(style, onStyleChanged),
@@ -731,16 +809,16 @@ Widget _buildStyleControls(
       const SizedBox(height: 8),
       const Text('Alinhamento'),
       const SizedBox(height: 8),
-      SegmentedButton<pw.CrossAxisAlignment>(
+      SegmentedButton<CrossAxisAlignment>(
         segments: const [
           ButtonSegment(
-              value: pw.CrossAxisAlignment.start,
+              value: CrossAxisAlignment.start,
               icon: Icon(Icons.format_align_left)),
           ButtonSegment(
-              value: pw.CrossAxisAlignment.center,
+              value: CrossAxisAlignment.center,
               icon: Icon(Icons.format_align_center)),
           ButtonSegment(
-              value: pw.CrossAxisAlignment.end,
+              value: CrossAxisAlignment.end,
               icon: Icon(Icons.format_align_right)),
         ],
         selected: {style.alignment},

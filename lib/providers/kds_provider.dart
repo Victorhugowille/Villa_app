@@ -1,3 +1,4 @@
+// lib/providers/kds_provider.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -41,7 +42,10 @@ class KdsProvider with ChangeNotifier {
   
   List<app_data.Order> get productionOrders {
     final filtered = _getFilteredOrders();
-    return filtered.where((order) => order.status == 'production').toList()
+    return filtered
+        .where((order) =>
+            order.status == 'production' || order.status == 'awaiting_print')
+        .toList()
       ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
   }
 
@@ -77,7 +81,7 @@ class KdsProvider with ChangeNotifier {
           .from('pedidos')
           .select('*, mesa_id(id, numero), itens_pedido(*, produtos(*))')
           .eq('company_id', companyId)
-          .inFilter('status', ['production', 'ready']);
+          .inFilter('status', ['awaiting_print', 'production', 'ready']);
 
       _allOrders = (response as List)
           .map((json) => app_data.Order.fromJson(json))
@@ -126,7 +130,7 @@ class KdsProvider with ChangeNotifier {
 
   Future<void> advanceOrder(BuildContext context, app_data.Order order) async {
     String nextStatus = '';
-    if (order.status == 'production') {
+    if (order.status == 'production' || order.status == 'awaiting_print') {
       nextStatus = 'ready';
     } else if (order.status == 'ready') {
       if (order.type == 'mesa') {

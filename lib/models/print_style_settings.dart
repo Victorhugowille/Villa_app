@@ -1,28 +1,28 @@
-import 'package:pdf/widgets.dart' as pw;
+// lib/models/print_style_settings.dart
+import 'package:flutter/material.dart' show CrossAxisAlignment;
 
-String alignmentToString(pw.CrossAxisAlignment alignment) {
-  if (alignment == pw.CrossAxisAlignment.start) return 'start';
-  if (alignment == pw.CrossAxisAlignment.center) return 'center';
-  if (alignment == pw.CrossAxisAlignment.end) return 'end';
+String alignmentToString(CrossAxisAlignment alignment) {
+  if (alignment == CrossAxisAlignment.center) return 'center';
+  if (alignment == CrossAxisAlignment.end) return 'end';
   return 'start';
 }
 
-pw.CrossAxisAlignment alignmentFromString(String alignmentStr) {
+CrossAxisAlignment alignmentFromString(String alignmentStr) {
   switch (alignmentStr) {
     case 'center':
-      return pw.CrossAxisAlignment.center;
+      return CrossAxisAlignment.center;
     case 'end':
-      return pw.CrossAxisAlignment.end;
+      return CrossAxisAlignment.end;
     case 'start':
     default:
-      return pw.CrossAxisAlignment.start;
+      return CrossAxisAlignment.start;
   }
 }
 
 class PrintStyle {
   final double fontSize;
   final bool isBold;
-  final pw.CrossAxisAlignment alignment;
+  final CrossAxisAlignment alignment;
 
   PrintStyle({
     required this.fontSize,
@@ -33,7 +33,7 @@ class PrintStyle {
   PrintStyle copyWith({
     double? fontSize,
     bool? isBold,
-    pw.CrossAxisAlignment? alignment,
+    CrossAxisAlignment? alignment,
   }) {
     return PrintStyle(
       fontSize: fontSize ?? this.fontSize,
@@ -99,12 +99,12 @@ class PrintTemplateSettings {
   }
 
   factory PrintTemplateSettings.defaults() => PrintTemplateSettings(
-      headerStyle: PrintStyle(fontSize: 14, isBold: true, alignment: pw.CrossAxisAlignment.center),
-      tableStyle: PrintStyle(fontSize: 16, isBold: true, alignment: pw.CrossAxisAlignment.center),
-      orderInfoStyle: PrintStyle(fontSize: 10, isBold: false, alignment: pw.CrossAxisAlignment.center),
-      itemStyle: PrintStyle(fontSize: 10, isBold: true, alignment: pw.CrossAxisAlignment.start),
+      headerStyle: PrintStyle(fontSize: 14, isBold: true, alignment: CrossAxisAlignment.center),
+      tableStyle: PrintStyle(fontSize: 16, isBold: true, alignment: CrossAxisAlignment.center),
+      orderInfoStyle: PrintStyle(fontSize: 10, isBold: false, alignment: CrossAxisAlignment.center),
+      itemStyle: PrintStyle(fontSize: 10, isBold: true, alignment: CrossAxisAlignment.start),
       footerText: 'Obrigado!',
-      footerStyle: PrintStyle(fontSize: 10, isBold: false, alignment: pw.CrossAxisAlignment.center),
+      footerStyle: PrintStyle(fontSize: 10, isBold: false, alignment: CrossAxisAlignment.center),
       logoPath: null,
       logoHeight: 40.0);
 
@@ -203,18 +203,18 @@ class ReceiptTemplateSettings {
     return ReceiptTemplateSettings(
       logoPath: null,
       logoHeight: 40.0,
-      headerStyle: PrintStyle(fontSize: 16, isBold: true, alignment: pw.CrossAxisAlignment.center),
+      headerStyle: PrintStyle(fontSize: 16, isBold: true, alignment: CrossAxisAlignment.center),
       subtitleText: 'CNPJ: 00.000.000/0001-00',
-      subtitleStyle: PrintStyle(fontSize: 10, isBold: false, alignment: pw.CrossAxisAlignment.center),
+      subtitleStyle: PrintStyle(fontSize: 10, isBold: false, alignment: CrossAxisAlignment.center),
       addressText: 'Rua Exemplo, 123, Bairro, Cidade-UF',
-      addressStyle: PrintStyle(fontSize: 10, isBold: false, alignment: pw.CrossAxisAlignment.center),
+      addressStyle: PrintStyle(fontSize: 10, isBold: false, alignment: CrossAxisAlignment.center),
       phoneText: 'Telefone: (00) 00000-0000',
-      phoneStyle: PrintStyle(fontSize: 10, isBold: false, alignment: pw.CrossAxisAlignment.center),
-      infoStyle: PrintStyle(fontSize: 10, isBold: false, alignment: pw.CrossAxisAlignment.center),
-      itemStyle: PrintStyle(fontSize: 10, isBold: false, alignment: pw.CrossAxisAlignment.start),
-      totalStyle: PrintStyle(fontSize: 14, isBold: true, alignment: pw.CrossAxisAlignment.start),
+      phoneStyle: PrintStyle(fontSize: 10, isBold: false, alignment: CrossAxisAlignment.center),
+      infoStyle: PrintStyle(fontSize: 10, isBold: false, alignment: CrossAxisAlignment.center),
+      itemStyle: PrintStyle(fontSize: 10, isBold: false, alignment: CrossAxisAlignment.start),
+      totalStyle: PrintStyle(fontSize: 14, isBold: true, alignment: CrossAxisAlignment.start),
       finalMessageText: 'Obrigado pela preferência!',
-      finalMessageStyle: PrintStyle(fontSize: 10, isBold: false, alignment: pw.CrossAxisAlignment.center),
+      finalMessageStyle: PrintStyle(fontSize: 10, isBold: false, alignment: CrossAxisAlignment.center),
     );
   }
 

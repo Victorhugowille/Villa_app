@@ -1,3 +1,4 @@
+// lib/screens/order_list_screen.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -85,7 +86,6 @@ class _OrderListScreenState extends State<OrderListScreen> {
     }
   }
 
-  // Função para registrar os botões de ação na AppBar do modo Desktop
   void _registerActions(List<app_data.Order> loadedOrders) {
     final navProvider = Provider.of<NavigationProvider>(context, listen: false);
     navProvider.setScreenActions([
@@ -107,7 +107,6 @@ class _OrderListScreenState extends State<OrderListScreen> {
     return FutureBuilder<List<app_data.Order>>(
       future: _ordersFuture,
       builder: (context, snapshot) {
-        // Registra as ações da AppBar do Desktop assim que os dados carregam
         if (isDesktop && snapshot.hasData) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             _registerActions(snapshot.data ?? []);

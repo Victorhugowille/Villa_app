@@ -1,11 +1,7 @@
 // lib/screens/print_layout_editor_screen.dart
 import 'dart:async';
-import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
+import 'dart:io';
 import 'package:provider/provider.dart';
 import 'package:villabistromobile/models/print_style_settings.dart';
 import 'package:villabistromobile/providers/navigation_provider.dart';
@@ -52,20 +48,20 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
 
   void _resetToDefaults() {
     final newSettings = PrintTemplateSettings.defaults();
-    Provider.of<PrinterProvider>(context, listen: false).saveTemplateSettings(newSettings);
+    Provider.of<PrinterProvider>(context, listen: false)
+        .saveTemplateSettings(newSettings);
     _footerController.text = newSettings.footerText;
   }
   
-  Future<Uint8List> _generatePreviewPdfBytes(PdfPageFormat format, PrintTemplateSettings settings) async {
+  Widget _generatePreviewWidget(PrintTemplateSettings settings) {
     final printingService = PrintingService();
-    return printingService.getKitchenOrderPdfBytes(
+    return printingService.buildKitchenOrderWidget(
       items: [
         app_data.CartItem(product: app_data.Product(id: '1', name: 'Produto Exemplo 1', price: 10.0, categoryId: '1', categoryName: 'Bebidas', displayOrder: 1, isSoldOut: false), quantity: 2),
         app_data.CartItem(product: app_data.Product(id: '2', name: 'Produto Exemplo 2', price: 15.0, categoryId: '1', categoryName: 'Bebidas', displayOrder: 2, isSoldOut: false), quantity: 1),
       ],
       tableNumber: 'XX',
-      orderId: 999,
-      paperSize: '58',
+      orderId: '999',
       templateSettings: settings,
     );
   }
@@ -85,7 +81,8 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
                 icon: const Icon(Icons.print_outlined),
                 tooltip: 'Ir para Estação de Impressão',
                 onPressed: () {
-                  Provider.of<NavigationProvider>(context, listen: false).navigateTo(
+                  Provider.of<NavigationProvider>(context, listen: false)
+                      .navigateTo(
                     context,
                     const KitchenPrinterScreen(),
                     'Estação de Impressão',
@@ -96,13 +93,16 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
                 IconButton(
                   icon: const Icon(Icons.preview_outlined),
                   tooltip: 'Visualizar',
-                  onPressed: () async {
-                    final format = const PdfPageFormat(
-                        57 * PdfPageFormat.mm, 
-                        250 * PdfPageFormat.mm,
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        content: Container(
+                          width: 250,
+                          child: _generatePreviewWidget(currentSettings),
+                        ),
+                      )
                     );
-                    final pdfBytes = await _generatePreviewPdfBytes(format, currentSettings);
-                    await Printing.layoutPdf(onLayout: (format) async => pdfBytes);
                   },
                 ),
               IconButton(
@@ -112,7 +112,9 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
               ),
             ],
           ),
-          body: isWideScreen ? _buildWideLayout(currentSettings) : _buildNarrowLayout(currentSettings),
+          body: isWideScreen
+              ? _buildWideLayout(currentSettings)
+              : _buildNarrowLayout(currentSettings),
         );
       },
     );
@@ -132,7 +134,7 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
             color: Colors.blueGrey.shade50,
             padding: const EdgeInsets.all(16.0),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Text(
                   'Pré-visualização em Tempo Real',
@@ -142,24 +144,13 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
                       ?.copyWith(color: Colors.black),
                 ),
                 const SizedBox(height: 8),
-                Expanded(
-                  child: Card(
-                    elevation: 4,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8.0),
-                      child: PdfPreview(
-                        build: (format) => _generatePreviewPdfBytes(
-                          format.copyWith(width: 58 * PdfPageFormat.mm),
-                          currentSettings,
-                        ),
-                        canChangeOrientation: false,
-                        canChangePageFormat: false,
-                        canDebug: false,
-                        scrollViewDecoration: BoxDecoration(
-                          color: Colors.grey[200],
-                        ),
-                      ),
-                    ),
+                Card(
+                  elevation: 4,
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    width: 280,
+                    color: Colors.white,
+                    child: _generatePreviewWidget(currentSettings),
                   ),
                 ),
               ],
@@ -169,7 +160,7 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
       ],
     );
   }
-  
+
   Widget _buildNarrowLayout(PrintTemplateSettings currentSettings) {
     return _buildControlsPanel(currentSettings);
   }
@@ -180,22 +171,29 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
       child: Column(
         children: [
           _buildLogoEditor(currentSettings),
-          _buildStyleEditor('Nome do Local (se não houver logo)', currentSettings.headerStyle, (newStyle) {
+          _buildStyleEditor(
+              'Nome do Local (se não houver logo)', currentSettings.headerStyle,
+              (newStyle) {
             _autoSaveSettings(currentSettings.copyWith(headerStyle: newStyle));
           }),
-          _buildStyleEditor('Número da Mesa', currentSettings.tableStyle, (newStyle) {
+          _buildStyleEditor('Número da Mesa', currentSettings.tableStyle,
+              (newStyle) {
             _autoSaveSettings(currentSettings.copyWith(tableStyle: newStyle));
           }),
-          _buildStyleEditor('Informações do Pedido', currentSettings.orderInfoStyle, (newStyle) {
-            _autoSaveSettings(currentSettings.copyWith(orderInfoStyle: newStyle));
+          _buildStyleEditor(
+              'Informações do Pedido', currentSettings.orderInfoStyle,
+              (newStyle) {
+            _autoSaveSettings(
+                currentSettings.copyWith(orderInfoStyle: newStyle));
           }),
-          _buildStyleEditor('Itens do Pedido', currentSettings.itemStyle, (newStyle) {
+          _buildStyleEditor('Itens do Pedido', currentSettings.itemStyle,
+              (newStyle) {
             _autoSaveSettings(currentSettings.copyWith(itemStyle: newStyle));
           }),
           _buildTextAndStyleEditor('Rodapé', _footerController, (newStyle) {
-             _autoSaveSettings(currentSettings.copyWith(footerStyle: newStyle));
+            _autoSaveSettings(currentSettings.copyWith(footerStyle: newStyle));
           }, currentSettings.footerStyle, (newText) {
-             _autoSaveSettings(currentSettings.copyWith(footerText: newText));
+            _autoSaveSettings(currentSettings.copyWith(footerText: newText));
           }),
         ],
       ),
@@ -203,7 +201,8 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
   }
 
   Widget _buildLogoEditor(PrintTemplateSettings currentSettings) {
-    final printerProvider = Provider.of<PrinterProvider>(context, listen: false);
+    final printerProvider =
+        Provider.of<PrinterProvider>(context, listen: false);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -212,12 +211,18 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Logo da Impressão', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const Text('Logo da Impressão',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             const Divider(),
             const SizedBox(height: 8),
             Center(
-              child: currentSettings.logoPath != null && currentSettings.logoPath!.isNotEmpty && File(currentSettings.logoPath!).existsSync()
-                  ? Image.file(File(currentSettings.logoPath!), height: 80, errorBuilder: (c, e, s) => const Icon(Icons.error, color: Colors.red))
+              child: currentSettings.logoPath != null &&
+                      currentSettings.logoPath!.isNotEmpty &&
+                      File(currentSettings.logoPath!).existsSync()
+                  ? Image.file(File(currentSettings.logoPath!),
+                      height: 80,
+                      errorBuilder: (c, e, s) =>
+                          const Icon(Icons.error, color: Colors.red))
                   : Image.asset('assets/images/logoVilla.jpg', height: 80),
             ),
             const SizedBox(height: 16),
@@ -231,7 +236,7 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
             ),
             const SizedBox(height: 16),
             const Text('Altura do Logo na Impressão'),
-           Slider(
+            Slider(
               value: currentSettings.logoHeight,
               min: 20,
               max: 100,
@@ -250,7 +255,12 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
     );
   }
 
-  Widget _buildTextAndStyleEditor(String title, TextEditingController controller, ValueChanged<PrintStyle> onStyleChanged, PrintStyle style, ValueChanged<String> onTextChanged) {
+  Widget _buildTextAndStyleEditor(
+      String title,
+      TextEditingController controller,
+      ValueChanged<PrintStyle> onStyleChanged,
+      PrintStyle style,
+      ValueChanged<String> onTextChanged) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       child: Padding(
@@ -258,7 +268,9 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            Text(title,
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             const Divider(),
             TextField(
               controller: controller,
@@ -282,7 +294,9 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            Text(title,
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             const Divider(),
             _buildStyleControls(onUpdate, style),
           ],
@@ -291,7 +305,8 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
     );
   }
 
-  Widget _buildStyleControls(ValueChanged<PrintStyle> onUpdate, PrintStyle style) {
+  Widget _buildStyleControls(
+      ValueChanged<PrintStyle> onUpdate, PrintStyle style) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -323,26 +338,25 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
             const Text('Negrito'),
             Switch(
               value: style.isBold,
-              onChanged: (isBold) =>
-                  onUpdate(style.copyWith(isBold: isBold)),
+              onChanged: (isBold) => onUpdate(style.copyWith(isBold: isBold)),
             ),
           ],
         ),
         const SizedBox(height: 8),
         const Text('Alinhamento'),
         const SizedBox(height: 8),
-        SegmentedButton<pw.CrossAxisAlignment>(
+        SegmentedButton<CrossAxisAlignment>(
           segments: const [
             ButtonSegment(
-                value: pw.CrossAxisAlignment.start,
+                value: CrossAxisAlignment.start,
                 icon: Icon(Icons.format_align_left),
                 label: Text('Esq.')),
             ButtonSegment(
-                value: pw.CrossAxisAlignment.center,
+                value: CrossAxisAlignment.center,
                 icon: Icon(Icons.format_align_center),
                 label: Text('Centro')),
             ButtonSegment(
-                value: pw.CrossAxisAlignment.end,
+                value: CrossAxisAlignment.end,
                 icon: Icon(Icons.format_align_right),
                 label: Text('Dir.')),
           ],

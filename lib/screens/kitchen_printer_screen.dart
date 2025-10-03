@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:villabistromobile/providers/navigation_provider.dart';
 import 'package:villabistromobile/providers/printer_provider.dart';
-import 'package:villabistromobile/screens/print_layout_editor_screen.dart';
 
 class KitchenPrinterScreen extends StatelessWidget {
   const KitchenPrinterScreen({super.key});
@@ -49,18 +47,7 @@ class KitchenPrinterScreen extends StatelessWidget {
             ),
           );
         },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Provider.of<NavigationProvider>(context, listen: false).navigateTo(
-            context,
-            const PrintLayoutEditorScreen(),
-            'Editar Layout de Impressão',
-          );
-        },
-        tooltip: 'Editar Layout de Impressão',
-        child: const Icon(Icons.edit),
-      ),
+      )
     );
-  }
+}
 }
