@@ -69,38 +69,29 @@ class MyApp extends StatelessWidget {
         // Providers que DEPENDEM do AuthProvider
         ChangeNotifierProxyProvider<AuthProvider, PrinterProvider>(
           create: (context) => PrinterProvider(context.read<AuthProvider>()),
-          update: (context, auth, previous) {
-            previous!.updateAuthProvider(auth);
-            return previous;
-          },
+          update: (context, auth, previous) =>
+              previous!..updateAuthProvider(auth),
         ),
         ChangeNotifierProxyProvider<AuthProvider, ProductProvider>(
           create: (context) => ProductProvider(context.read<AuthProvider>()),
-          update: (context, auth, previous) {
-            previous!.updateAuthProvider(auth);
-            return previous;
-          },
+          update: (context, auth, previous) =>
+              previous!..updateAuthProvider(auth),
         ),
         ChangeNotifierProxyProvider<AuthProvider, TableProvider>(
           create: (context) => TableProvider(context.read<AuthProvider>()),
-          update: (context, auth, previous) {
-            previous!.updateAuthProvider(auth);
-            return previous;
-          },
+          update: (context, auth, previous) =>
+              previous!..updateAuthProvider(auth),
         ),
         ChangeNotifierProxyProvider<AuthProvider, TransactionProvider>(
-          create: (context) => TransactionProvider(context.read<AuthProvider>()),
-          update: (context, auth, previous) {
-            previous!.updateAuthProvider(auth);
-            return previous;
-          },
+          create: (context) =>
+              TransactionProvider(context.read<AuthProvider>()),
+          update: (context, auth, previous) =>
+              previous!..updateAuthProvider(auth),
         ),
         ChangeNotifierProxyProvider<AuthProvider, KdsProvider>(
           create: (context) => KdsProvider(context.read<AuthProvider>()),
-          update: (context, auth, previous) {
-            previous!.updateAuthProvider(auth);
-            return previous;
-          },
+          update: (context, auth, previous) =>
+              previous!..updateAuthProvider(auth),
         ),
       ],
       child: Consumer<ThemeProvider>(

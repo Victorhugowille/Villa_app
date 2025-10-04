@@ -8,6 +8,8 @@ class TableProvider with ChangeNotifier {
   AuthProvider? _authProvider;
   final String _tableMesa = 'mesas';
 
+  String? _lastFetchedCompanyId;
+
   List<app_data.Table> _tables = [];
   bool _isLoading = true;
   String? _errorMessage;
@@ -16,18 +18,19 @@ class TableProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
-  TableProvider(this._authProvider) {
+  TableProvider(AuthProvider? authProvider) {
+    _authProvider = authProvider;
+    _lastFetchedCompanyId = _authProvider?.companyId;
     if (_authProvider?.companyId != null) {
       fetchAndSetTables();
     }
   }
 
   void updateAuthProvider(AuthProvider newAuthProvider) {
-    final oldCompanyId = _authProvider?.companyId;
     _authProvider = newAuthProvider;
     final newCompanyId = newAuthProvider.companyId;
 
-    if (newCompanyId != null && newCompanyId != oldCompanyId) {
+    if (newCompanyId != null && newCompanyId != _lastFetchedCompanyId) {
       fetchAndSetTables();
     }
   }
@@ -36,13 +39,27 @@ class TableProvider with ChangeNotifier {
     return _authProvider?.companyId;
   }
 
-  Future<void> fetchAndSetTables() async {
-    final companyId = _getCompanyId();
-    if (companyId == null) return;
+  String? _getUserId() {
+    return _authProvider?.user?.id;
+  }
 
-    _isLoading = true;
-    _errorMessage = null;
-    notifyListeners();
+  Future<void> fetchAndSetTables() async {
+    if (!_isLoading) {
+      _isLoading = true;
+      notifyListeners();
+    }
+
+    final companyId = _getCompanyId();
+    if (companyId == null) {
+      _tables = [];
+      _isLoading = false;
+      _lastFetchedCompanyId = null;
+      notifyListeners();
+      return;
+    }
+    
+    _lastFetchedCompanyId = companyId;
+
     try {
       final data = await _supabase
           .from(_tableMesa)
@@ -82,19 +99,19 @@ class TableProvider with ChangeNotifier {
             .insert({'numero': nextNumber, 'company_id': companyId});
 
         await fetchAndSetTables();
-        return; // Sucesso, sai da função.
-
+        return;
       } on PostgrestException catch (error) {
         if (error.code == '23505' && attempt < maxRetries - 1) {
-          await Future.delayed(const Duration(milliseconds: 100)); // Espera antes de tentar de novo
-          continue; // Tenta o loop novamente
+          await Future.delayed(const Duration(milliseconds: 100));
+          continue;
         }
         rethrow;
       } catch (error) {
         rethrow;
       }
     }
-    throw Exception('Não foi possível adicionar a mesa após $maxRetries tentativas.');
+    throw Exception(
+        'Não foi possível adicionar a mesa após $maxRetries tentativas.');
   }
 
   Future<void> updateTable(String tableId, int newNumber) async {
@@ -116,13 +133,14 @@ class TableProvider with ChangeNotifier {
         .order('numero', ascending: false)
         .limit(1)
         .maybeSingle();
-    
+
     if (response == null) {
       throw Exception('Não há mesas para excluir.');
     }
 
     if (response['status'] == 'ocupada') {
-      throw Exception('A mesa de maior número (Mesa ${response['numero']}) está ocupada e não pode ser excluída.');
+      throw Exception(
+          'A mesa de maior número (Mesa ${response['numero']}) está ocupada e não pode ser excluída.');
     }
 
     await _supabase.from(_tableMesa).delete().eq('id', response['id']);
@@ -154,13 +172,26 @@ class TableProvider with ChangeNotifier {
         .single();
     final orderId = orderResponse['id'];
 
-    final itemsToInsert = items
-        .map((cartItem) => {
-              'pedido_id': orderId,
-              'produto_id': cartItem.product!.id,
-              'quantidade': cartItem.quantity,
-            })
-        .toList();
+    final itemsToInsert = items.map((cartItem) {
+      final adicionaisJson = cartItem.selectedAdicionais.map((itemAd) {
+        return {
+          'adicional_id': itemAd.adicional.id,
+          'quantity': itemAd.quantity,
+          'adicional': {
+            'id': itemAd.adicional.id,
+            'name': itemAd.adicional.name,
+            'price': itemAd.adicional.price,
+          }
+        };
+      }).toList();
+
+      return {
+        'pedido_id': orderId,
+        'produto_id': cartItem.product.id,
+        'quantidade': cartItem.quantity,
+        'adicionais_selecionados': adicionaisJson,
+      };
+    }).toList();
 
     await _supabase.from('itens_pedido').insert(itemsToInsert);
     await updateStatus(tableId, 'ocupada');
@@ -173,10 +204,11 @@ class TableProvider with ChangeNotifier {
     try {
       final response = await _supabase
           .from('pedidos')
-          .select('*, itens_pedido!inner(*, produtos!inner(*, categorias(name)))')
+          .select(
+              '*, itens_pedido(*, adicionais_selecionados, produtos(*, categorias(*))), mesas!inner(numero)')
           .eq('mesa_id', tableId)
           .eq('company_id', companyId)
-          .neq('status', 'completed');
+          .neq('status', 'finalizado');
 
       return response
           .map((orderData) => app_data.Order.fromJson(orderData))
@@ -190,13 +222,17 @@ class TableProvider with ChangeNotifier {
   Future<void> clearTable(String tableId) async {
     final companyId = _getCompanyId();
     if (companyId == null) return;
-    
-    await _supabase
-        .from('pedidos')
-        .delete()
-        .eq('mesa_id', tableId)
-        .eq('company_id', companyId)
-        .neq('status', 'completed');
+
+    final orders = await getOrdersForTable(tableId);
+    final orderIds = orders.map((o) => o.id).toList();
+
+    if (orderIds.isNotEmpty) {
+      final filter = orderIds.map((id) => 'id.eq.$id').join(',');
+      await _supabase
+          .from('pedidos')
+          .update({'status': 'finalizado'})
+          .or(filter);
+    }
 
     await updateStatus(tableId, 'livre');
   }
@@ -211,16 +247,28 @@ class TableProvider with ChangeNotifier {
     required String paymentMethod,
   }) async {
     final companyId = _getCompanyId();
-    if (companyId == null) throw Exception('Empresa não encontrada.');
+    final userId = _getUserId();
+
+    if (companyId == null) {
+      throw Exception(
+          'Empresa não encontrada. Não é possível salvar a transação.');
+    }
+    if (userId == null) {
+      throw Exception(
+          'Usuário não autenticado. Não é possível salvar a transação.');
+    }
+
+    final payload = {
+      'table_number': table.tableNumber,
+      'total_amount': totalAmount,
+      'payment_method': paymentMethod,
+      'company_id': companyId,
+      'user_id': userId,
+    };
 
     final transactionResponse = await _supabase
         .from('transacoes')
-        .insert({
-          'table_number': table.tableNumber,
-          'total_amount': totalAmount,
-          'payment_method': paymentMethod,
-          'company_id': companyId,
-        })
+        .insert(payload)
         .select()
         .single();
 

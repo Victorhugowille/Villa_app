@@ -113,8 +113,6 @@ class _ReceiptLayoutEditorScreenState extends State<ReceiptLayoutEditorScreen> {
   Future<Uint8List> _generatePreviewPdfBytes(
       ReceiptTemplateSettings settings) async {
     final printingService = PrintingService();
-    final estabelecimentoProvider =
-        Provider.of<EstabelecimentoProvider>(context, listen: false);
     return printingService.getReceiptPdfBytes(
       orders: [
         app_data.Order(
@@ -139,7 +137,6 @@ class _ReceiptLayoutEditorScreenState extends State<ReceiptLayoutEditorScreen> {
       tableNumber: 'XX',
       totalAmount: 20.0,
       settings: settings,
-      companyName: estabelecimentoProvider.estabelecimento?.nomeFantasia ?? 'Nome da Empresa',
     );
   }
 

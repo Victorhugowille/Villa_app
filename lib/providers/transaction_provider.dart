@@ -1,3 +1,4 @@
+// lib/providers/transaction_provider.dart
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:villabistromobile/data/app_data.dart' as app_data;
@@ -76,8 +77,15 @@ class TransactionProvider with ChangeNotifier {
           .lte('created_at', endOfDay)
           .order('created_at', ascending: false);
 
-      _transactions =
-          dataList.map((item) => app_data.Transaction.fromJson(item)).toList();
+      _transactions = dataList.map((item) {
+        try {
+          return app_data.Transaction.fromJson(item);
+        } catch (e) {
+          debugPrint("Falha ao processar transação: $item. Erro: $e");
+          return null;
+        }
+      }).whereType<app_data.Transaction>().toList();
+      
     } catch (error) {
       debugPrint("Erro ao carregar transações: $error");
       _transactions = [];

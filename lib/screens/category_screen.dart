@@ -1,4 +1,3 @@
-// lib/screens/category_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:villabistromobile/data/app_data.dart' as app_data;
@@ -8,9 +7,26 @@ import 'package:villabistromobile/providers/product_provider.dart';
 import 'package:villabistromobile/screens/cart_screen.dart';
 import 'package:villabistromobile/screens/product_selection_screen.dart';
 
-class CategoryScreen extends StatelessWidget {
+class CategoryScreen extends StatefulWidget {
   final app_data.Table table;
   const CategoryScreen({super.key, required this.table});
+
+  @override
+  State<CategoryScreen> createState() => _CategoryScreenState();
+}
+
+class _CategoryScreenState extends State<CategoryScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<ProductProvider>(context, listen: false).fetchData();
+    });
+  }
+
+  Future<void> _refreshData() async {
+    await Provider.of<ProductProvider>(context, listen: false).fetchData();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,19 +48,32 @@ class CategoryScreen extends StatelessWidget {
 
     Widget bodyContent = Consumer<ProductProvider>(
       builder: (context, productProvider, child) {
-        if (productProvider.categories.isEmpty) {
-          // Garante que os dados sejam buscados se não estiverem disponíveis
-          productProvider.fetchData();
-        }
         if (productProvider.isLoading && productProvider.categories.isEmpty) {
           return Center(
               child: CircularProgressIndicator(color: theme.primaryColor));
         }
 
+        if (!productProvider.isLoading && productProvider.categories.isEmpty) {
+          return RefreshIndicator(
+            onRefresh: _refreshData,
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: [
+                SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.7,
+                  child: const Center(
+                    child: Text("Nenhuma categoria encontrada."),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
         final categories = productProvider.categories;
 
         return RefreshIndicator(
-          onRefresh: () => productProvider.fetchData(),
+          onRefresh: _refreshData,
           child: GridView.builder(
             padding: const EdgeInsets.all(16),
             itemCount: categories.length,
@@ -65,7 +94,7 @@ class CategoryScreen extends StatelessWidget {
                   navProvider.navigateTo(
                     context,
                     ProductSelectionScreen(
-                      table: table,
+                      table: widget.table,
                       category: category,
                       products: productsInCategory,
                     ),
@@ -75,11 +104,14 @@ class CategoryScreen extends StatelessWidget {
                 child: Card(
                   color: theme.primaryColor,
                   elevation: 4,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
-                        Icons.local_pizza, // Ícone de exemplo, troque se tiver um na sua Categoria
+                        category.icon,
                         size: 50,
                         color: theme.colorScheme.onPrimary,
                       ),
@@ -111,8 +143,8 @@ class CategoryScreen extends StatelessWidget {
             IconButton(
               icon: const Icon(Icons.shopping_cart_outlined, size: 28),
               onPressed: () {
-                navProvider.navigateTo(context, CartScreen(table: table),
-                    'Carrinho - Mesa ${table.tableNumber}');
+                navProvider.navigateTo(context, CartScreen(table: widget.table),
+                    'Carrinho - Mesa ${widget.table.tableNumber}');
               },
             ),
             if (cart.totalItemsQuantity > 0)
@@ -129,8 +161,7 @@ class CategoryScreen extends StatelessWidget {
                       const BoxConstraints(minWidth: 16, minHeight: 16),
                   child: Text(
                     '${cart.totalItemsQuantity}',
-                    style:
-                        const TextStyle(color: Colors.white, fontSize: 10),
+                    style: const TextStyle(color: Colors.white, fontSize: 10),
                     textAlign: TextAlign.center,
                   ),
                 ),

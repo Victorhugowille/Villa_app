@@ -1,16 +1,14 @@
-// lib/screens/printer_model_screen.dart
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
-import 'package:villabistromobile/data/app_data.dart';
+import 'package:villabistromobile/data/app_data.dart' as app_data;
 import 'package:villabistromobile/models/print_style_settings.dart';
 import 'package:villabistromobile/providers/estabelecimento_provider.dart';
 import 'package:villabistromobile/providers/printer_provider.dart';
 import 'package:villabistromobile/providers/product_provider.dart';
 import 'package:villabistromobile/services/printing_service.dart';
-import 'package:villabistromobile/data/app_data.dart' as app_data;
 import 'package:villabistromobile/widgets/side_menu.dart';
 import 'package:villabistromobile/screens/kitchen_printer_screen.dart';
 
@@ -155,7 +153,7 @@ class _CategoryPrinterSettingsTabState
             padding: const EdgeInsets.all(8.0),
             itemCount: categories.length,
             itemBuilder: (context, index) {
-              final Category category = categories[index];
+              final category = categories[index];
               final settings = _currentSettings[category.id] ?? {};
               final String? selectedPrinterName =
                   _printers.any((p) => p.name == settings['name'])
@@ -290,8 +288,32 @@ class __ReceiptLayoutEditorTabState extends State<_ReceiptLayoutEditorTab> {
         app_data.Order(
             id: 'teste-id',
             items: [
-              app_data.CartItem(product: app_data.Product(id: '1', name: 'Produto Teste 1', price: 10.99, categoryId: 'cat1', categoryName: 'Exemplo', displayOrder: 1, isSoldOut: false), quantity: 2),
-              app_data.CartItem(product: app_data.Product(id: '2', name: 'Produto Teste 2', price: 8.50, categoryId: 'cat1', categoryName: 'Exemplo', displayOrder: 2, isSoldOut: false), quantity: 1),
+              app_data.CartItem(
+                  product: app_data.Product(
+                      id: '1',
+                      name: 'Produto Teste 1',
+                      price: 10.99,
+                      categoryId: 'cat1',
+                      categoryName: 'Exemplo',
+                      displayOrder: 1,
+                      isSoldOut: false),
+                  quantity: 2,
+                  selectedAdicionais: [
+                     app_data.CartItemAdicional(
+                      adicional: app_data.Adicional(id: 'ad1', name: 'Bacon Extra', price: 3.0),
+                      quantity: 1
+                    )
+                  ]),
+              app_data.CartItem(
+                  product: app_data.Product(
+                      id: '2',
+                      name: 'Produto Teste 2',
+                      price: 8.50,
+                      categoryId: 'cat1',
+                      categoryName: 'Exemplo',
+                      displayOrder: 2,
+                      isSoldOut: false),
+                  quantity: 1),
             ],
             timestamp: DateTime.now(),
             status: 'completed',
@@ -300,7 +322,6 @@ class __ReceiptLayoutEditorTabState extends State<_ReceiptLayoutEditorTab> {
       tableNumber: '99',
       totalAmount: 30.48,
       settings: settings,
-      companyName: Provider.of<EstabelecimentoProvider>(context, listen: false).estabelecimento?.nomeFantasia ?? 'Sua Empresa',
     );
     await Printing.layoutPdf(onLayout: (format) => pdfBytes);
   }
@@ -311,14 +332,38 @@ class __ReceiptLayoutEditorTabState extends State<_ReceiptLayoutEditorTab> {
     return Consumer<PrinterProvider>(
       builder: (context, printerProvider, child) {
         final settings = printerProvider.receiptTemplateSettings;
-        
+
         final previewWidget = PrintingService().buildReceiptWidget(
           orders: [
             app_data.Order(
                 id: 'preview-id',
                 items: [
-                  app_data.CartItem(product: app_data.Product(id: '1', name: 'Produto Exemplo 1', price: 10.99, categoryId: 'cat1', categoryName: 'Exemplo', displayOrder: 1, isSoldOut: false), quantity: 2),
-                  app_data.CartItem(product: app_data.Product(id: '2', name: 'Produto 2 com nome longo', price: 8.50, categoryId: 'cat1', categoryName: 'Exemplo', displayOrder: 2, isSoldOut: false), quantity: 1),
+                  app_data.CartItem(
+                      product: app_data.Product(
+                          id: '1',
+                          name: 'Produto Exemplo 1',
+                          price: 10.99,
+                          categoryId: 'cat1',
+                          categoryName: 'Exemplo',
+                          displayOrder: 1,
+                          isSoldOut: false),
+                      quantity: 2),
+                  app_data.CartItem(
+                      product: app_data.Product(
+                          id: '2',
+                          name: 'Produto 2 com nome longo',
+                          price: 8.50,
+                          categoryId: 'cat1',
+                          categoryName: 'Exemplo',
+                          displayOrder: 2,
+                          isSoldOut: false),
+                      quantity: 1,
+                      selectedAdicionais: [
+                        app_data.CartItemAdicional(
+                          adicional: app_data.Adicional(id: 'ad1', name: 'Molho Extra', price: 2.0),
+                          quantity: 2
+                        )
+                      ]),
                 ],
                 timestamp: DateTime.now(),
                 status: 'completed',
@@ -327,7 +372,6 @@ class __ReceiptLayoutEditorTabState extends State<_ReceiptLayoutEditorTab> {
           tableNumber: 'XX',
           totalAmount: 20.49,
           settings: settings,
-          companyName: Provider.of<EstabelecimentoProvider>(context, listen: false).estabelecimento?.nomeFantasia ?? 'Sua Empresa',
         );
 
         if (isWideScreen) {
@@ -390,7 +434,7 @@ class __ReceiptLayoutEditorTabState extends State<_ReceiptLayoutEditorTab> {
             (newStyle) =>
                 _autoSaveSettings(settings.copyWith(totalStyle: newStyle)),
           ),
-          if (! (MediaQuery.of(context).size.width > 800))
+          if (!(MediaQuery.of(context).size.width > 800))
             Padding(
               padding: const EdgeInsets.only(top: 24.0),
               child: ElevatedButton.icon(
@@ -418,20 +462,26 @@ class __ReceiptLayoutEditorTabState extends State<_ReceiptLayoutEditorTab> {
             const Text('Logo',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             const Divider(),
-             if (settings.logoPath != null && settings.logoPath!.isNotEmpty && File(settings.logoPath!).existsSync())
+            if (settings.logoPath != null &&
+                settings.logoPath!.isNotEmpty &&
+                File(settings.logoPath!).existsSync())
               Center(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8.0),
                   child: Image.file(
                     File(settings.logoPath!),
+                    key: UniqueKey(),
                     height: 80,
-                    errorBuilder: (c, e, s) => const Icon(Icons.error, color: Colors.red, size: 40),
+                    errorBuilder: (c, e, s) =>
+                        const Icon(Icons.error, color: Colors.red, size: 40),
                   ),
                 ),
               ),
             Center(
               child: ElevatedButton.icon(
-                onPressed: () => Provider.of<PrinterProvider>(context, listen: false).pickAndSaveLogo(),
+                onPressed: () =>
+                    Provider.of<PrinterProvider>(context, listen: false)
+                        .pickAndSaveLogo(),
                 icon: const Icon(Icons.image),
                 label: const Text('Selecionar Imagem do Logo'),
               ),
@@ -445,9 +495,35 @@ class __ReceiptLayoutEditorTabState extends State<_ReceiptLayoutEditorTab> {
               divisions: 8,
               label: settings.logoHeight.round().toString(),
               onChanged: (value) {
-                Provider.of<PrinterProvider>(context, listen: false).updateLogoHeight(value);
+                Provider.of<PrinterProvider>(context, listen: false)
+                    .updateLogoHeight(value);
+              },
+              onChangeEnd: (value) {
                 _autoSaveSettings(settings.copyWith(logoHeight: value));
               },
+            ),
+            const SizedBox(height: 8),
+            const Text('Alinhamento do Logo'),
+            const SizedBox(height: 8),
+            Center(
+              child: SegmentedButton<CrossAxisAlignment>(
+                segments: const [
+                  ButtonSegment(
+                      value: CrossAxisAlignment.start,
+                      icon: Icon(Icons.format_align_left)),
+                  ButtonSegment(
+                      value: CrossAxisAlignment.center,
+                      icon: Icon(Icons.format_align_center)),
+                  ButtonSegment(
+                      value: CrossAxisAlignment.end,
+                      icon: Icon(Icons.format_align_right)),
+                ],
+                selected: {settings.logoAlignment},
+                onSelectionChanged: (newSelection) {
+                  Provider.of<PrinterProvider>(context, listen: false)
+                      .updateReceiptLogoAlignment(newSelection.first);
+                },
+              ),
             ),
           ],
         ),
@@ -456,7 +532,9 @@ class __ReceiptLayoutEditorTabState extends State<_ReceiptLayoutEditorTab> {
   }
 
   Widget _buildInfoEditor(ReceiptTemplateSettings settings) {
-    final estabelecimento = Provider.of<EstabelecimentoProvider>(context, listen: false).estabelecimento;
+    final estabelecimento =
+        Provider.of<EstabelecimentoProvider>(context, listen: false)
+            .estabelecimento;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -469,7 +547,8 @@ class __ReceiptLayoutEditorTabState extends State<_ReceiptLayoutEditorTab> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text('Dados do Estabelecimento',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    style:
+                        TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 if (estabelecimento != null)
                   Tooltip(
                     message: 'Preencher com os dados cadastrados',
@@ -478,10 +557,12 @@ class __ReceiptLayoutEditorTabState extends State<_ReceiptLayoutEditorTab> {
                       onPressed: () {
                         final newSettings = settings.copyWith(
                           subtitleText: 'CNPJ: ${estabelecimento.cnpj}',
-                          addressText: '${estabelecimento.rua}, ${estabelecimento.numero}, ${estabelecimento.bairro}',
+                          addressText:
+                              '${estabelecimento.rua}, ${estabelecimento.numero}, ${estabelecimento.bairro}',
                           phoneText: 'Tel: ${estabelecimento.telefone}',
                         );
-                        Provider.of<PrinterProvider>(context, listen: false).saveReceiptTemplateSettings(newSettings);
+                        Provider.of<PrinterProvider>(context, listen: false)
+                            .saveReceiptTemplateSettings(newSettings);
                       },
                     ),
                   ),
@@ -491,30 +572,38 @@ class __ReceiptLayoutEditorTabState extends State<_ReceiptLayoutEditorTab> {
             _buildTextAndStyleEditor(
               'Subtítulo (CNPJ)',
               settings.subtitleText,
-              (newText) => _autoSaveSettings(settings.copyWith(subtitleText: newText)),
+              (newText) =>
+                  _autoSaveSettings(settings.copyWith(subtitleText: newText)),
               settings.subtitleStyle,
-              (newStyle) => _autoSaveSettings(settings.copyWith(subtitleStyle: newStyle)),
+              (newStyle) =>
+                  _autoSaveSettings(settings.copyWith(subtitleStyle: newStyle)),
             ),
             _buildTextAndStyleEditor(
               'Endereço',
               settings.addressText,
-              (newText) => _autoSaveSettings(settings.copyWith(addressText: newText)),
+              (newText) =>
+                  _autoSaveSettings(settings.copyWith(addressText: newText)),
               settings.addressStyle,
-              (newStyle) => _autoSaveSettings(settings.copyWith(addressStyle: newStyle)),
+              (newStyle) =>
+                  _autoSaveSettings(settings.copyWith(addressStyle: newStyle)),
             ),
             _buildTextAndStyleEditor(
               'Telefone',
               settings.phoneText,
-              (newText) => _autoSaveSettings(settings.copyWith(phoneText: newText)),
+              (newText) =>
+                  _autoSaveSettings(settings.copyWith(phoneText: newText)),
               settings.phoneStyle,
-              (newStyle) => _autoSaveSettings(settings.copyWith(phoneStyle: newStyle)),
+              (newStyle) =>
+                  _autoSaveSettings(settings.copyWith(phoneStyle: newStyle)),
             ),
-             _buildTextAndStyleEditor(
+            _buildTextAndStyleEditor(
               'Mensagem Final',
               settings.finalMessageText,
-              (newText) => _autoSaveSettings(settings.copyWith(finalMessageText: newText)),
+              (newText) => _autoSaveSettings(
+                  settings.copyWith(finalMessageText: newText)),
               settings.finalMessageStyle,
-              (newStyle) => _autoSaveSettings(settings.copyWith(finalMessageStyle: newStyle)),
+              (newStyle) => _autoSaveSettings(
+                  settings.copyWith(finalMessageStyle: newStyle)),
             ),
           ],
         ),
@@ -533,14 +622,14 @@ class _KitchenLayoutEditorTab extends StatefulWidget {
 
 class __KitchenLayoutEditorTabState extends State<_KitchenLayoutEditorTab> {
   Timer? _debounce;
-  
+
   @override
   void dispose() {
     _debounce?.cancel();
     super.dispose();
   }
 
-  void _autoSaveSettings(PrintTemplateSettings settings) {
+  void _autoSaveSettings(KitchenTemplateSettings settings) {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
     _debounce = Timer(const Duration(milliseconds: 500), () {
       Provider.of<PrinterProvider>(context, listen: false)
@@ -548,15 +637,27 @@ class __KitchenLayoutEditorTabState extends State<_KitchenLayoutEditorTab> {
     });
   }
 
-  void _printTest(PrintTemplateSettings settings) async {
+  void _printTest(KitchenTemplateSettings settings) async {
     final pdfBytes = await PrintingService().getKitchenOrderPdfBytes(
       items: [
-        app_data.CartItem(product: app_data.Product(id: '1', name: 'Produto Teste 1', price: 10.0, categoryId: '1', categoryName: 'Bebidas', displayOrder: 1, isSoldOut: false), quantity: 2),
-        app_data.CartItem(product: app_data.Product(id: '2', name: 'Produto Teste 2', price: 15.0, categoryId: '1', categoryName: 'Bebidas', displayOrder: 2, isSoldOut: false), quantity: 1),
+        app_data.CartItem(
+            product: app_data.Product(id: '1', name: 'Produto Teste 1', price: 10.0, categoryId: '1', categoryName: 'Bebidas', displayOrder: 1, isSoldOut: false),
+            quantity: 2,
+            selectedAdicionais: [
+              app_data.CartItemAdicional(
+                adicional: app_data.Adicional(id: 'ad1', name: 'Gelo e Limão', price: 0.5),
+                quantity: 1
+              )
+            ]
+        ),
+        app_data.CartItem(
+            product: app_data.Product(id: '2', name: 'Produto Teste 2', price: 15.0, categoryId: '1', categoryName: 'Bebidas', displayOrder: 2, isSoldOut: false),
+            quantity: 1
+        ),
       ],
       tableNumber: '99',
       orderId: 'teste-123',
-      paperSize: '58', 
+      paperSize: '58',
       templateSettings: settings,
     );
     await Printing.layoutPdf(onLayout: (format) => pdfBytes);
@@ -571,14 +672,30 @@ class __KitchenLayoutEditorTabState extends State<_KitchenLayoutEditorTab> {
 
         final previewWidget = PrintingService().buildKitchenOrderWidget(
           items: [
-            app_data.CartItem(product: app_data.Product(id: '1', name: 'Produto Exemplo 1', price: 10.0, categoryId: '1', categoryName: 'Bebidas', displayOrder: 1, isSoldOut: false), quantity: 2),
-            app_data.CartItem(product: app_data.Product(id: '2', name: 'Produto Exemplo 2', price: 15.0, categoryId: '1', categoryName: 'Bebidas', displayOrder: 2, isSoldOut: false), quantity: 1),
+            app_data.CartItem(
+              product: app_data.Product(id: '1', name: 'Produto Exemplo 1', price: 10.0, categoryId: '1', categoryName: 'Bebidas', displayOrder: 1, isSoldOut: false),
+              quantity: 2,
+              selectedAdicionais: [
+                app_data.CartItemAdicional(
+                  adicional: app_data.Adicional(id: 'ad1', name: 'Bacon Extra', price: 3.0),
+                  quantity: 1
+                ),
+                app_data.CartItemAdicional(
+                  adicional: app_data.Adicional(id: 'ad2', name: 'Cheddar', price: 2.0),
+                  quantity: 2
+                )
+              ]
+            ),
+            app_data.CartItem(
+              product: app_data.Product(id: '2', name: 'Produto Exemplo 2', price: 15.0, categoryId: '1', categoryName: 'Bebidas', displayOrder: 2, isSoldOut: false),
+              quantity: 1
+            ),
           ],
           tableNumber: 'XX',
           orderId: 'preview-123',
           templateSettings: settings,
         );
-        
+
         if (isWideScreen) {
           return Row(
             children: [
@@ -620,7 +737,7 @@ class __KitchenLayoutEditorTabState extends State<_KitchenLayoutEditorTab> {
     );
   }
 
-  Widget _buildControlsPanel(PrintTemplateSettings settings) {
+  Widget _buildControlsPanel(KitchenTemplateSettings settings) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -643,13 +760,13 @@ class __KitchenLayoutEditorTabState extends State<_KitchenLayoutEditorTab> {
                   _autoSaveSettings(settings.copyWith(itemStyle: newStyle))),
           _buildTextAndStyleEditor(
               'Texto de Rodapé',
-              settings.footerText, 
+              settings.footerText,
               (newText) =>
                   _autoSaveSettings(settings.copyWith(footerText: newText)),
               settings.footerStyle,
               (newStyle) =>
                   _autoSaveSettings(settings.copyWith(footerStyle: newStyle))),
-          if (! (MediaQuery.of(context).size.width > 800))
+          if (!(MediaQuery.of(context).size.width > 800))
             Padding(
               padding: const EdgeInsets.only(top: 24.0),
               child: ElevatedButton.icon(
@@ -666,7 +783,7 @@ class __KitchenLayoutEditorTabState extends State<_KitchenLayoutEditorTab> {
     );
   }
 
-  Widget _buildLogoEditor(PrintTemplateSettings settings) {
+  Widget _buildLogoEditor(KitchenTemplateSettings settings) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       child: Padding(
@@ -677,20 +794,26 @@ class __KitchenLayoutEditorTabState extends State<_KitchenLayoutEditorTab> {
             const Text('Logo',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             const Divider(),
-            if (settings.logoPath != null && settings.logoPath!.isNotEmpty && File(settings.logoPath!).existsSync())
+            if (settings.logoPath != null &&
+                settings.logoPath!.isNotEmpty &&
+                File(settings.logoPath!).existsSync())
               Center(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8.0),
                   child: Image.file(
                     File(settings.logoPath!),
+                    key: UniqueKey(),
                     height: 80,
-                    errorBuilder: (c, e, s) => const Icon(Icons.error, color: Colors.red, size: 40),
+                    errorBuilder: (c, e, s) =>
+                        const Icon(Icons.error, color: Colors.red, size: 40),
                   ),
                 ),
               ),
             Center(
               child: ElevatedButton.icon(
-                onPressed: () => Provider.of<PrinterProvider>(context, listen: false).pickAndSaveLogo(),
+                onPressed: () =>
+                    Provider.of<PrinterProvider>(context, listen: false)
+                        .pickAndSaveLogo(),
                 icon: const Icon(Icons.image),
                 label: const Text('Selecionar Imagem do Logo'),
               ),
@@ -704,9 +827,35 @@ class __KitchenLayoutEditorTabState extends State<_KitchenLayoutEditorTab> {
               divisions: 8,
               label: settings.logoHeight.round().toString(),
               onChanged: (value) {
-                Provider.of<PrinterProvider>(context, listen: false).updateLogoHeight(value);
-                 _autoSaveSettings(settings.copyWith(logoHeight: value));
+                Provider.of<PrinterProvider>(context, listen: false)
+                    .updateLogoHeight(value);
               },
+              onChangeEnd: (value) {
+                _autoSaveSettings(settings.copyWith(logoHeight: value));
+              },
+            ),
+            const SizedBox(height: 8),
+            const Text('Alinhamento do Logo'),
+            const SizedBox(height: 8),
+            Center(
+              child: SegmentedButton<CrossAxisAlignment>(
+                segments: const [
+                  ButtonSegment(
+                      value: CrossAxisAlignment.start,
+                      icon: Icon(Icons.format_align_left)),
+                  ButtonSegment(
+                      value: CrossAxisAlignment.center,
+                      icon: Icon(Icons.format_align_center)),
+                  ButtonSegment(
+                      value: CrossAxisAlignment.end,
+                      icon: Icon(Icons.format_align_right)),
+                ],
+                selected: {settings.logoAlignment},
+                onSelectionChanged: (newSelection) {
+                  Provider.of<PrinterProvider>(context, listen: false)
+                      .updateKitchenLogoAlignment(newSelection.first);
+                },
+              ),
             ),
           ],
         ),
@@ -723,10 +872,7 @@ Widget _buildTextAndStyleEditor(
   ValueChanged<PrintStyle> onStyleChanged,
 ) {
   final controller = TextEditingController(text: initialValue);
-  
-  // Para evitar múltiplas atualizações, o listener do controller
-  // só deve chamar o onTextChanged.
-  // A UI reconstruirá e pegará o novo valor do controller.
+
   controller.addListener(() {
     onTextChanged(controller.text);
   });

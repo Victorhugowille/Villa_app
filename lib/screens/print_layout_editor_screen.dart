@@ -1,4 +1,3 @@
-// lib/screens/print_layout_editor_screen.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'dart:io';
@@ -38,7 +37,7 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
     super.dispose();
   }
 
-  void _autoSaveSettings(PrintTemplateSettings settings) {
+  void _autoSaveSettings(KitchenTemplateSettings settings) {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
     _debounce = Timer(const Duration(milliseconds: 500), () {
       Provider.of<PrinterProvider>(context, listen: false)
@@ -47,18 +46,36 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
   }
 
   void _resetToDefaults() {
-    final newSettings = PrintTemplateSettings.defaults();
+    final newSettings = KitchenTemplateSettings.defaults();
     Provider.of<PrinterProvider>(context, listen: false)
         .saveTemplateSettings(newSettings);
     _footerController.text = newSettings.footerText;
   }
-  
-  Widget _generatePreviewWidget(PrintTemplateSettings settings) {
+
+  Widget _generatePreviewWidget(KitchenTemplateSettings settings) {
     final printingService = PrintingService();
     return printingService.buildKitchenOrderWidget(
       items: [
-        app_data.CartItem(product: app_data.Product(id: '1', name: 'Produto Exemplo 1', price: 10.0, categoryId: '1', categoryName: 'Bebidas', displayOrder: 1, isSoldOut: false), quantity: 2),
-        app_data.CartItem(product: app_data.Product(id: '2', name: 'Produto Exemplo 2', price: 15.0, categoryId: '1', categoryName: 'Bebidas', displayOrder: 2, isSoldOut: false), quantity: 1),
+        app_data.CartItem(
+            product: app_data.Product(
+                id: '1',
+                name: 'Produto Exemplo 1',
+                price: 10.0,
+                categoryId: '1',
+                categoryName: 'Bebidas',
+                displayOrder: 1,
+                isSoldOut: false),
+            quantity: 2),
+        app_data.CartItem(
+            product: app_data.Product(
+                id: '2',
+                name: 'Produto Exemplo 2',
+                price: 15.0,
+                categoryId: '1',
+                categoryName: 'Bebidas',
+                displayOrder: 2,
+                isSoldOut: false),
+            quantity: 1),
       ],
       tableNumber: 'XX',
       orderId: '999',
@@ -95,14 +112,13 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
                   tooltip: 'Visualizar',
                   onPressed: () {
                     showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        content: Container(
-                          width: 250,
-                          child: _generatePreviewWidget(currentSettings),
-                        ),
-                      )
-                    );
+                        context: context,
+                        builder: (context) => AlertDialog(
+                              content: SizedBox(
+                                width: 250,
+                                child: _generatePreviewWidget(currentSettings),
+                              ),
+                            ));
                   },
                 ),
               IconButton(
@@ -120,7 +136,7 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
     );
   }
 
-  Widget _buildWideLayout(PrintTemplateSettings currentSettings) {
+  Widget _buildWideLayout(KitchenTemplateSettings currentSettings) {
     return Row(
       children: [
         Expanded(
@@ -161,11 +177,11 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
     );
   }
 
-  Widget _buildNarrowLayout(PrintTemplateSettings currentSettings) {
+  Widget _buildNarrowLayout(KitchenTemplateSettings currentSettings) {
     return _buildControlsPanel(currentSettings);
   }
 
-  Widget _buildControlsPanel(PrintTemplateSettings currentSettings) {
+  Widget _buildControlsPanel(KitchenTemplateSettings currentSettings) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -200,7 +216,7 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
     );
   }
 
-  Widget _buildLogoEditor(PrintTemplateSettings currentSettings) {
+  Widget _buildLogoEditor(KitchenTemplateSettings currentSettings) {
     final printerProvider =
         Provider.of<PrinterProvider>(context, listen: false);
 
@@ -219,10 +235,13 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
               child: currentSettings.logoPath != null &&
                       currentSettings.logoPath!.isNotEmpty &&
                       File(currentSettings.logoPath!).existsSync()
-                  ? Image.file(File(currentSettings.logoPath!),
+                  ? Image.file(
+                      File(currentSettings.logoPath!),
+                      key: UniqueKey(), // Força a atualização da imagem
                       height: 80,
                       errorBuilder: (c, e, s) =>
-                          const Icon(Icons.error, color: Colors.red))
+                          const Icon(Icons.error, color: Colors.red),
+                    )
                   : Image.asset('assets/images/logoVilla.jpg', height: 80),
             ),
             const SizedBox(height: 16),
@@ -248,6 +267,29 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
               onChangeEnd: (double value) {
                 _autoSaveSettings(currentSettings.copyWith(logoHeight: value));
               },
+            ),
+            const SizedBox(height: 8),
+            const Text('Alinhamento do Logo'),
+            const SizedBox(height: 8),
+            Center(
+              child: SegmentedButton<CrossAxisAlignment>(
+                segments: const [
+                  ButtonSegment(
+                      value: CrossAxisAlignment.start,
+                      icon: Icon(Icons.format_align_left)),
+                  ButtonSegment(
+                      value: CrossAxisAlignment.center,
+                      icon: Icon(Icons.format_align_center)),
+                  ButtonSegment(
+                      value: CrossAxisAlignment.end,
+                      icon: Icon(Icons.format_align_right)),
+                ],
+                selected: {currentSettings.logoAlignment},
+                onSelectionChanged: (newSelection) {
+                  printerProvider
+                      .updateKitchenLogoAlignment(newSelection.first);
+                },
+              ),
             ),
           ],
         ),

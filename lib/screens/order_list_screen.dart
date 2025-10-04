@@ -1,9 +1,7 @@
-// lib/screens/order_list_screen.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:villabistromobile/data/app_data.dart' as app_data;
-import 'package:villabistromobile/providers/estabelecimento_provider.dart';
 import 'package:villabistromobile/providers/navigation_provider.dart';
 import 'package:villabistromobile/providers/printer_provider.dart';
 import 'package:villabistromobile/providers/table_provider.dart';
@@ -64,8 +62,6 @@ class _OrderListScreenState extends State<OrderListScreen> {
     final totalAmount =
         loadedOrders.fold(0.0, (sum, order) => sum + order.total);
     final printerProvider = Provider.of<PrinterProvider>(context, listen: false);
-    final estabelecimentoProvider =
-        Provider.of<EstabelecimentoProvider>(context, listen: false);
 
     try {
       await _printingService.printReceiptPdf(
@@ -73,8 +69,6 @@ class _OrderListScreenState extends State<OrderListScreen> {
         tableNumber: widget.table.tableNumber.toString(),
         totalAmount: totalAmount,
         settings: printerProvider.receiptTemplateSettings,
-        companyName:
-            estabelecimentoProvider.estabelecimento?.nomeFantasia ?? 'Nome da Empresa',
       );
     } catch (e) {
       if (!mounted) return;
@@ -212,14 +206,34 @@ class _OrderListScreenState extends State<OrderListScreen> {
               children: order.items.map((item) {
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Flexible(
-                          child: Text(
-                              '${item.quantity}x ${item.product?.name ?? "Produto removido"}')),
-                      Text(
-                          'R\$ ${((item.product?.price ?? 0.0) * item.quantity).toStringAsFixed(2)}'),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Flexible(
+                              child: Text(
+                                  '${item.quantity}x ${item.product.name}')),
+                          Text(
+                              'R\$ ${(item.product.price * item.quantity).toStringAsFixed(2)}'),
+                        ],
+                      ),
+                      if (item.selectedAdicionais.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 16.0, top: 4.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: item.selectedAdicionais.map((itemAd) {
+                              final ad = itemAd.adicional;
+                              return Text(
+                                "+ ${itemAd.quantity}x ${ad.name} (+ R\$ ${(ad.price * itemAd.quantity).toStringAsFixed(2)})",
+                                style: const TextStyle(
+                                    fontSize: 12, color: Colors.black54),
+                              );
+                            }).toList(),
+                          ),
+                        )
                     ],
                   ),
                 );
@@ -254,7 +268,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
         color: theme.cardColor,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: const Color.fromARGB(255, 252, 251, 251).withOpacity(0.1),
             spreadRadius: 0,
             blurRadius: 10,
             offset: const Offset(0, -5),
@@ -290,8 +304,8 @@ class _OrderListScreenState extends State<OrderListScreen> {
               label: const Text('FECHAR CONTA'),
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                textStyle:
-                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                textStyle: const TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.bold),
               ),
               onPressed: totalAmount > 0
                   ? () {

@@ -2,84 +2,91 @@ import 'package:flutter/foundation.dart';
 import 'package:villabistromobile/data/app_data.dart' as app_data;
 
 class CartProvider with ChangeNotifier {
-  final Map<String, app_data.CartItem> _items = {};
+  final List<app_data.CartItem> _items = [];
 
-  Map<String, app_data.CartItem> get items => {..._items};
-
-  List<app_data.CartItem> get itemsAsList {
-    return _items.values.toList();
-  }
-
-  int get itemCount {
-    return _items.length;
-  }
+  List<app_data.CartItem> get items => [..._items];
 
   int get totalItemsQuantity {
-    return _items.values.fold(0, (sum, item) => sum + item.quantity);
+    return _items.fold(0, (sum, item) => sum + item.quantity);
   }
 
   double get totalAmount {
-    var total = 0.0;
-    _items.forEach((key, cartItem) {
-      total += cartItem.product.price * cartItem.quantity;
+    return _items.fold(0.0, (sum, item) => sum + item.totalPrice);
+  }
+
+  void updateCartFromSelection({
+    required Map<String, int> productQuantities,
+    required Map<String, Map<String, int>> adicionalQuantities,
+    required List<app_data.Product> allProducts,
+    required Map<String, List<app_data.GrupoAdicional>> allAdicionais,
+  }) {
+    allProducts.forEach((product) {
+      _items.removeWhere((item) => item.product.id == product.id);
     });
-    return total;
-  }
 
-  void addItem(app_data.Product product) {
-    if (_items.containsKey(product.id)) {
-      _items.update(
-        product.id,
-        (existing) => app_data.CartItem(
-          product: existing.product,
-          quantity: existing.quantity + 1,
-        ),
-      );
-    } else {
-      _items.putIfAbsent(
-        product.id,
-        () => app_data.CartItem(product: product, quantity: 1),
-      );
-    }
-    notifyListeners();
-  }
+    productQuantities.forEach((productId, productQty) {
+      if (productQty > 0) {
+        final product = allProducts.firstWhere((p) => p.id == productId);
+        final selectedAdicionais = <app_data.CartItemAdicional>[];
 
-  void removeSingleItem(String productId) {
-    if (!_items.containsKey(productId)) return;
-    if (_items[productId]!.quantity > 1) {
-      _items.update(
-          productId,
-          (existing) => app_data.CartItem(
-                product: existing.product,
-                quantity: existing.quantity - 1,
-              ));
-    } else {
-      _items.remove(productId);
-    }
-    notifyListeners();
-  }
+        final adicionaisForProduct = adicionalQuantities[productId];
+        if (adicionaisForProduct != null) {
+          adicionaisForProduct.forEach((adicionalId, adicionalQty) {
+            if (adicionalQty > 0) {
+              final allProductAdicionais = allAdicionais[productId] ?? [];
+              for (var grupo in allProductAdicionais) {
+                final adicional = grupo.adicionais.firstWhere(
+                    (ad) => ad.id == adicionalId,
+                    orElse: () => app_data.Adicional(
+                        id: '', name: '', price: 0, imageUrl: null));
+                if (adicional.id.isNotEmpty) {
+                  selectedAdicionais.add(app_data.CartItemAdicional(
+                      adicional: adicional, quantity: adicionalQty));
+                  break;
+                }
+              }
+            }
+          });
+        }
 
-  void addItemsFromSelection(
-      Map<String, int> selection, List<app_data.Product> products) {
-    selection.forEach((productId, quantity) {
-      if (quantity > 0) {
-        final product = products.firstWhere((p) => p.id == productId);
-        _items[productId] =
-            app_data.CartItem(product: product, quantity: quantity);
-      } else {
-        _items.remove(productId);
+        _items.add(app_data.CartItem(
+          product: product,
+          quantity: productQty,
+          selectedAdicionais: selectedAdicionais,
+        ));
       }
     });
+
     notifyListeners();
   }
 
-  void removeItem(String productId) {
-    _items.remove(productId);
-    notifyListeners();
+  void increaseQuantity(String cartItemId) {
+    final index = _items.indexWhere((item) => item.cartItemId == cartItemId);
+    if (index != -1) {
+      final oldItem = _items[index];
+      final newItem = oldItem.copyWith(quantity: oldItem.quantity + 1);
+      _items[index] = newItem;
+      notifyListeners();
+    }
   }
 
-  int getItemQuantity(String productId) {
-    return _items.containsKey(productId) ? _items[productId]!.quantity : 0;
+  void decreaseQuantity(String cartItemId) {
+    final index = _items.indexWhere((item) => item.cartItemId == cartItemId);
+    if (index != -1) {
+      final oldItem = _items[index];
+      if (oldItem.quantity > 1) {
+        final newItem = oldItem.copyWith(quantity: oldItem.quantity - 1);
+        _items[index] = newItem;
+      } else {
+        _items.removeAt(index);
+      }
+      notifyListeners();
+    }
+  }
+
+  void removeItem(String cartItemId) {
+    _items.removeWhere((item) => item.cartItemId == cartItemId);
+    notifyListeners();
   }
 
   void clearCart() {

@@ -33,96 +33,163 @@ class SideMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     final companyProvider = context.watch<CompanyProvider>();
 
+    // traduz o cargo
+    String roleText;
+    switch (companyProvider.role) {
+      case 'owner':
+        roleText = 'Dono';
+        break;
+      case 'employee':
+        roleText = 'Funcionário';
+        break;
+      default:
+        roleText = 'Usuário';
+    }
+
     return Drawer(
       elevation: 4,
-      child: ListView(
-        padding: EdgeInsets.zero,
-        children: <Widget>[
+      child: Column(
+        children: [
           Container(
-            padding: EdgeInsets.only(
-              top: MediaQuery.of(context).padding.top + 20,
+            width: double.infinity,
+            padding: const EdgeInsets.only(
+              top: 20,
               bottom: 20,
               left: 16,
-              right: 16,
+              right: 20,
             ),
             decoration: BoxDecoration(
               color: Theme.of(context).primaryColor,
+              borderRadius: const BorderRadius.only(
+              ),
             ),
-            child: Text(
-              companyProvider.companyName,
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold),
+            child: SafeArea(
+            bottom: false,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  companyProvider.companyName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  roleText, // cargo traduzido
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
             ),
           ),
-          ListTile(
-            leading: const Icon(Icons.table_restaurant),
-            title: const Text('Mesas'),
-            onTap: () => _navigateTo(
-                context, const TableSelectionScreen(), 'Seleção de Mesas'),
           ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.wechat),
-            title: const Text('WhatsApp'),
-            onTap: () =>
-                _navigateTo(context, const WhatsAppWebScreen(), 'WhatsApp'),
-          ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.view_kanban_outlined),
-            title: const Text('Painel de Pedidos (KDS)'),
-            onTap: () =>
-                _navigateTo(context, const KdsScreen(), 'Painel de Pedidos (KDS)'),
-          ),
-          const Divider(),
-          if (companyProvider.role == 'owner') ...[
-            ListTile(
-              leading: const Icon(Icons.receipt_long),
-              title: const Text('Movimentação'),
-              onTap: () => _navigateTo(context,
-                  const TransactionsReportScreen(), 'Relatório de Movimentação'),
+
+          // Lista de opções do menu
+          Expanded(
+            child: ListView(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.table_restaurant),
+                  title: const Text('Mesas'),
+                  onTap: () => _navigateTo(
+                    context,
+                    const TableSelectionScreen(),
+                    'Seleção de Mesas',
+                  ),
+                ),
+                const Divider(),
+                ListTile(
+                  leading: const Icon(Icons.wechat),
+                  title: const Text('WhatsApp'),
+                  onTap: () => _navigateTo(
+                    context,
+                    const WhatsAppWebScreen(),
+                    'WhatsApp',
+                  ),
+                ),
+                const Divider(),
+                ListTile(
+                  leading: const Icon(Icons.view_kanban_outlined),
+                  title: const Text('Painel de Pedidos (KDS)'),
+                  onTap: () => _navigateTo(
+                    context,
+                    const KdsScreen(),
+                    'Painel de Pedidos (KDS)',
+                  ),
+                ),
+                const Divider(),
+                if (companyProvider.role == 'owner') ...[
+                  ListTile(
+                    leading: const Icon(Icons.receipt_long),
+                    title: const Text('Movimentação'),
+                    onTap: () => _navigateTo(
+                      context,
+                      const TransactionsReportScreen(),
+                      'Relatório de Movimentação',
+                    ),
+                  ),
+                  const Divider(),
+                ],
+                ListTile(
+                  leading: const Icon(Icons.grid_on_outlined),
+                  title: const Text('Planilhas'),
+                  onTap: () => _navigateTo(
+                    context,
+                    const ExcelGeneratorScreen(),
+                    'Planilhas',
+                  ),
+                ),
+                const Divider(),
+                if (companyProvider.role == 'owner') ...[
+                  ListTile(
+                    leading: const Icon(Icons.business_center),
+                    title: const Text('Gestão'),
+                    onTap: () => _navigateTo(
+                      context,
+                      const ManagementScreen(),
+                      'Gestão',
+                    ),
+                  ),
+                  const Divider(),
+                ],
+                if (companyProvider.role == 'owner') ...[
+                  ListTile(
+                    leading: const Icon(Icons.smart_toy_outlined),
+                    title: const Text('Robô'),
+                    onTap: () => _navigateTo(
+                      context,
+                      const BotManagementScreen(),
+                      'Gerenciamento do Robô',
+                    ),
+                  ),
+                  const Divider(),
+                ],
+                ListTile(
+                  leading: const Icon(Icons.print_rounded),
+                  title: const Text('Impressão'),
+                  onTap: () => _navigateTo(
+                    context,
+                    const PrinterModelScreen(),
+                    'Modelos de Impressão',
+                  ),
+                ),
+                const Divider(),
+                ListTile(
+                  leading: const Icon(Icons.settings),
+                  title: const Text('Configurações'),
+                  onTap: () => _navigateTo(
+                    context,
+                    const ConfiguracaoScreen(),
+                    'Configurações',
+                  ),
+                ),
+              ],
             ),
-            const Divider(),
-          ],
-          ListTile(
-            leading: const Icon(Icons.grid_on_outlined),
-            title: const Text('Planilhas'),
-            onTap: () =>
-                _navigateTo(context, const ExcelGeneratorScreen(), 'Planilhas'),
-          ),
-          const Divider(),
-          if (companyProvider.role == 'owner') ...[
-            ListTile(
-              leading: const Icon(Icons.business_center),
-              title: const Text('Gestão'),
-              onTap: () =>
-                  _navigateTo(context, const ManagementScreen(), 'Gestão'),
-            ),
-            const Divider(),
-          ],
-          if (companyProvider.role == 'owner') ...[
-            ListTile(
-              leading: const Icon(Icons.smart_toy_outlined),
-              title: const Text('Robô'),
-              onTap: () => _navigateTo(
-                  context, const BotManagementScreen(), 'Gerenciamento do Robô'),
-            ),
-            const Divider(),
-          ],
-          ListTile(
-            leading: const Icon(Icons.print_rounded),
-            title: const Text('Impressão'),
-            onTap: () => _navigateTo(
-                context, const PrinterModelScreen(), 'Modelos de Impressão'),
-          ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.settings),
-            title: const Text('Configurações'),
-            onTap: () => _navigateTo(
-                context, const ConfiguracaoScreen(), 'Configurações'),
           ),
         ],
       ),

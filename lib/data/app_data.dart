@@ -1,40 +1,32 @@
-// lib/data/app_data.dart
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
 
 class SavedReport {
   final String id;
   final String name;
   final DateTime createdAt;
-
-  SavedReport({
-    required this.id,
-    required this.name,
-    required this.createdAt,
-  });
-
+  SavedReport(
+      {required this.id, required this.name, required this.createdAt});
   factory SavedReport.fromJson(Map<String, dynamic> json) {
     return SavedReport(
-      id: json['id'],
-      name: json['name'],
-      createdAt: DateTime.parse(json['created_at']),
-    );
+        id: json['id'],
+        name: json['name'],
+        createdAt: DateTime.parse(json['created_at']));
   }
 }
+
 class GrupoAdicional {
   final String id;
   final String name;
   final String produtoId;
   final String? imageUrl;
   final List<Adicional> adicionais;
-
-  GrupoAdicional({
-    required this.id,
-    required this.name,
-    required this.produtoId,
-    this.imageUrl,
-    this.adicionais = const [],
-  });
-
+  GrupoAdicional(
+      {required this.id,
+      required this.name,
+      required this.produtoId,
+      this.imageUrl,
+      this.adicionais = const []});
   factory GrupoAdicional.fromJson(Map<String, dynamic> json) {
     List<Adicional> items = [];
     if (json['adicionais'] != null) {
@@ -43,12 +35,11 @@ class GrupoAdicional {
           .toList();
     }
     return GrupoAdicional(
-      id: json['id'].toString(),
-      name: json['name'],
-      produtoId: json['produto_id'].toString(),
-      imageUrl: json['image_url'],
-      adicionais: items,
-    );
+        id: json['id'].toString(),
+        name: json['name'],
+        produtoId: json['produto_id'].toString(),
+        imageUrl: json['image_url'],
+        adicionais: items);
   }
 }
 
@@ -58,17 +49,19 @@ class Adicional {
   final double price;
   final String? grupoId;
   final String? imageUrl;
-
-  Adicional({required this.id, required this.name, required this.price, this.grupoId, this.imageUrl});
-
+  Adicional(
+      {required this.id,
+      required this.name,
+      required this.price,
+      this.grupoId,
+      this.imageUrl});
   factory Adicional.fromJson(Map<String, dynamic> json) {
     return Adicional(
-      id: json['id'].toString(),
-      name: json['name'],
-      price: (json['price'] as num).toDouble(),
-      grupoId: json['grupo_id']?.toString(),
-      imageUrl: json['image_url'],
-    );
+        id: json['id'].toString(),
+        name: json['name'],
+        price: (json['price'] as num).toDouble(),
+        grupoId: json['grupo_id']?.toString(),
+        imageUrl: json['image_url']);
   }
 }
 
@@ -76,18 +69,13 @@ class Category {
   final String id;
   final String name;
   final IconData icon;
-
   Category({required this.id, required this.name, required this.icon});
-
   factory Category.fromJson(Map<String, dynamic> jsonData) {
     return Category(
-      id: jsonData['id'].toString(),
-      name: jsonData['name'],
-      icon: IconData(
-        jsonData['icon_code_point'],
-        fontFamily: jsonData['icon_font_family'],
-      ),
-    );
+        id: jsonData['id'].toString(),
+        name: jsonData['name'],
+        icon: IconData(jsonData['icon_code_point'],
+            fontFamily: jsonData['icon_font_family']));
   }
 }
 
@@ -100,72 +88,98 @@ class Product {
   final int displayOrder;
   final String? imageUrl;
   final bool isSoldOut;
-
-  Product({
-    required this.id,
-    required this.name,
-    required this.price,
-    required this.categoryId,
-    required this.categoryName,
-    required this.displayOrder,
-    this.imageUrl,
-    required this.isSoldOut,
-  });
-
+  Product(
+      {required this.id,
+      required this.name,
+      required this.price,
+      required this.categoryId,
+      required this.categoryName,
+      required this.displayOrder,
+      this.imageUrl,
+      required this.isSoldOut});
   factory Product.fromJson(Map<String, dynamic> jsonData) {
     return Product(
-      id: jsonData['id'].toString(),
-      name: jsonData['name'],
-      price: (jsonData['price'] as num).toDouble(),
-      categoryId: jsonData['category_id'].toString(),
-      categoryName:
-          (jsonData['categorias'] != null) ? jsonData['categorias']['name'] : 'Sem Categoria',
-      displayOrder: jsonData['display_order'] ?? 0,
-      imageUrl: jsonData['image_url'],
-      isSoldOut: jsonData['is_sold_out'] ?? false,
-    );
+        id: jsonData['id'].toString(),
+        name: jsonData['name'],
+        price: (jsonData['price'] as num).toDouble(),
+        categoryId: jsonData['category_id'].toString(),
+        categoryName: (jsonData['categorias'] != null)
+            ? jsonData['categorias']['name']
+            : 'Sem Categoria',
+        displayOrder: jsonData['display_order'] ?? 0,
+        imageUrl: jsonData['image_url'],
+        isSoldOut: jsonData['is_sold_out'] ?? false);
   }
 }
+
 class Table {
   final String id;
   final int tableNumber;
   final bool isOccupied;
-
-  Table({
-    required this.id,
-    required this.tableNumber,
-    required this.isOccupied,
-  });
-
+  Table(
+      {required this.id,
+      required this.tableNumber,
+      required this.isOccupied});
   factory Table.fromJson(Map<String, dynamic> jsonData) {
     return Table(
-      id: jsonData['id'].toString(),
-      tableNumber: jsonData['numero'] ?? 0,
-      isOccupied: jsonData['status'] == 'ocupada',
+        id: jsonData['id'].toString(),
+        tableNumber: jsonData['numero'] ?? 0,
+        isOccupied: jsonData['status'] == 'ocupada');
+  }
+}
+
+class CartItemAdicional {
+  final Adicional adicional;
+  final int quantity;
+
+  CartItemAdicional({required this.adicional, required this.quantity});
+
+  factory CartItemAdicional.fromJson(Map<String, dynamic> json) {
+    return CartItemAdicional(
+      adicional: Adicional.fromJson(json['adicional']),
+      quantity: json['quantity'] ?? 1,
     );
   }
 }
 
 class CartItem {
+  final String cartItemId;
   final Product product;
   final int quantity;
+  final List<CartItemAdicional> selectedAdicionais;
 
-  CartItem({required this.product, required this.quantity});
+  CartItem({
+    required this.product,
+    required this.quantity,
+    this.selectedAdicionais = const [],
+  }) : cartItemId = const Uuid().v4();
+
+  double get totalPrice {
+    final double adicionaisPrice = selectedAdicionais.fold(
+        0.0, (sum, item) => sum + (item.adicional.price * item.quantity));
+    return (product.price + adicionaisPrice) * quantity;
+  }
 
   factory CartItem.fromJson(Map<String, dynamic> json) {
     return CartItem(
       product: Product.fromJson(json['produtos']),
       quantity: json['quantidade'],
+      selectedAdicionais:
+          (json['adicionais_selecionados'] as List? ?? [])
+              .map((item) => CartItemAdicional.fromJson(item))
+              .toList(),
     );
   }
 
   CartItem copyWith({
     Product? product,
     int? quantity,
+    List<CartItemAdicional>? selectedAdicionais,
   }) {
     return CartItem(
       product: product ?? this.product,
       quantity: quantity ?? this.quantity,
+      selectedAdicionais: selectedAdicionais ?? this.selectedAdicionais,
     );
   }
 }
@@ -196,21 +210,21 @@ class Order {
           .map((itemJson) => CartItem.fromJson(itemJson))
           .toList();
     }
-    
     return Order(
-      id: json['id'].toString(),
-      items: itemsList,
-      timestamp: DateTime.parse(json['created_at']),
-      status: json['status'] ?? 'production',
-      type: json['type'] ?? 'mesa',
-      tableNumber: (json['mesas'] is Map) ? json['mesas']['numero'] : null,
-      tableId: (json['mesas'] is Map) ? json['mesas']['id'].toString() : json['mesa_id'].toString(),
-    );
+        id: json['id'].toString(),
+        items: itemsList,
+        timestamp: DateTime.parse(json['created_at']),
+        status: json['status'] ?? 'production',
+        type: json['type'] ?? 'mesa',
+        tableNumber: (json['mesas'] is Map) ? json['mesas']['numero'] : null,
+        tableId: (json['mesas'] is Map)
+            ? json['mesas']['id'].toString()
+            : json['mesa_id'].toString());
   }
-  
-  double get total =>
-      items.fold(0.0, (sum, item) => sum + (item.product.price * item.quantity));
+
+  double get total => items.fold(0.0, (sum, item) => sum + item.totalPrice);
 }
+
 
 class Transaction {
   final String id;
@@ -242,7 +256,7 @@ class Transaction {
       surcharge: (jsonData['surcharge'] as num?)?.toDouble() ?? 0.0,
     );
   }
-} 
+}
 
 class CustomSpreadsheet {
   final String? id;

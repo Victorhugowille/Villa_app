@@ -20,6 +20,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool _isLoading = false;
   bool _isCheckingCnpj = false;
+  bool _rememberMe = false;
+  bool _acceptedPrivacy = false;
+
   String _companyName = '';
   Timer? _debounce;
 
@@ -64,7 +67,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     final unmaskedCnpj = _cnpjMaskFormatter.getUnmaskedText();
     if (unmaskedCnpj.length != 14) {
-       setState(() {
+      setState(() {
         _isCheckingCnpj = false;
       });
       return;
@@ -74,7 +77,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final response = await Supabase.instance.client
           .from('companies')
           .select('name')
-          .eq('cnpj', unmaskedCnpj) // <-- ALTERAÇÃO AQUI
+          .eq('cnpj', unmaskedCnpj)
           .maybeSingle();
 
       if (mounted && response != null) {
@@ -101,6 +104,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (!_acceptedPrivacy) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Você precisa aceitar as políticas de privacidade.')),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
@@ -113,7 +123,9 @@ class _LoginScreenState extends State<LoginScreen> {
         Navigator.of(context).pushReplacementNamed('/home');
       }
     } on AuthException catch (error) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -121,70 +133,144 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final bool empresaValida = _companyName.isNotEmpty &&
+        _companyName != 'Empresa não encontrada' &&
+        _companyName != 'Erro ao buscar';
+
     return Scaffold(
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text('Bem-vindo', style: TextStyle(fontSize: 40)),
-                const SizedBox(height: 40),
-                TextFormField(
-                  controller: _cnpjController,
-                  decoration: const InputDecoration(labelText: 'CNPJ da Empresa'),
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [_cnpjMaskFormatter],
-                  onChanged: _onCnpjChanged,
-                  validator: (v) => (v == null || v.length < 18) ? 'CNPJ inválido' : null,
-                ),
-                SizedBox(
-                  height: 24,
-                  child: _isCheckingCnpj
-                      ? const Center(child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)))
-                      : Center(
-                          child: Text(
-                            _companyName,
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: _companyName == 'Empresa não encontrada' || _companyName == 'Erro ao buscar'
-                                  ? Colors.red
-                                  : Theme.of(context).primaryColor,
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24.0),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Icon(Icons.storefront, size: 60, color: theme.primaryColor),
+                    const SizedBox(height: 16),
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 300),
+                      child: Text(
+                        empresaValida ? 'Bem-vindo à\n$_companyName' : 'Bem-vindo',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                    
+                    TextFormField(
+                      controller: _cnpjController,
+                      decoration: InputDecoration(
+                        labelText: 'CNPJ da Empresa',
+                        prefixIcon: const Icon(Icons.business_center_outlined),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [_cnpjMaskFormatter],
+                      onChanged: _onCnpjChanged,
+                      validator: (v) => (v == null || v.length < 18) ? 'CNPJ inválido' : null,
+                    ),
+                    SizedBox(
+                      height: 24,
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 4.0),
+                        child: _isCheckingCnpj
+                            ? const Center(
+                                child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)))
+                            : Center(
+                                child: Text(
+                                  _companyName,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: empresaValida ? theme.primaryColor.withOpacity(0.8) : Colors.redAccent,
+                                  ),
+                                ),
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    TextFormField(
+                      controller: _emailController,
+                      decoration: InputDecoration(
+                        labelText: 'Email',
+                        prefixIcon: const Icon(Icons.email_outlined),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      validator: (v) => v!.isEmpty ? 'Campo obrigatório' : null,
+                    ),
+                    const SizedBox(height: 16),
+
+                    TextFormField(
+                      controller: _passwordController,
+                      decoration: InputDecoration(
+                        labelText: 'Senha',
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      obscureText: true,
+                      validator: (v) => v!.isEmpty ? 'Campo obrigatório' : null,
+                    ),
+                    const SizedBox(height: 8),
+
+                    Row(
+                      children: [
+                        Checkbox(
+                          value: _acceptedPrivacy,
+                          onChanged: (v) => setState(() => _acceptedPrivacy = v ?? false),
+                        ),
+                        Flexible(
+                          child: GestureDetector(
+                            onTap: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Exibir políticas de privacidade...')),
+                              );
+                            },
+                            child: const Text(
+                              "Li e aceito as Políticas de Privacidade",
+                              style: TextStyle(decoration: TextDecoration.underline),
                             ),
                           ),
                         ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    _isLoading
+                        ? const Center(child: CircularProgressIndicator())
+                        : ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            onPressed: _submit,
+                            child: const Text('ENTRAR', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          ),
+                    const SizedBox(height: 24),
+
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text('Não tem uma conta?'),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.of(context).push(MaterialPageRoute(
+                              builder: (context) => const SignUpSelectionScreen(),
+                            ));
+                          },
+                          child: const Text('Cadastre-se'),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-                TextFormField(
-                  controller: _emailController,
-                  decoration: const InputDecoration(labelText: 'Email'),
-                  validator: (v) => v!.isEmpty ? 'Campo obrigatório' : null,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _passwordController,
-                  decoration: const InputDecoration(labelText: 'Senha'),
-                  obscureText: true,
-                  validator: (v) => v!.isEmpty ? 'Campo obrigatório' : null,
-                ),
-                const SizedBox(height: 30),
-                if (_isLoading) const CircularProgressIndicator(),
-                if (!_isLoading)
-                  ElevatedButton(
-                    onPressed: _submit,
-                    child: const Text('ENTRAR'),
-                  ),
-                const SizedBox(height: 20),
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).push(MaterialPageRoute(
-                      builder: (context) => const SignUpSelectionScreen(),
-                    ));
-                  },
-                  child: const Text('Não tem uma conta? Cadastre-se'),
-                ),
-              ],
+              ),
             ),
           ),
         ),

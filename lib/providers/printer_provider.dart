@@ -1,4 +1,3 @@
-// lib/providers/printer_provider.dart
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -27,11 +26,12 @@ class PrinterProvider with ChangeNotifier {
   Map<String, Map<String, String>> _categoryPrinterSettings = {};
   Map<String, Map<String, String>> get categoryPrinterSettings =>
       _categoryPrinterSettings;
-      
-  PrintTemplateSettings _templateSettings = PrintTemplateSettings.defaults();
-  PrintTemplateSettings get templateSettings => _templateSettings;
 
-  ReceiptTemplateSettings _receiptTemplateSettings = ReceiptTemplateSettings.defaults();
+  KitchenTemplateSettings _templateSettings = KitchenTemplateSettings.defaults();
+  KitchenTemplateSettings get templateSettings => _templateSettings;
+
+  ReceiptTemplateSettings _receiptTemplateSettings =
+      ReceiptTemplateSettings.defaults();
   ReceiptTemplateSettings get receiptTemplateSettings => _receiptTemplateSettings;
 
   List<String> _logMessages = [];
@@ -60,7 +60,7 @@ class PrinterProvider with ChangeNotifier {
 
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
-    
+
     final settingsString = prefs.getString('categoryPrinterSettings');
     if (settingsString != null) {
       final decodedData = json.decode(settingsString) as Map<String, dynamic>;
@@ -69,20 +69,23 @@ class PrinterProvider with ChangeNotifier {
       });
     }
 
-    final templateString = prefs.getString('printTemplateSettings');
+    final templateString = prefs.getString('kitchenTemplateSettings');
     if (templateString != null) {
-      _templateSettings = PrintTemplateSettings.fromJson(json.decode(templateString));
+      _templateSettings =
+          KitchenTemplateSettings.fromJson(json.decode(templateString));
     }
 
     final receiptTemplateString = prefs.getString('receiptTemplateSettings');
     if (receiptTemplateString != null) {
-      _receiptTemplateSettings = ReceiptTemplateSettings.fromJson(json.decode(receiptTemplateString));
+      _receiptTemplateSettings =
+          ReceiptTemplateSettings.fromJson(json.decode(receiptTemplateString));
     }
 
     notifyListeners();
   }
 
-  Future<void> saveSettings(Map<String, Map<String, String>> newSettings) async {
+  Future<void> saveSettings(
+      Map<String, Map<String, String>> newSettings) async {
     _categoryPrinterSettings = newSettings;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('categoryPrinterSettings', json.encode(newSettings));
@@ -90,18 +93,21 @@ class PrinterProvider with ChangeNotifier {
     _addLog('Configurações de impressora salvas.');
   }
 
-  Future<void> saveTemplateSettings(PrintTemplateSettings newSettings) async {
+  Future<void> saveTemplateSettings(KitchenTemplateSettings newSettings) async {
     _templateSettings = newSettings;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('printTemplateSettings', json.encode(newSettings.toJson()));
+    await prefs.setString(
+        'kitchenTemplateSettings', json.encode(newSettings.toJson()));
     notifyListeners();
     _addLog('Layout de impressão da cozinha salvo.');
   }
-  
-  Future<void> saveReceiptTemplateSettings(ReceiptTemplateSettings newSettings) async {
+
+  Future<void> saveReceiptTemplateSettings(
+      ReceiptTemplateSettings newSettings) async {
     _receiptTemplateSettings = newSettings;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('receiptTemplateSettings', json.encode(newSettings.toJson()));
+    await prefs.setString(
+        'receiptTemplateSettings', json.encode(newSettings.toJson()));
     notifyListeners();
     _addLog('Layout de impressão de conferência salvo.');
   }
@@ -114,12 +120,13 @@ class PrinterProvider with ChangeNotifier {
       try {
         final directory = await getApplicationDocumentsDirectory();
         final imagePath = '${directory.path}/custom_logo.png';
-        
+
         final imageFile = File(imagePath);
         await imageFile.writeAsBytes(await pickedFile.readAsBytes());
 
         _templateSettings = _templateSettings.copyWith(logoPath: imagePath);
-        _receiptTemplateSettings = _receiptTemplateSettings.copyWith(logoPath: imagePath);
+        _receiptTemplateSettings =
+            _receiptTemplateSettings.copyWith(logoPath: imagePath);
 
         await saveTemplateSettings(_templateSettings);
         await saveReceiptTemplateSettings(_receiptTemplateSettings);
@@ -131,13 +138,21 @@ class PrinterProvider with ChangeNotifier {
   }
 
   void updateLogoHeight(double newHeight) {
-    if (_templateSettings.logoHeight != newHeight) {
-      _templateSettings = _templateSettings.copyWith(logoHeight: newHeight);
-    }
-    if (_receiptTemplateSettings.logoHeight != newHeight) {
-      _receiptTemplateSettings = _receiptTemplateSettings.copyWith(logoHeight: newHeight);
-    }
+    _templateSettings = _templateSettings.copyWith(logoHeight: newHeight);
+    _receiptTemplateSettings =
+        _receiptTemplateSettings.copyWith(logoHeight: newHeight);
     notifyListeners();
+  }
+
+  void updateKitchenLogoAlignment(CrossAxisAlignment newAlignment) {
+    _templateSettings = _templateSettings.copyWith(logoAlignment: newAlignment);
+    saveTemplateSettings(_templateSettings);
+  }
+
+  void updateReceiptLogoAlignment(CrossAxisAlignment newAlignment) {
+    _receiptTemplateSettings =
+        _receiptTemplateSettings.copyWith(logoAlignment: newAlignment);
+    saveReceiptTemplateSettings(_receiptTemplateSettings);
   }
 
   void startListening() {
@@ -146,30 +161,32 @@ class PrinterProvider with ChangeNotifier {
       _addLog('Não foi possível iniciar: Serviço já ativo ou sem ID de empresa.');
       return;
     }
-    
+
     _addLog('Tentando iniciar monitoramento de impressão...');
-    
+
     _orderChannel = _supabase.channel('public:pedidos:company_id=eq.$companyId');
-    _orderChannel!.onPostgresChanges(
-        event: PostgresChangeEvent.insert,
-        schema: 'public',
-        table: 'pedidos',
-        callback: (payload) {
-          if (payload.newRecord['status'] == 'awaiting_print') {
-            _handleNewOrder(payload.newRecord);
-          }
-        },
-      ).subscribe((status, [error]) {
-        _addLog('Status da conexão de Impressão: $status');
-        if (error != null) {
-          _addLog('ERRO DE IMPRESSÃO: ${error.toString()}');
+    _orderChannel!
+        .onPostgresChanges(
+      event: PostgresChangeEvent.insert,
+      schema: 'public',
+      table: 'pedidos',
+      callback: (payload) {
+        if (payload.newRecord['status'] == 'awaiting_print') {
+          _handleNewOrder(payload.newRecord);
         }
-        
-        final newListeningStatus = (status == RealtimeSubscribeStatus.subscribed);
-        if (_isListening != newListeningStatus) {
-           _isListening = newListeningStatus;
-           notifyListeners();
-        }
+      },
+    )
+        .subscribe((status, [error]) {
+      _addLog('Status da conexão de Impressão: $status');
+      if (error != null) {
+        _addLog('ERRO DE IMPRESSÃO: ${error.toString()}');
+      }
+
+      final newListeningStatus = (status == RealtimeSubscribeStatus.subscribed);
+      if (_isListening != newListeningStatus) {
+        _isListening = newListeningStatus;
+        Future.microtask(notifyListeners);
+      }
     });
   }
 
@@ -187,7 +204,8 @@ class PrinterProvider with ChangeNotifier {
     if (newOrderData.isEmpty) return;
 
     final orderId = newOrderData['id'].toString();
-    final orderIdDisplay = orderId.length > 8 ? orderId.substring(0, 8) : orderId;
+    final orderIdDisplay =
+        orderId.length > 8 ? orderId.substring(0, 8) : orderId;
     _addLog('Novo pedido para impressão: #$orderIdDisplay');
 
     try {
@@ -209,15 +227,15 @@ class PrinterProvider with ChangeNotifier {
 
   Future<void> _routeAndPrintOrder(
       List<app_data.CartItem> items, String tableNumber, String orderId) async {
-    final orderIdDisplay = orderId.length > 8 ? orderId.substring(0, 8) : orderId;
+    final orderIdDisplay =
+        orderId.length > 8 ? orderId.substring(0, 8) : orderId;
     try {
       final groupedBySettings = groupBy(items, (item) {
-        if (item.product == null) return null;
-        return _categoryPrinterSettings[item.product!.categoryId];
+        return _categoryPrinterSettings[item.product.categoryId];
       });
 
       if (groupedBySettings.isEmpty) {
-         _addLog('Pedido #$orderIdDisplay: Nenhum item para imprimir.');
+        _addLog('Pedido #$orderIdDisplay: Nenhum item para imprimir.');
       }
 
       for (final settings in groupedBySettings.keys) {
@@ -229,9 +247,10 @@ class PrinterProvider with ChangeNotifier {
         final printerName = settings['name']!;
         final paperSize = settings['size'] ?? '58';
         final itemsForPrinter = groupedBySettings[settings]!;
-        
+
         final printers = await Printing.listPrinters();
-        final selectedPrinter = printers.firstWhereOrNull((p) => p.name == printerName);
+        final selectedPrinter =
+            printers.firstWhereOrNull((p) => p.name == printerName);
 
         if (selectedPrinter != null) {
           await _printingService.printKitchenOrder(
@@ -244,15 +263,18 @@ class PrinterProvider with ChangeNotifier {
           );
           _addLog('Pedido #$orderIdDisplay enviado para: $printerName.');
         } else {
-          _addLog('Impressora "$printerName" não encontrada. Pedido #$orderIdDisplay não impresso.');
+          _addLog(
+              'Impressora "$printerName" não encontrada. Pedido #$orderIdDisplay não impresso.');
         }
       }
     } catch (e) {
       _addLog('ERRO CRÍTICO no processo de impressão: $e');
     }
-    
+
     try {
-      await _supabase.from('pedidos').update({'status': 'production'}).eq('id', orderId);
+      await _supabase
+          .from('pedidos')
+          .update({'status': 'production'}).eq('id', orderId);
       _addLog('Pedido #$orderIdDisplay atualizado para "Em Produção".');
     } catch (e) {
       _addLog('ERRO ao atualizar o status do pedido #$orderIdDisplay: $e');
@@ -263,7 +285,7 @@ class PrinterProvider with ChangeNotifier {
     final timestamp = DateFormat('HH:mm:ss').format(DateTime.now());
     _logMessages.insert(0, '$timestamp - $message');
     if (_logMessages.length > 100) _logMessages.removeLast();
-    notifyListeners();
+    Future.microtask(notifyListeners);
   }
 
   @override

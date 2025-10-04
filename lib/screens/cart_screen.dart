@@ -1,4 +1,3 @@
-// lib/screens/cart_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:villabistromobile/data/app_data.dart' as app_data;
@@ -21,7 +20,7 @@ class CartScreen extends StatelessWidget {
     try {
       await tableProvider.placeOrder(
         tableId: table.id,
-        items: cart.itemsAsList,
+        items: cart.items,
       );
       cart.clearCart();
 
@@ -78,9 +77,9 @@ class CartScreen extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       itemCount: cart.items.length,
       itemBuilder: (ctx, i) {
-        final cartItem = cart.items.values.toList()[i];
+        final cartItem = cart.items[i];
         return Dismissible(
-          key: ValueKey(cartItem.product.id),
+          key: ValueKey(cartItem.cartItemId),
           background: Container(
             color: Colors.red.withOpacity(0.8),
             alignment: Alignment.centerRight,
@@ -90,7 +89,7 @@ class CartScreen extends StatelessWidget {
           direction: DismissDirection.endToStart,
           onDismissed: (direction) {
             Provider.of<CartProvider>(context, listen: false)
-                .removeItem(cartItem.product.id);
+                .removeItem(cartItem.cartItemId);
           },
           child: Card(
             margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 4),
@@ -104,8 +103,23 @@ class CartScreen extends StatelessWidget {
                   onBackgroundImageError: (_, __) {},
                 ),
                 title: Text(cartItem.product.name),
-                subtitle: Text(
-                    'Total: R\$ ${(cartItem.product.price * cartItem.quantity).toStringAsFixed(2)}'),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ...cartItem.selectedAdicionais.map(
+                      (itemAd) => Text(
+                        "+ ${itemAd.quantity}x ${itemAd.adicional.name}",
+                        style: const TextStyle(
+                            fontSize: 12, color: Colors.black54),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Total do item: R\$ ${cartItem.totalPrice.toStringAsFixed(2)}',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -113,7 +127,7 @@ class CartScreen extends StatelessWidget {
                       icon: const Icon(Icons.remove_circle_outline,
                           color: Colors.red),
                       onPressed: () =>
-                          cart.removeSingleItem(cartItem.product.id),
+                          cart.decreaseQuantity(cartItem.cartItemId),
                     ),
                     Text(
                       '${cartItem.quantity}',
@@ -123,7 +137,8 @@ class CartScreen extends StatelessWidget {
                     IconButton(
                       icon: Icon(Icons.add_circle_outline,
                           color: theme.primaryColor),
-                      onPressed: () => cart.addItem(cartItem.product),
+                      onPressed: () =>
+                          cart.increaseQuantity(cartItem.cartItemId),
                     ),
                   ],
                 ),

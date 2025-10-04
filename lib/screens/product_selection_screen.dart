@@ -1,9 +1,9 @@
-// lib/screens/product_selection_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:villabistromobile/data/app_data.dart' as app_data;
 import 'package:villabistromobile/providers/cart_provider.dart';
 import 'package:villabistromobile/providers/navigation_provider.dart';
+import 'package:villabistromobile/providers/product_provider.dart';
 import 'package:villabistromobile/screens/cart_screen.dart';
 import 'package:villabistromobile/widgets/side_menu.dart';
 
@@ -24,129 +24,213 @@ class ProductSelectionScreen extends StatefulWidget {
 }
 
 class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
-  late Map<String, int> _selection;
+  Map<String, int> _productQuantities = {};
+  Map<String, Map<String, int>> _adicionalQuantities = {};
+  Map<String, List<app_data.GrupoAdicional>> _cachedAdicionais = {};
 
   @override
   void initState() {
     super.initState();
     final cart = Provider.of<CartProvider>(context, listen: false);
-    _selection = {
-      for (var product in widget.products)
-        product.id: cart.getItemQuantity(product.id)
-    };
+
+    for (final cartItem in cart.items) {
+      final productId = cartItem.product.id;
+      if (widget.products.any((p) => p.id == productId)) {
+        _productQuantities[productId] = cartItem.quantity;
+        _adicionalQuantities[productId] = {};
+        for (var itemAdicional in cartItem.selectedAdicionais) {
+          _adicionalQuantities[productId]![itemAdicional.adicional.id] =
+              itemAdicional.quantity;
+        }
+      }
+    }
   }
 
-  void _updateSelection(String productId, int quantity) {
+  void _updateProductQuantity(String productId, int change) {
     setState(() {
-      _selection[productId] = quantity;
+      final currentQty = _productQuantities[productId] ?? 0;
+      final newQty = currentQty + change;
+      _productQuantities[productId] = newQty > 0 ? newQty : 0;
     });
   }
 
-  int get _totalSelectedItems {
-    return _selection.values.where((qty) => qty > 0).length;
+  void _updateAdicionalQuantity(
+      String productId, String adicionalId, int change) {
+    setState(() {
+      _adicionalQuantities.putIfAbsent(productId, () => {});
+      final currentQty = _adicionalQuantities[productId]![adicionalId] ?? 0;
+      final newQty = currentQty + change;
+      _adicionalQuantities[productId]![adicionalId] = newQty > 0 ? newQty : 0;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDesktop = MediaQuery.of(context).size.width > 800;
+    final totalSelectedItems =
+        _productQuantities.values.where((qty) => qty > 0).length;
 
     Widget content = ListView.builder(
       itemCount: widget.products.length,
       itemBuilder: (ctx, index) {
         final product = widget.products[index];
-        final quantity = _selection[product.id] ?? 0;
+        final productQty = _productQuantities[product.id] ?? 0;
 
         return Card(
-          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8.0),
-            child: ListTile(
-              leading: SizedBox(
-                width: 60,
-                height: 60,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8.0),
-                  child: Image.network(
-                    product.imageUrl ??
-                        'https://placehold.co/100x100/e2e8f0/e2e8f0?text=Img',
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Icon(
-                        Icons.fastfood,
-                        color: theme.primaryColor.withOpacity(0.5)),
+          clipBehavior: Clip.antiAlias,
+          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          child: Column(
+            children: [
+              ListTile(
+                leading: SizedBox(
+                  width: 60,
+                  height: 60,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8.0),
+                    child: Image.network(
+                      product.imageUrl ??
+                          'https://placehold.co/100x100/e2e8f0/e2e8f0?text=Img',
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Icon(
+                          Icons.fastfood,
+                          color: theme.primaryColor.withOpacity(0.5)),
+                    ),
                   ),
                 ),
+                title: Text(product.name,
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Text('R\$ ${product.price.toStringAsFixed(2)}'),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.remove_circle_outline,
+                          color: productQty > 0 ? Colors.red : Colors.grey),
+                      onPressed: productQty > 0
+                          ? () => _updateProductQuantity(product.id, -1)
+                          : null,
+                    ),
+                    Text('$productQty',
+                        style: const TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold)),
+                    IconButton(
+                      icon: Icon(Icons.add_circle_outline,
+                          color: theme.primaryColor),
+                      onPressed: () => _updateProductQuantity(product.id, 1),
+                    ),
+                  ],
+                ),
               ),
-              title: Text(product.name,
-                  style: const TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text('R\$ ${product.price.toStringAsFixed(2)}'),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: Icon(Icons.remove_circle_outline,
-                        color: quantity > 0 ? Colors.red : Colors.grey),
-                    onPressed: quantity > 0
-                        ? () => _updateSelection(product.id, quantity - 1)
-                        : null,
-                  ),
-                  Text(
-                    '$quantity',
-                    style: const TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.add_circle_outline,
-                        color: theme.primaryColor, size: 28),
-                    onPressed: () =>
-                        _updateSelection(product.id, quantity + 1),
-                  ),
-                ],
+              FutureBuilder<List<app_data.GrupoAdicional>>(
+                future: _fetchAdicionais(product.id),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.done &&
+                      snapshot.hasData &&
+                      snapshot.data!.isNotEmpty) {
+                    return ExpansionTile(
+                      key: PageStorageKey(product.id),
+                      title: Text('Escolher adicionais +',
+                          style: TextStyle(color: theme.primaryColor)),
+                      children: snapshot.data!.map((grupo) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding:
+                                  const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                              child: Text(grupo.name,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold)),
+                            ),
+                            ...grupo.adicionais.map((adicional) {
+                              final adicionalQty =
+                                  _adicionalQuantities[product.id]
+                                          ?[adicional.id] ??
+                                      0;
+                              return ListTile(
+                                title: Text(adicional.name),
+                                subtitle: Text(
+                                    '+ R\$ ${adicional.price.toStringAsFixed(2)}'),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: Icon(
+                                          Icons.remove_circle_outline,
+                                          color: adicionalQty > 0
+                                              ? Colors.red
+                                              : Colors.grey),
+                                      onPressed: adicionalQty > 0
+                                          ? () => _updateAdicionalQuantity(
+                                              product.id, adicional.id, -1)
+                                          : null,
+                                    ),
+                                    Text('$adicionalQty',
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.bold)),
+                                    IconButton(
+                                      icon: Icon(Icons.add_circle_outline,
+                                          color: theme.primaryColor),
+                                      onPressed: () =>
+                                          _updateAdicionalQuantity(
+                                              product.id, adicional.id, 1),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                            const Divider(),
+                          ],
+                        );
+                      }).toList(),
+                    );
+                  } else {
+                    return const SizedBox.shrink();
+                  }
+                },
               ),
-            ),
+            ],
           ),
         );
       },
     );
 
-    FloatingActionButton? fab = _totalSelectedItems > 0
+    FloatingActionButton? fab = totalSelectedItems > 0
         ? FloatingActionButton.extended(
             onPressed: () {
               final cart = Provider.of<CartProvider>(context, listen: false);
-              
-              cart.addItemsFromSelection(_selection, widget.products);
+              cart.updateCartFromSelection(
+                productQuantities: _productQuantities,
+                adicionalQuantities: _adicionalQuantities,
+                allProducts: widget.products,
+                allAdicionais: _cachedAdicionais,
+              );
 
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
-                      '$_totalSelectedItems tipo(s) de item atualizado(s) no carrinho.'),
+                      '$totalSelectedItems tipo(s) de item atualizado(s) no carrinho.'),
                   backgroundColor: theme.primaryColor,
                 ),
               );
-              
-              if(isDesktop) {
-                 Provider.of<NavigationProvider>(context, listen: false).pop();
+
+              if (isDesktop) {
+                Provider.of<NavigationProvider>(context, listen: false).pop();
               } else {
-                 Navigator.of(context).pop();
+                Navigator.of(context).pop();
               }
             },
             icon: const Icon(Icons.shopping_cart_checkout),
             label: const Text('ATUALIZAR CARRINHO'),
           )
         : null;
-    
+
     if (isDesktop) {
-        return Stack(
-          children: [
-            content,
-            if (fab != null)
-            Positioned(
-              bottom: 24,
-              right: 24,
-              child: fab,
-            )
-          ],
-        );
+      return Stack(children: [
+        content,
+        if (fab != null) Positioned(bottom: 24, right: 24, child: fab)
+      ]);
     }
 
     return Scaffold(
@@ -161,7 +245,10 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
                 IconButton(
                   icon: const Icon(Icons.shopping_cart_outlined, size: 28),
                   onPressed: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => CartScreen(table: widget.table)));
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => CartScreen(table: widget.table)));
                   },
                 ),
                 if (cart.totalItemsQuantity > 0)
@@ -171,9 +258,8 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(2),
                       decoration: BoxDecoration(
-                        color: Colors.red,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(10)),
                       constraints:
                           const BoxConstraints(minWidth: 16, minHeight: 16),
                       child: Text(
@@ -192,5 +278,22 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
       body: content,
       floatingActionButton: fab,
     );
+  }
+
+  Future<List<app_data.GrupoAdicional>> _fetchAdicionais(
+      String productId) async {
+    if (_cachedAdicionais.containsKey(productId)) {
+      return _cachedAdicionais[productId]!;
+    }
+    final productProvider =
+        Provider.of<ProductProvider>(context, listen: false);
+    final adicionais =
+        await productProvider.getGruposAdicionaisParaProduto(productId);
+    if (mounted) {
+      setState(() {
+        _cachedAdicionais[productId] = adicionais;
+      });
+    }
+    return adicionais;
   }
 }

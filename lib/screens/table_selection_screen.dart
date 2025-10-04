@@ -1,4 +1,3 @@
-// lib/screens/table_selection_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:villabistromobile/data/app_data.dart' as app_data;
@@ -199,7 +198,20 @@ class _TableSelectionScreenState extends State<TableSelectionScreen> {
         }
 
         if (tableProvider.tables.isEmpty) {
-          return const Center(child: Text('Nenhuma mesa cadastrada.'));
+          return RefreshIndicator(
+            onRefresh: () => tableProvider.fetchAndSetTables(),
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: [
+                SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.7,
+                  child: const Center(
+                    child: Text('Nenhuma mesa cadastrada.'),
+                  ),
+                )
+              ],
+            ),
+          );
         }
 
         final tables = tableProvider.tables;
@@ -271,6 +283,5 @@ class _TableSelectionScreenState extends State<TableSelectionScreen> {
         body: screenContent,
       );
     }
-    
   }
 }
