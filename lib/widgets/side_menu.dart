@@ -4,7 +4,7 @@ import 'package:villabistromobile/providers/company_provider.dart';
 import 'package:villabistromobile/providers/navigation_provider.dart';
 import 'package:villabistromobile/screens/bot_management_screen.dart';
 import 'package:villabistromobile/screens/configuracao/configuracao_screen.dart';
-import 'package:villabistromobile/screens/excel_generator_screen.dart';
+import 'package:villabistromobile/screens/google_sheets_screen.dart';
 import 'package:villabistromobile/screens/kds_screen.dart';
 import 'package:villabistromobile/screens/management/management_screen.dart';
 import 'package:villabistromobile/screens/printer_model_screen.dart';
@@ -33,7 +33,6 @@ class SideMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     final companyProvider = context.watch<CompanyProvider>();
 
-    // traduz o cargo
     String roleText;
     switch (companyProvider.role) {
       case 'owner':
@@ -60,36 +59,33 @@ class SideMenu extends StatelessWidget {
             ),
             decoration: BoxDecoration(
               color: Theme.of(context).primaryColor,
-              borderRadius: const BorderRadius.only(
-              ),
+              borderRadius: const BorderRadius.only(),
             ),
             child: SafeArea(
-            bottom: false,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  companyProvider.companyName,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
+              bottom: false,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    companyProvider.companyName,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  roleText, // cargo traduzido
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 16,
+                  const SizedBox(height: 8),
+                  Text(
+                    roleText,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 16,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-          ),
-
-          // Lista de opções do menu
           Expanded(
             child: ListView(
               children: [
@@ -140,7 +136,7 @@ class SideMenu extends StatelessWidget {
                   title: const Text('Planilhas'),
                   onTap: () => _navigateTo(
                     context,
-                    const ExcelGeneratorScreen(),
+                    const GoogleSheetsScreen(),
                     'Planilhas',
                   ),
                 ),

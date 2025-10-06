@@ -15,7 +15,6 @@ import 'package:villabistromobile/providers/printer_provider.dart';
 import 'package:villabistromobile/providers/product_provider.dart';
 import 'package:villabistromobile/providers/report_provider.dart';
 import 'package:villabistromobile/providers/saved_report_provider.dart';
-import 'package:villabistromobile/providers/spreadsheet_provider.dart';
 import 'package:villabistromobile/providers/table_provider.dart';
 import 'package:villabistromobile/providers/theme_provider.dart';
 import 'package:villabistromobile/providers/transaction_provider.dart';
@@ -58,7 +57,6 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (context) => CartProvider()),
         ChangeNotifierProvider(create: (context) => ReportProvider()),
         ChangeNotifierProvider(create: (context) => SavedReportProvider()),
-        ChangeNotifierProvider(create: (context) => SpreadsheetProvider()),
         ChangeNotifierProvider(create: (context) => BotProvider()),
         ChangeNotifierProvider(create: (context) => EstabelecimentoProvider()),
         ChangeNotifierProvider(create: (context) => CompanyProvider()),
