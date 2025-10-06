@@ -63,12 +63,25 @@ class _OrderListScreenState extends State<OrderListScreen> {
         loadedOrders.fold(0.0, (sum, order) => sum + order.total);
     final printerProvider = Provider.of<PrinterProvider>(context, listen: false);
 
+    final conferencePrinter = printerProvider.conferencePrinter;
+
+    if (conferencePrinter == null) {
+       if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Nenhuma impressora de conferência configurada! Vá em Impressão > Conferência para configurar.'),
+            backgroundColor: Colors.red),
+      );
+      return;
+    }
+
     try {
-      await _printingService.printReceiptPdf(
+      await _printingService.directPrintReceiptPdf(
         orders: loadedOrders,
         tableNumber: widget.table.tableNumber.toString(),
         totalAmount: totalAmount,
         settings: printerProvider.receiptTemplateSettings,
+        printer: conferencePrinter,
       );
     } catch (e) {
       if (!mounted) return;
@@ -117,6 +130,33 @@ class _OrderListScreenState extends State<OrderListScreen> {
               child: Text('Erro ao carregar pedidos: ${snapshot.error}'));
         } else {
           final loadedOrders = snapshot.data ?? [];
+          
+          final tableProvider = context.watch<TableProvider>();
+          final paidItemIds =
+              tableProvider.getPaidItemIdsForTable(widget.table.id);
+
+          double remainingTotal = 0.0;
+          List<app_data.Order> unpaidOrders = [];
+
+          for (var order in loadedOrders) {
+            List<app_data.CartItem> unpaidItems = [];
+            for (var item in order.items) {
+              if (!paidItemIds.contains(item.id)) {
+                remainingTotal += item.totalPrice;
+                unpaidItems.add(item);
+              }
+            }
+            if (unpaidItems.isNotEmpty) {
+              unpaidOrders.add(app_data.Order(
+                  id: order.id,
+                  items: unpaidItems,
+                  timestamp: order.timestamp,
+                  status: order.status,
+                  type: order.type,
+                  tableId: order.tableId,
+                  tableNumber: order.tableNumber));
+            }
+          }
 
           if (loadedOrders.isEmpty) {
             bodyContent = Center(
@@ -132,8 +172,6 @@ class _OrderListScreenState extends State<OrderListScreen> {
               ),
             );
           } else {
-            final totalAmount =
-                loadedOrders.fold(0.0, (sum, order) => sum + order.total);
             bodyContent = Column(
               children: [
                 Expanded(
@@ -144,12 +182,12 @@ class _OrderListScreenState extends State<OrderListScreen> {
                       itemCount: loadedOrders.length,
                       itemBuilder: (ctx, index) {
                         final order = loadedOrders[index];
-                        return _buildOrderCard(order, theme);
+                        return _buildOrderCard(order, paidItemIds, theme);
                       },
                     ),
                   ),
                 ),
-                _buildFooter(totalAmount, loadedOrders, navProvider, theme),
+                _buildFooter(remainingTotal, unpaidOrders, navProvider, theme),
               ],
             );
           }
@@ -177,7 +215,8 @@ class _OrderListScreenState extends State<OrderListScreen> {
     );
   }
 
-  Widget _buildOrderCard(app_data.Order order, ThemeData theme) {
+  Widget _buildOrderCard(
+      app_data.Order order, Set<String> paidItemIds, ThemeData theme) {
     final String orderIdDisplay =
         order.id.length > 8 ? order.id.substring(0, 8) : order.id;
 
@@ -204,6 +243,14 @@ class _OrderListScreenState extends State<OrderListScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Column(
               children: order.items.map((item) {
+                final isPaid = paidItemIds.contains(item.id);
+                final style = isPaid
+                    ? const TextStyle(
+                        decoration: TextDecoration.lineThrough,
+                        color: Colors.grey,
+                        fontSize: 14)
+                    : const TextStyle(fontSize: 14);
+
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Column(
@@ -213,23 +260,47 @@ class _OrderListScreenState extends State<OrderListScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Flexible(
-                              child: Text(
-                                  '${item.quantity}x ${item.product.name}')),
+                              child: Row(
+                            children: [
+                              Text('${item.quantity}x ${item.product.name}',
+                                  style: style),
+                              if (isPaid)
+                                const Padding(
+                                  padding: EdgeInsets.only(left: 8.0),
+                                  child: Chip(
+                                    label: Text('PAGO'),
+                                    visualDensity: VisualDensity.compact,
+                                    padding: EdgeInsets.zero,
+                                    backgroundColor: Colors.green,
+                                    labelStyle: TextStyle(
+                                        color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                            ],
+                          )),
                           Text(
-                              'R\$ ${(item.product.price * item.quantity).toStringAsFixed(2)}'),
+                              'R\$ ${(item.product.price * item.quantity).toStringAsFixed(2)}',
+                              style: style),
                         ],
                       ),
                       if (item.selectedAdicionais.isNotEmpty)
                         Padding(
-                          padding: const EdgeInsets.only(left: 16.0, top: 4.0),
+                          padding:
+                              const EdgeInsets.only(left: 16.0, top: 4.0),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: item.selectedAdicionais.map((itemAd) {
                               final ad = itemAd.adicional;
                               return Text(
                                 "+ ${itemAd.quantity}x ${ad.name} (+ R\$ ${(ad.price * itemAd.quantity).toStringAsFixed(2)})",
-                                style: const TextStyle(
-                                    fontSize: 12, color: Colors.black54),
+                                style: isPaid
+                                    ? const TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey,
+                                        decoration: TextDecoration.lineThrough)
+                                    : const TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.black54),
                               );
                             }).toList(),
                           ),
@@ -240,27 +311,12 @@ class _OrderListScreenState extends State<OrderListScreen> {
               }).toList(),
             ),
           ),
-          const Divider(height: 1, indent: 16, endIndent: 16),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                const Text('Subtotal do Pedido: ',
-                    style: TextStyle(fontWeight: FontWeight.w500)),
-                Text(
-                  'R\$ ${order.total.toStringAsFixed(2)}',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );
   }
 
-  Widget _buildFooter(double totalAmount, List<app_data.Order> loadedOrders,
+  Widget _buildFooter(double remainingTotal, List<app_data.Order> unpaidOrders,
       NavigationProvider navProvider, ThemeData theme) {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
@@ -268,7 +324,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
         color: theme.cardColor,
         boxShadow: [
           BoxShadow(
-            color: const Color.fromARGB(255, 252, 251, 251).withOpacity(0.1),
+            color: Colors.black.withOpacity(0.1),
             spreadRadius: 0,
             blurRadius: 10,
             offset: const Offset(0, -5),
@@ -285,10 +341,10 @@ class _OrderListScreenState extends State<OrderListScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Total da Mesa:',
+              const Text('Valor Restante:',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
               Text(
-                'R\$ ${totalAmount.toStringAsFixed(2)}',
+                'R\$ ${remainingTotal.toStringAsFixed(2)}',
                 style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
@@ -307,14 +363,14 @@ class _OrderListScreenState extends State<OrderListScreen> {
                 textStyle: const TextStyle(
                     fontSize: 16, fontWeight: FontWeight.bold),
               ),
-              onPressed: totalAmount > 0
+              onPressed: remainingTotal > 0 || unpaidOrders.isEmpty
                   ? () {
                       navProvider.navigateTo(
                         context,
                         PaymentScreen(
                           table: widget.table,
-                          totalAmount: totalAmount,
-                          orders: loadedOrders,
+                          totalAmount: remainingTotal,
+                          orders: unpaidOrders,
                         ),
                         'Pagamento - Mesa ${widget.table.tableNumber}',
                       );

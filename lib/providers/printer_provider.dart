@@ -5,6 +5,7 @@ import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:printing/printing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -33,6 +34,9 @@ class PrinterProvider with ChangeNotifier {
   ReceiptTemplateSettings _receiptTemplateSettings =
       ReceiptTemplateSettings.defaults();
   ReceiptTemplateSettings get receiptTemplateSettings => _receiptTemplateSettings;
+
+  Printer? _conferencePrinter;
+  Printer? get conferencePrinter => _conferencePrinter;
 
   List<String> _logMessages = [];
   List<String> get logMessages => _logMessages;
@@ -81,6 +85,19 @@ class PrinterProvider with ChangeNotifier {
           ReceiptTemplateSettings.fromJson(json.decode(receiptTemplateString));
     }
 
+    final conferencePrinterString = prefs.getString('conferencePrinter');
+    if (conferencePrinterString != null) {
+      final printerMap = json.decode(conferencePrinterString);
+      _conferencePrinter = Printer(
+        url: printerMap['url'],
+        name: printerMap['name'],
+        model: printerMap['model'],
+        location: printerMap['location'],
+        isDefault: printerMap['isDefault'] ?? false,
+        isAvailable: printerMap['isAvailable'] ?? true,
+      );
+    }
+
     notifyListeners();
   }
 
@@ -112,6 +129,26 @@ class PrinterProvider with ChangeNotifier {
     _addLog('Layout de impressão de conferência salvo.');
   }
 
+  Future<void> saveConferencePrinter(Printer? printer) async {
+    _conferencePrinter = printer;
+    final prefs = await SharedPreferences.getInstance();
+    if (printer == null) {
+      await prefs.remove('conferencePrinter');
+    } else {
+      final printerMap = {
+        'url': printer.url,
+        'name': printer.name,
+        'model': printer.model,
+        'location': printer.location,
+        'isDefault': printer.isDefault,
+        'isAvailable': printer.isAvailable,
+      };
+      await prefs.setString('conferencePrinter', json.encode(printerMap));
+    }
+    notifyListeners();
+    _addLog('Impressora de conferência salva: ${printer?.name ?? 'Nenhuma'}.');
+  }
+
   Future<void> pickAndSaveLogo() async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
@@ -119,14 +156,14 @@ class PrinterProvider with ChangeNotifier {
     if (pickedFile != null) {
       try {
         final directory = await getApplicationDocumentsDirectory();
-        final imagePath = '${directory.path}/custom_logo.png';
+        final String fileName = path.basename(pickedFile.path);
+        final String imagePath = path.join(directory.path, fileName);
+        
+        final newImageFile = await File(pickedFile.path).copy(imagePath);
 
-        final imageFile = File(imagePath);
-        await imageFile.writeAsBytes(await pickedFile.readAsBytes());
-
-        _templateSettings = _templateSettings.copyWith(logoPath: imagePath);
+        _templateSettings = _templateSettings.copyWith(logoPath: newImageFile.path);
         _receiptTemplateSettings =
-            _receiptTemplateSettings.copyWith(logoPath: imagePath);
+            _receiptTemplateSettings.copyWith(logoPath: newImageFile.path);
 
         await saveTemplateSettings(_templateSettings);
         await saveReceiptTemplateSettings(_receiptTemplateSettings);
@@ -216,17 +253,19 @@ class PrinterProvider with ChangeNotifier {
           .eq('id', orderId)
           .single();
       final tableNumber = orderDetails['mesa_id']['numero'].toString();
+      final orderObservation = orderDetails['observacao'] as String?;
       final itemsData = orderDetails['itens_pedido'] as List;
       final orderItems =
           itemsData.map((item) => app_data.CartItem.fromJson(item)).toList();
-      await _routeAndPrintOrder(orderItems, tableNumber, orderId);
+          
+      await _routeAndPrintOrder(orderItems, tableNumber, orderId, orderObservation: orderObservation);
     } catch (e) {
       _addLog('ERRO ao buscar detalhes do pedido #$orderIdDisplay: $e');
     }
   }
 
   Future<void> _routeAndPrintOrder(
-      List<app_data.CartItem> items, String tableNumber, String orderId) async {
+      List<app_data.CartItem> items, String tableNumber, String orderId, {String? orderObservation}) async {
     final orderIdDisplay =
         orderId.length > 8 ? orderId.substring(0, 8) : orderId;
     try {
@@ -260,6 +299,7 @@ class PrinterProvider with ChangeNotifier {
             printer: selectedPrinter,
             paperSize: paperSize,
             templateSettings: _templateSettings,
+            orderObservation: orderObservation,
           );
           _addLog('Pedido #$orderIdDisplay enviado para: $printerName.');
         } else {

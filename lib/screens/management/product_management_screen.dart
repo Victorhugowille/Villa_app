@@ -1,4 +1,3 @@
-// lib/screens/management/product_management_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:villabistromobile/data/app_data.dart';
@@ -24,6 +23,12 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _refreshData();
+
+      // Otimização: registrar as ações apenas uma vez na inicialização
+      final isDesktop = MediaQuery.of(context).size.width > 800;
+      if (isDesktop) {
+        _registerActions();
+      }
     });
   }
 
@@ -55,9 +60,6 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
     final navProvider = Provider.of<NavigationProvider>(context, listen: false);
 
     if (isDesktop) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _registerActions();
-      });
       return Row(
         children: [
           SizedBox(
@@ -82,7 +84,6 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
       );
     }
 
-    // Layout para Mobile
     Widget bodyContent = Consumer<ProductProvider>(
       builder: (context, productProvider, child) {
         if (productProvider.products.isEmpty && productProvider.isLoading) {
@@ -90,19 +91,8 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
         }
 
         final categories = productProvider.categories;
-        final products = productProvider.products;
-        final List<dynamic> groupedItems = [];
 
-        for (var category in categories) {
-          final productsInCategory =
-              products.where((p) => p.categoryId == category.id).toList();
-          if (productsInCategory.isNotEmpty) {
-            groupedItems.add(category);
-            groupedItems.addAll(productsInCategory);
-          }
-        }
-
-        if (groupedItems.isEmpty) {
+        if (categories.isEmpty) {
           return RefreshIndicator(
             onRefresh: _refreshData,
             child: ListView(
@@ -116,60 +106,10 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
 
         return RefreshIndicator(
           onRefresh: _refreshData,
-          child: ListView.builder(
-            itemCount: groupedItems.length,
-            itemBuilder: (ctx, index) {
-              final item = groupedItems[index];
-
-              if (item is Category) {
-                return Container(
-                  color: Theme.of(context).primaryColor.withAlpha(50),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Text(
-                    item.name,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                    ),
-                  ),
-                );
-              }
-
-              if (item is Product) {
-                return Card(
-                  margin: const EdgeInsets.fromLTRB(8, 4, 8, 4),
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      radius: 30,
-                      backgroundColor: Colors.grey.shade200,
-                      backgroundImage: item.imageUrl != null
-                          ? NetworkImage(item.imageUrl!)
-                          : null,
-                      child: item.imageUrl == null
-                          ? const Icon(Icons.fastfood, color: Colors.grey)
-                          : null,
-                    ),
-                    title: Text(item.name),
-                    subtitle: Text('R\$ ${item.price.toStringAsFixed(2)}'),
-                    trailing: item.isSoldOut
-                        ? Text(
-                            'Esgotado',
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.error,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          )
-                        : null,
-                    onTap: () {
-                      navProvider.navigateTo(
-                          context, ProductEditScreen(product: item), 'Editar Produto');
-                    },
-                  ),
-                );
-              }
-
-              return const SizedBox.shrink();
+          child: ProductList(
+            onProductSelected: (product) {
+              navProvider.navigateTo(
+                  context, ProductEditScreen(product: product), 'Editar Produto');
             },
           ),
         );
@@ -179,18 +119,15 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Gerenciar Produtos'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            tooltip: 'Adicionar Produto',
-            onPressed: () {
-              navProvider.navigateTo(
-                  context, const ProductEditScreen(), 'Adicionar Produto');
-            },
-          ),
-        ],
       ),
       body: bodyContent,
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          navProvider.navigateTo(
+              context, const ProductEditScreen(), 'Novo Produto');
+        },
+        child: const Icon(Icons.add),
+      ),
     );
   }
 }

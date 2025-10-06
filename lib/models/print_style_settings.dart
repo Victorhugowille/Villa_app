@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart' show CrossAxisAlignment;
 
-// Funções utilitárias para converter CrossAxisAlignment para e de String
 String alignmentToString(CrossAxisAlignment alignment) {
   if (alignment == CrossAxisAlignment.center) return 'center';
   if (alignment == CrossAxisAlignment.end) return 'end';
@@ -60,22 +59,24 @@ class KitchenTemplateSettings {
   final PrintStyle tableStyle;
   final PrintStyle orderInfoStyle;
   final PrintStyle itemStyle;
+  final PrintStyle observationStyle;
   final String footerText;
   final PrintStyle footerStyle;
   final String? logoPath;
   final double logoHeight;
-  final CrossAxisAlignment logoAlignment; // Novo campo para alinhamento do logo
+  final CrossAxisAlignment logoAlignment;
 
   KitchenTemplateSettings({
     required this.headerStyle,
     required this.tableStyle,
     required this.orderInfoStyle,
     required this.itemStyle,
+    required this.observationStyle,
     required this.footerText,
     required this.footerStyle,
     this.logoPath,
     this.logoHeight = 40.0,
-    required this.logoAlignment, // Inicialização
+    required this.logoAlignment,
   });
 
   KitchenTemplateSettings copyWith({
@@ -83,40 +84,38 @@ class KitchenTemplateSettings {
     PrintStyle? tableStyle,
     PrintStyle? orderInfoStyle,
     PrintStyle? itemStyle,
+    PrintStyle? observationStyle,
     String? footerText,
     PrintStyle? footerStyle,
     String? logoPath,
     double? logoHeight,
-    CrossAxisAlignment? logoAlignment, // Para o copyWith
+    CrossAxisAlignment? logoAlignment,
   }) {
     return KitchenTemplateSettings(
       headerStyle: headerStyle ?? this.headerStyle,
       tableStyle: tableStyle ?? this.tableStyle,
       orderInfoStyle: orderInfoStyle ?? this.orderInfoStyle,
       itemStyle: itemStyle ?? this.itemStyle,
+      observationStyle: observationStyle ?? this.observationStyle,
       footerText: footerText ?? this.footerText,
       footerStyle: footerStyle ?? this.footerStyle,
       logoPath: logoPath ?? this.logoPath,
       logoHeight: logoHeight ?? this.logoHeight,
-      logoAlignment: logoAlignment ?? this.logoAlignment, // Aplica o novo campo
+      logoAlignment: logoAlignment ?? this.logoAlignment,
     );
   }
 
   factory KitchenTemplateSettings.defaults() => KitchenTemplateSettings(
-        headerStyle: PrintStyle(
-            fontSize: 14, isBold: true, alignment: CrossAxisAlignment.center),
-        tableStyle: PrintStyle(
-            fontSize: 16, isBold: true, alignment: CrossAxisAlignment.center),
-        orderInfoStyle: PrintStyle(
-            fontSize: 10, isBold: false, alignment: CrossAxisAlignment.center),
-        itemStyle: PrintStyle(
-            fontSize: 10, isBold: true, alignment: CrossAxisAlignment.start),
+        headerStyle: PrintStyle(fontSize: 14, isBold: true, alignment: CrossAxisAlignment.center),
+        tableStyle: PrintStyle(fontSize: 16, isBold: true, alignment: CrossAxisAlignment.center),
+        orderInfoStyle: PrintStyle(fontSize: 10, isBold: false, alignment: CrossAxisAlignment.center),
+        itemStyle: PrintStyle(fontSize: 10, isBold: true, alignment: CrossAxisAlignment.start),
+        observationStyle: PrintStyle(fontSize: 9, isBold: false, alignment: CrossAxisAlignment.start),
         footerText: 'Obrigado!',
-        footerStyle: PrintStyle(
-            fontSize: 10, isBold: false, alignment: CrossAxisAlignment.center),
+        footerStyle: PrintStyle(fontSize: 10, isBold: false, alignment: CrossAxisAlignment.center),
         logoPath: null,
         logoHeight: 40.0,
-        logoAlignment: CrossAxisAlignment.center, // Valor padrão
+        logoAlignment: CrossAxisAlignment.center,
       );
 
   factory KitchenTemplateSettings.fromJson(Map<String, dynamic> json) =>
@@ -125,12 +124,12 @@ class KitchenTemplateSettings {
         tableStyle: PrintStyle.fromJson(json['tableStyle'] ?? {}),
         orderInfoStyle: PrintStyle.fromJson(json['orderInfoStyle'] ?? {}),
         itemStyle: PrintStyle.fromJson(json['itemStyle'] ?? {}),
+        observationStyle: PrintStyle.fromJson(json['observationStyle'] ?? {}),
         footerText: json['footerText'] ?? 'Obrigado!',
         footerStyle: PrintStyle.fromJson(json['footerStyle'] ?? {}),
         logoPath: json['logoPath'],
         logoHeight: (json['logoHeight'] as num? ?? 40.0).toDouble(),
-        logoAlignment:
-            alignmentFromString(json['logoAlignment'] as String? ?? 'center'), // Desserialização
+        logoAlignment: alignmentFromString(json['logoAlignment'] as String? ?? 'center'),
       );
 
   Map<String, dynamic> toJson() => {
@@ -138,11 +137,12 @@ class KitchenTemplateSettings {
         'tableStyle': tableStyle.toJson(),
         'orderInfoStyle': orderInfoStyle.toJson(),
         'itemStyle': itemStyle.toJson(),
+        'observationStyle': observationStyle.toJson(),
         'footerText': footerText,
         'footerStyle': footerStyle.toJson(),
         'logoPath': logoPath,
         'logoHeight': logoHeight,
-        'logoAlignment': alignmentToString(logoAlignment), // Serialização
+        'logoAlignment': alignmentToString(logoAlignment),
       };
 }
 

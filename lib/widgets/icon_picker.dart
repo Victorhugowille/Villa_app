@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 class IconPicker extends StatelessWidget {
   final ValueChanged<IconData> onIconSelected;
@@ -8,7 +9,42 @@ class IconPicker extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    
+    // Lista de ícones combinando Material e FontAwesome
     final List<IconData> foodIcons = [
+      // FontAwesome Icons
+      FontAwesomeIcons.pepperHot,
+      FontAwesomeIcons.martiniGlass,
+      FontAwesomeIcons.beerMugEmpty,
+      FontAwesomeIcons.burger,
+      FontAwesomeIcons.cheese,
+      FontAwesomeIcons.breadSlice,
+      FontAwesomeIcons.utensils,
+      FontAwesomeIcons.mugSaucer,
+      FontAwesomeIcons.fish,
+      FontAwesomeIcons.shrimp,
+      FontAwesomeIcons.whiskeyGlass,
+      FontAwesomeIcons.bowlRice,
+      FontAwesomeIcons.plateWheat,
+      FontAwesomeIcons.carrot,
+      FontAwesomeIcons.bacon,
+      FontAwesomeIcons.seedling,
+      FontAwesomeIcons.leaf,
+      FontAwesomeIcons.drumstickBite,
+      FontAwesomeIcons.hotdog,
+      FontAwesomeIcons.stroopwafel,
+      FontAwesomeIcons.pizzaSlice,
+      FontAwesomeIcons.glassWater,
+      FontAwesomeIcons.candyCane,
+      FontAwesomeIcons.jar,
+      FontAwesomeIcons.cow,
+      FontAwesomeIcons.lemon,
+      FontAwesomeIcons.appleWhole,
+      FontAwesomeIcons.bottleWater,
+      FontAwesomeIcons.truck,
+      FontAwesomeIcons.box,
+
+      // Material Icons (os melhores da lista anterior)
       Icons.fastfood,
       Icons.local_bar,
       Icons.outdoor_grill,
@@ -16,32 +52,35 @@ class IconPicker extends StatelessWidget {
       Icons.local_pizza,
       Icons.restaurant,
       Icons.ramen_dining,
-      Icons.lunch_dining,
-      Icons.tapas,
-      Icons.kebab_dining,
       Icons.icecream,
       Icons.local_cafe,
       Icons.wine_bar,
       Icons.liquor,
-      Icons.nightlife,
-      Icons.set_meal,
-      Icons.bakery_dining,
-      Icons.brunch_dining,
-      Icons.dinner_dining,
-      Icons.egg,
+      Icons.takeout_dining,
+      Icons.delivery_dining,
+      Icons.breakfast_dining,
+      Icons.flatware,
+      Icons.shopping_bag,
+      Icons.grass,
+      Icons.whatshot,
+      Icons.percent,
     ];
+
+    // Ordenar a lista para facilitar a busca visual
+    foodIcons.sort((a, b) => a.codePoint.compareTo(b.codePoint));
 
     return AlertDialog(
       backgroundColor: theme.dialogBackgroundColor,
-      title: Text('Selecione um Ícone', style: TextStyle(color: theme.colorScheme.onSurface)),
+      title: Text('Selecione um Ícone',
+          style: TextStyle(color: theme.colorScheme.onSurface)),
       content: SizedBox(
         width: double.maxFinite,
         child: GridView.builder(
           shrinkWrap: true,
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 5,
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
+            crossAxisCount: 10,
+            crossAxisSpacing: 1,
+            mainAxisSpacing: 1,
           ),
           itemCount: foodIcons.length,
           itemBuilder: (context, index) {
@@ -51,7 +90,11 @@ class IconPicker extends StatelessWidget {
                 onIconSelected(icon);
                 Navigator.of(context).pop();
               },
-              child: Icon(icon, size: 30, color: theme.colorScheme.onSurface),
+              borderRadius: BorderRadius.circular(12),
+              child: Tooltip(
+                message: icon.fontFamily,
+                child: FaIcon(icon, size: 28, color: theme.colorScheme.onSurface),
+              ),
             );
           },
         ),

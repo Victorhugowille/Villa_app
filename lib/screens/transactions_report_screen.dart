@@ -1,7 +1,8 @@
-// lib/screens/transactions_report_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:villabistromobile/data/app_data.dart' as app_data;
 import 'package:villabistromobile/providers/transaction_provider.dart';
 import 'package:villabistromobile/widgets/charts/daily_revenue_bar_chart.dart';
 import 'package:villabistromobile/widgets/charts/payment_method_pie_chart.dart';
@@ -40,6 +41,41 @@ class _TransactionsReportScreenState extends State<TransactionsReportScreen>
     super.dispose();
   }
 
+  void _exportToClipboard(List<app_data.Transaction> transactions) {
+    if (transactions.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Não há dados para exportar.')),
+      );
+      return;
+    }
+
+    final DateFormat formatter = DateFormat('dd/MM/yyyy HH:mm');
+    final StringBuffer buffer = StringBuffer();
+
+    buffer.writeln('Data\tMesa\tValor Total\tMétodo de Pagamento\tDesconto\tAcréscimo');
+
+    for (final transaction in transactions) {
+      final line = [
+        formatter.format(transaction.timestamp),
+        transaction.tableNumber.toString(),
+        transaction.totalAmount.toStringAsFixed(2).replaceAll('.', ','),
+        transaction.paymentMethod,
+        transaction.discount.toStringAsFixed(2).replaceAll('.', ','),
+        transaction.surcharge.toStringAsFixed(2).replaceAll('.', ','),
+      ].join('\t');
+      buffer.writeln(line);
+    }
+
+    Clipboard.setData(ClipboardData(text: buffer.toString()));
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        backgroundColor: Colors.green,
+        content: Text('Relatório copiado! Cole em uma planilha do Google Sheets.'),
+      ),
+    );
+  }
+
   Future<void> _selectDate(BuildContext context, bool isStartDate) async {
     final provider = Provider.of<TransactionProvider>(context, listen: false);
     final initialDate = isStartDate ? _startDate : _endDate;
@@ -72,7 +108,7 @@ class _TransactionsReportScreenState extends State<TransactionsReportScreen>
 
     Widget bodyContent = Column(
       children: [
-        _buildDateSelector(context, formatter, theme),
+        _buildDateSelector(context, formatter, theme, transactionProvider.transactions),
         _buildSummaryCards(transactionProvider, theme),
         const SizedBox(height: 8),
         Expanded(
@@ -135,8 +171,8 @@ class _TransactionsReportScreenState extends State<TransactionsReportScreen>
     );
   }
 
-  Widget _buildDateSelector(
-      BuildContext context, DateFormat formatter, ThemeData theme) {
+  Widget _buildDateSelector(BuildContext context, DateFormat formatter,
+      ThemeData theme, List<app_data.Transaction> transactions) {
     return Padding(
       padding: const EdgeInsets.all(12.0),
       child: Row(
@@ -144,9 +180,16 @@ class _TransactionsReportScreenState extends State<TransactionsReportScreen>
         children: [
           _buildDateButton('De:', formatter.format(_startDate),
               () => _selectDate(context, true), theme),
-          const SizedBox(width: 20),
+          const SizedBox(width: 10),
           _buildDateButton('Até:', formatter.format(_endDate),
               () => _selectDate(context, false), theme),
+          const SizedBox(width: 10),
+          IconButton(
+            icon: const Icon(Icons.upload_file),
+            onPressed: () => _exportToClipboard(transactions),
+            tooltip: 'Exportar para Área de Transferência',
+            color: theme.primaryColor,
+          ),
         ],
       ),
     );

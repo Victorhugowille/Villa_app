@@ -76,13 +76,16 @@ class PrintingService {
     required Printer printer,
     required String paperSize,
     required KitchenTemplateSettings templateSettings,
+    String? orderObservation,
   }) async {
     final pdfBytes = await getKitchenOrderPdfBytes(
-        items: items,
-        tableNumber: tableNumber,
-        orderId: orderId,
-        paperSize: paperSize,
-        templateSettings: templateSettings);
+      items: items,
+      tableNumber: tableNumber,
+      orderId: orderId,
+      paperSize: paperSize,
+      templateSettings: templateSettings,
+      orderObservation: orderObservation,
+    );
 
     await Printing.directPrintPdf(
       printer: printer,
@@ -105,12 +108,31 @@ class PrintingService {
         onLayout: (PdfPageFormat format) async => pdfBytes);
   }
 
+  Future<void> directPrintReceiptPdf({
+    required List<app_data.Order> orders,
+    required String tableNumber,
+    required double totalAmount,
+    required ReceiptTemplateSettings settings,
+    required Printer printer,
+  }) async {
+    final pdfBytes = await getReceiptPdfBytes(
+        orders: orders,
+        tableNumber: tableNumber,
+        totalAmount: totalAmount,
+        settings: settings);
+    await Printing.directPrintPdf(
+      printer: printer,
+      onLayout: (format) async => pdfBytes,
+    );
+  }
+
   Future<Uint8List> getKitchenOrderPdfBytes({
     required List<app_data.CartItem> items,
     required String tableNumber,
     required String orderId,
     required String paperSize,
     required KitchenTemplateSettings templateSettings,
+    String? orderObservation,
   }) async {
     final doc = pw.Document();
     final robotoRegular = await PdfGoogleFonts.robotoRegular();
@@ -126,10 +148,13 @@ class PrintingService {
       }
     }
 
-    pw.TextStyle getTextStyle(PrintStyle style, {bool isAdicional = false}) {
+    pw.TextStyle getTextStyle(PrintStyle style,
+        {bool isAdicional = false, bool isObservation = false}) {
       return pw.TextStyle(
         font: style.isBold ? robotoBold : robotoRegular,
-        fontSize: isAdicional ? style.fontSize - 1 : style.fontSize, // Fonte menor para adicional
+        fontSize:
+            isAdicional || isObservation ? style.fontSize - 1 : style.fontSize,
+        fontStyle: isObservation ? pw.FontStyle.italic : pw.FontStyle.normal,
       );
     }
 
@@ -155,7 +180,7 @@ class PrintingService {
                   'MESA $tableNumber',
                   style: getTextStyle(templateSettings.tableStyle),
                   textAlign:
-                      _pdfTextAlign(templateSettings.tableStyle.alignment),
+                      pw.TextAlign.center,
                 ),
               ),
               pw.SizedBox(height: 5),
@@ -164,41 +189,70 @@ class PrintingService {
                 child: pw.Text(
                   'Pedido #${orderId.length > 8 ? orderId.substring(0, 8) : orderId} - ${DateFormat('HH:mm').format(DateTime.now())}',
                   style: getTextStyle(templateSettings.orderInfoStyle),
-                  textAlign:
-                      _pdfTextAlign(templateSettings.orderInfoStyle.alignment),
+                  textAlign: pw.TextAlign.center,
                 ),
               ),
+              if (orderObservation != null && orderObservation.isNotEmpty)
+                pw.Padding(
+                  padding: const pw.EdgeInsets.only(top: 4),
+                  child: pw.SizedBox(
+                    width: double.infinity,
+                    child: pw.Text(
+                      'OBS: $orderObservation',
+                      style: getTextStyle(templateSettings.itemStyle,
+                          isObservation: true),
+                      textAlign:
+                          _pdfTextAlign(templateSettings.itemStyle.alignment),
+                    ),
+                  ),
+                ),
               pw.Divider(color: PdfColors.black),
               for (final item in items)
                 pw.Container(
                   width: double.infinity,
                   padding: const pw.EdgeInsets.symmetric(vertical: 2),
                   child: pw.Column(
-                    crossAxisAlignment: _flutterToPdfAlignment(templateSettings.itemStyle.alignment),
-                    children: [
-                      pw.Text(
-                        '(${item.quantity}) ${item.product.name}',
-                        style: getTextStyle(templateSettings.itemStyle),
-                        textAlign:
-                            _pdfTextAlign(templateSettings.itemStyle.alignment),
-                      ),
-                      if(item.selectedAdicionais.isNotEmpty)
-                        pw.Padding(
-                          padding: const pw.EdgeInsets.only(left: 15.0),
-                          child: pw.Column(
-                             crossAxisAlignment: _flutterToPdfAlignment(templateSettings.itemStyle.alignment),
-                            children: item.selectedAdicionais.map((itemAd) {
-                              final ad = itemAd.adicional;
-                              return pw.Text(
-                                "+ ${itemAd.quantity}x ${ad.name}",
-                                style: getTextStyle(templateSettings.itemStyle, isAdicional: true),
-                                textAlign: _pdfTextAlign(templateSettings.itemStyle.alignment),
-                              );
-                            }).toList(),
-                          )
-                        )
-                    ]
-                  ),
+                      crossAxisAlignment: _flutterToPdfAlignment(
+                          templateSettings.itemStyle.alignment),
+                      children: [
+                        pw.Text(
+                          '(${item.quantity}) ${item.product.name}',
+                          style: getTextStyle(templateSettings.itemStyle),
+                          textAlign: _pdfTextAlign(
+                              templateSettings.itemStyle.alignment),
+                        ),
+                        if (item.observacao != null &&
+                            item.observacao!.isNotEmpty)
+                          pw.Padding(
+                            padding: const pw.EdgeInsets.only(left: 15.0),
+                            child: pw.Text(
+                              'Obs: ${item.observacao}',
+                              style: getTextStyle(templateSettings.itemStyle,
+                                  isObservation: true),
+                              textAlign: _pdfTextAlign(
+                                  templateSettings.itemStyle.alignment),
+                            ),
+                          ),
+                        if (item.selectedAdicionais.isNotEmpty)
+                          pw.Padding(
+                              padding: const pw.EdgeInsets.only(left: 15.0),
+                              child: pw.Column(
+                                crossAxisAlignment: _flutterToPdfAlignment(
+                                    templateSettings.itemStyle.alignment),
+                                children:
+                                    item.selectedAdicionais.map((itemAd) {
+                                  final ad = itemAd.adicional;
+                                  return pw.Text(
+                                    "+ ${itemAd.quantity}x ${ad.name}",
+                                    style: getTextStyle(
+                                        templateSettings.itemStyle,
+                                        isAdicional: true),
+                                    textAlign: _pdfTextAlign(
+                                        templateSettings.itemStyle.alignment),
+                                  );
+                                }).toList(),
+                              ))
+                      ]),
                 ),
               if (templateSettings.footerText.isNotEmpty)
                 pw.Padding(
@@ -297,7 +351,7 @@ class PrintingService {
               ),
               pw.Divider(color: PdfColors.black, height: 12),
               for (final item in orders.expand((order) => order.items))
-                  pw.Column(
+                pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
                       pw.Row(
@@ -324,13 +378,15 @@ class PrintingService {
                               final ad = itemAd.adicional;
                               return pw.Text(
                                 "+ ${itemAd.quantity}x ${ad.name} (+ R\$ ${(ad.price * itemAd.quantity).toStringAsFixed(2)})",
-                                style: getTextStyle(settings.itemStyle).copyWith(fontSize: settings.itemStyle.fontSize - 1),
+                                style: getTextStyle(settings.itemStyle)
+                                    .copyWith(
+                                        fontSize:
+                                            settings.itemStyle.fontSize - 1),
                               );
                             }).toList(),
                           ),
                         )
-                    ]
-                  ),
+                    ]),
               pw.Divider(color: PdfColors.black, height: 12),
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
@@ -366,11 +422,15 @@ class PrintingService {
     required String tableNumber,
     required String orderId,
     required KitchenTemplateSettings templateSettings,
+    String? orderObservation,
   }) {
-    TextStyle getTextStyle(PrintStyle style, {bool isAdicional = false}) {
+    TextStyle getTextStyle(PrintStyle style,
+        {bool isAdicional = false, bool isObservation = false}) {
       return TextStyle(
-        fontSize: isAdicional ? style.fontSize - 1 : style.fontSize,
+        fontSize:
+            isAdicional || isObservation ? style.fontSize - 1 : style.fontSize,
         fontWeight: style.isBold ? FontWeight.bold : FontWeight.normal,
+        fontStyle: isObservation ? FontStyle.italic : FontStyle.normal,
         color: Colors.black,
         fontFamily: 'Roboto',
       );
@@ -406,44 +466,71 @@ class PrintingService {
         SizedBox(
           width: double.infinity,
           child: Text(
-            'Pedido #${orderId.length > 8 ? orderId.substring(0, 8) : orderId} - ${DateFormat('HH:mm').format(DateTime.now())}',
+            'Pedido #$orderId - ${DateFormat('HH:mm').format(DateTime.now())}',
             style: getTextStyle(templateSettings.orderInfoStyle),
             textAlign:
                 _flutterToTextAlign(templateSettings.orderInfoStyle.alignment),
           ),
         ),
-        const Divider(color: Colors.black),
-        for (final item in items)
-            Container(
+        if (orderObservation != null && orderObservation.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 4.0),
+            child: SizedBox(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 2),
-              child: Column(
-                crossAxisAlignment: templateSettings.itemStyle.alignment,
-                children: [
-                  Text(
-                    '(${item.quantity}) ${item.product.name}',
-                    style: getTextStyle(templateSettings.itemStyle),
-                    textAlign:
-                        _flutterToTextAlign(templateSettings.itemStyle.alignment),
-                  ),
-                   if(item.selectedAdicionais.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 15.0),
-                      child: Column(
-                        crossAxisAlignment: templateSettings.itemStyle.alignment,
-                        children: item.selectedAdicionais.map((itemAd) {
-                          final ad = itemAd.adicional;
-                          return Text(
-                            "+ ${itemAd.quantity}x ${ad.name}",
-                             style: getTextStyle(templateSettings.itemStyle, isAdicional: true),
-                             textAlign: _flutterToTextAlign(templateSettings.itemStyle.alignment),
-                          );
-                        }).toList(),
-                      )
-                    )
-                ],
+              child: Text(
+                'OBS: $orderObservation',
+                style:
+                    getTextStyle(templateSettings.itemStyle, isObservation: true),
+                textAlign:
+                    _flutterToTextAlign(templateSettings.itemStyle.alignment),
               ),
             ),
+          ),
+        const Divider(color: Colors.black),
+        for (final item in items)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Column(
+              crossAxisAlignment: templateSettings.itemStyle.alignment,
+              children: [
+                Text(
+                  '(${item.quantity}) ${item.product.name}',
+                  style: getTextStyle(templateSettings.itemStyle),
+                  textAlign:
+                      _flutterToTextAlign(templateSettings.itemStyle.alignment),
+                ),
+                if (item.observacao != null && item.observacao!.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 15.0),
+                    child: Text(
+                      'Obs: ${item.observacao}',
+                      style: getTextStyle(templateSettings.itemStyle,
+                          isObservation: true),
+                      textAlign: _flutterToTextAlign(
+                          templateSettings.itemStyle.alignment),
+                    ),
+                  ),
+                if (item.selectedAdicionais.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 15.0),
+                    child: Column(
+                      crossAxisAlignment: templateSettings.itemStyle.alignment,
+                      children: item.selectedAdicionais.map((itemAd) {
+                        final ad = itemAd.adicional;
+                        return Text(
+                          "+ ${itemAd.quantity}x ${ad.name}",
+                          style: getTextStyle(templateSettings.itemStyle,
+                              isAdicional: true),
+                          textAlign: _flutterToTextAlign(
+                              templateSettings.itemStyle.alignment),
+                        );
+                      }).toList(),
+                    ),
+                  )
+              ],
+            ),
+          ),
         if (templateSettings.footerText.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 10),
@@ -547,20 +634,22 @@ class PrintingService {
                     ),
                   ],
                 ),
-                 if (item.selectedAdicionais.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 10.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: item.selectedAdicionais.map((itemAd) {
-                          final ad = itemAd.adicional;
-                          return Text(
-                            "+ ${itemAd.quantity}x ${ad.name} (+ R\$ ${(ad.price * itemAd.quantity).toStringAsFixed(2)})",
-                             style: TextStyle(fontSize: settings.itemStyle.fontSize - 1, color: Colors.black87),
-                          );
-                        }).toList(),
-                      ),
-                    )
+                if (item.selectedAdicionais.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 10.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: item.selectedAdicionais.map((itemAd) {
+                        final ad = itemAd.adicional;
+                        return Text(
+                          "+ ${itemAd.quantity}x ${ad.name} (+ R\$ ${(ad.price * itemAd.quantity).toStringAsFixed(2)})",
+                          style: TextStyle(
+                              fontSize: settings.itemStyle.fontSize - 1,
+                              color: Colors.black87),
+                        );
+                      }).toList(),
+                    ),
+                  )
               ],
             ),
           ),

@@ -9,6 +9,40 @@ class CartScreen extends StatelessWidget {
   final app_data.Table table;
   const CartScreen({super.key, required this.table});
 
+  void _showItemObservationDialog(
+      BuildContext context, app_data.CartItem cartItem) {
+    final controller = TextEditingController(text: cartItem.observacao);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Observação para ${cartItem.product.name}'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+              labelText: 'Ex: Sem cebola, ponto da carne, etc.'),
+          onSubmitted: (_) =>
+              _submitObservation(context, cartItem.id, controller.text),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          TextButton(
+              onPressed: () =>
+                  _submitObservation(context, cartItem.id, controller.text),
+              child: const Text('Salvar')),
+        ],
+      ),
+    );
+  }
+
+  void _submitObservation(
+      BuildContext context, String cartItemId, String observation) {
+    Provider.of<CartProvider>(context, listen: false)
+        .updateItemObservation(cartItemId, observation);
+    Navigator.pop(context);
+  }
+
   Future<void> _placeOrder(BuildContext context) async {
     final cart = Provider.of<CartProvider>(context, listen: false);
     final navProvider = Provider.of<NavigationProvider>(context, listen: false);
@@ -21,6 +55,7 @@ class CartScreen extends StatelessWidget {
       await tableProvider.placeOrder(
         tableId: table.id,
         items: cart.items,
+        orderObservation: cart.orderObservation,
       );
       cart.clearCart();
 
@@ -53,169 +88,135 @@ class CartScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final cart = Provider.of<CartProvider>(context);
     final theme = Theme.of(context);
-    final isDesktop = MediaQuery.of(context).size.width > 800;
-    final navProvider = Provider.of<NavigationProvider>(context, listen: false);
 
-    Widget emptyCartView = Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.remove_shopping_cart_outlined,
-              size: 80, color: Colors.grey.shade600),
-          const SizedBox(height: 16),
-          Text(
-            'Seu carrinho está vazio.',
-            style: TextStyle(
-                color: theme.colorScheme.onBackground.withOpacity(0.7),
-                fontSize: 18),
-          ),
-        ],
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Carrinho'),
       ),
-    );
-
-    Widget listContent = ListView.builder(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      itemCount: cart.items.length,
-      itemBuilder: (ctx, i) {
-        final cartItem = cart.items[i];
-        return Dismissible(
-          key: ValueKey(cartItem.cartItemId),
-          background: Container(
-            color: Colors.red.withOpacity(0.8),
-            alignment: Alignment.centerRight,
-            padding: const EdgeInsets.only(right: 20),
-            child: const Icon(Icons.delete, color: Colors.white, size: 30),
-          ),
-          direction: DismissDirection.endToStart,
-          onDismissed: (direction) {
-            Provider.of<CartProvider>(context, listen: false)
-                .removeItem(cartItem.cartItemId);
-          },
-          child: Card(
-            margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 4),
-            child: Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: ListTile(
-                leading: CircleAvatar(
-                  radius: 30,
-                  backgroundImage: NetworkImage(cartItem.product.imageUrl ??
-                      'https://placehold.co/100x100/e2e8f0/e2e8f0?text=Img'),
-                  onBackgroundImageError: (_, __) {},
-                ),
-                title: Text(cartItem.product.name),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    ...cartItem.selectedAdicionais.map(
-                      (itemAd) => Text(
-                        "+ ${itemAd.quantity}x ${itemAd.adicional.name}",
-                        style: const TextStyle(
-                            fontSize: 12, color: Colors.black54),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Total do item: R\$ ${cartItem.totalPrice.toStringAsFixed(2)}',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.remove_circle_outline,
-                          color: Colors.red),
-                      onPressed: () =>
-                          cart.decreaseQuantity(cartItem.cartItemId),
-                    ),
-                    Text(
-                      '${cartItem.quantity}',
-                      style: const TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    IconButton(
-                      icon: Icon(Icons.add_circle_outline,
-                          color: theme.primaryColor),
-                      onPressed: () =>
-                          cart.increaseQuantity(cartItem.cartItemId),
-                    ),
-                  ],
-                ),
+      body: cart.items.isEmpty
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.remove_shopping_cart_outlined, size: 80, color: Colors.grey.shade600),
+                  const SizedBox(height: 16),
+                  const Text('Seu carrinho está vazio.', style: TextStyle(fontSize: 18)),
+                ],
               ),
-            ),
-          ),
-        );
-      },
-    );
-
-    Widget bodyContent = cart.items.isEmpty ? emptyCartView : listContent;
-
-    if (isDesktop) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        navProvider.setScreenActions([
-          if (cart.items.isNotEmpty) ...[
-            const Text('Total:', style: TextStyle(fontSize: 16)),
-            const SizedBox(width: 8),
-            Chip(
-              label: Text(
-                'R\$ ${cart.totalAmount.toStringAsFixed(2)}',
-                style: TextStyle(
-                    color: theme.colorScheme.onPrimary,
-                    fontWeight: FontWeight.bold),
-              ),
-              backgroundColor: theme.primaryColor,
-            ),
-            const SizedBox(width: 16),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.check_circle_outline),
-              label: const Text('Fazer Pedido'),
-              onPressed: () => _placeOrder(context),
-            ),
-            const SizedBox(width: 8),
-          ]
-        ]);
-      });
-
-      return bodyContent;
-    } else {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('Carrinho'),
-        ),
-        body: bodyContent,
-        bottomNavigationBar: cart.items.isEmpty
-            ? null
-            : BottomAppBar(
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: <Widget>[
-                      Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Total', style: TextStyle(fontSize: 16)),
-                          Text(
-                            'R\$ ${cart.totalAmount.toStringAsFixed(2)}',
-                            style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: theme.primaryColor),
+            )
+          : Column(
+              children: [
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.only(top: 8),
+                    itemCount: cart.items.length,
+                    itemBuilder: (ctx, i) {
+                      final cartItem = cart.items[i];
+                      return Dismissible(
+                        key: ValueKey(cartItem.id),
+                        direction: DismissDirection.endToStart,
+                        background: Container(
+                          color: Colors.red,
+                          alignment: Alignment.centerRight,
+                          padding: const EdgeInsets.only(right: 20),
+                          child: const Icon(Icons.delete, color: Colors.white),
+                        ),
+                        onDismissed: (_) {
+                          cart.removeItem(cartItem.id);
+                        },
+                        child: Card(
+                          margin: const EdgeInsets.symmetric(
+                              horizontal: 15, vertical: 4),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              ListTile(
+                                title: Text(cartItem.product.name),
+                                subtitle: Text(
+                                    'Total: R\$ ${cartItem.totalPrice.toStringAsFixed(2)}'),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                        icon: const Icon(Icons.remove),
+                                        onPressed: () =>
+                                            cart.decreaseQuantity(cartItem.id)),
+                                    Text('${cartItem.quantity}',
+                                        style: const TextStyle(fontSize: 18)),
+                                    IconButton(
+                                        icon: const Icon(Icons.add),
+                                        onPressed: () =>
+                                            cart.increaseQuantity(cartItem.id)),
+                                  ],
+                                ),
+                              ),
+                              if (cartItem.observacao != null &&
+                                  cartItem.observacao!.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                      left: 16, right: 16, bottom: 8),
+                                  child: Text(
+                                    'Obs: ${cartItem.observacao}',
+                                    style: const TextStyle(
+                                        fontStyle: FontStyle.italic,
+                                        color: Colors.black54),
+                                  ),
+                                ),
+                              Padding(
+                                padding: const EdgeInsets.only(left: 8.0, bottom: 4.0),
+                                child: TextButton.icon(
+                                  icon: const Icon(Icons.edit_note, size: 20),
+                                  label: Text(
+                                      cartItem.observacao != null &&
+                                              cartItem.observacao!.isNotEmpty
+                                          ? 'Editar Observação'
+                                          : 'Adicionar Observação'),
+                                  onPressed: () =>
+                                      _showItemObservationDialog(context, cartItem),
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                      ElevatedButton(
-                        onPressed: () => _placeOrder(context),
-                        child: const Text('FAZER PEDIDO'),
-                      )
-                    ],
+                        ),
+                      );
+                    },
                   ),
                 ),
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: TextField(
+                    decoration: const InputDecoration(
+                      labelText: 'Observação Geral do Pedido',
+                      hintText: 'Ex: Trazer todos os pratos juntos, etc.',
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: (text) {
+                      cart.updateOrderObservation(text);
+                    },
+                  ),
+                )
+              ],
+            ),
+      bottomNavigationBar: cart.items.isEmpty
+          ? null
+          : BottomAppBar(
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: <Widget>[
+                    Text('Total: R\$ ${cart.totalAmount.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                            fontSize: 20, fontWeight: FontWeight.bold)),
+                    ElevatedButton(
+                      onPressed: () => _placeOrder(context),
+                      child: const Text('FAZER PEDIDO'),
+                    )
+                  ],
+                ),
               ),
-      );
-    }
+            ),
+    );
   }
 }

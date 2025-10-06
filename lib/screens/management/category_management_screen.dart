@@ -1,6 +1,6 @@
-// lib/screens/management/category_management_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:villabistromobile/data/app_data.dart';
 import 'package:villabistromobile/providers/navigation_provider.dart';
 import 'package:villabistromobile/providers/product_provider.dart';
 import 'package:villabistromobile/screens/management/category_edit_screen.dart';
@@ -14,6 +14,9 @@ class CategoryManagementScreen extends StatefulWidget {
 }
 
 class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
+  List<Category> _localCategories = [];
+  bool _isSavingOrder = false;
+
   @override
   void initState() {
     super.initState();
@@ -24,6 +27,15 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
 
   Future<void> _refreshData() async {
     await Provider.of<ProductProvider>(context, listen: false).fetchData();
+    _syncLocalList();
+  }
+
+  void _syncLocalList() {
+    if (!mounted) return;
+    setState(() {
+      _localCategories = List<Category>.from(
+          Provider.of<ProductProvider>(context, listen: false).categories);
+    });
   }
 
   void _showErrorDialog(String message) {
@@ -57,6 +69,42 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
     ]);
   }
 
+  Future<void> _onReorder(int oldIndex, int newIndex) async {
+    if (_isSavingOrder) return;
+
+    setState(() {
+      if (newIndex > oldIndex) {
+        newIndex -= 1;
+      }
+      final Category item = _localCategories.removeAt(oldIndex);
+      _localCategories.insert(newIndex, item);
+      _isSavingOrder = true;
+    });
+
+    try {
+      await Provider.of<ProductProvider>(context, listen: false)
+          .updateCategoryOrder(_localCategories);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Ordem salva com sucesso!'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 1),
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        _showErrorDialog(e.toString());
+        _syncLocalList();
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSavingOrder = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -65,26 +113,38 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
 
     Widget bodyContent = Consumer<ProductProvider>(
       builder: (context, productProvider, child) {
-        if (productProvider.isLoading && productProvider.categories.isEmpty) {
+        if (productProvider.isLoading && _localCategories.isEmpty) {
           return Center(
               child: CircularProgressIndicator(color: theme.primaryColor));
         }
-        if (productProvider.categories.isEmpty) {
+
+        // CORREÇÃO APLICADA AQUI
+        if (productProvider.categories.length != _localCategories.length &&
+            !_isSavingOrder) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _syncLocalList();
+          });
+        }
+
+        if (_localCategories.isEmpty) {
           return RefreshIndicator(
             onRefresh: _refreshData,
             child: ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              children: const [Center(child: Text("Nenhuma categoria encontrada."))]
-            ),
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: const [
+                  Center(child: Text("Nenhuma categoria encontrada."))
+                ]),
           );
         }
+
         return RefreshIndicator(
           onRefresh: _refreshData,
-          child: ListView.builder(
-            itemCount: productProvider.categories.length,
+          child: ReorderableListView.builder(
+            itemCount: _localCategories.length,
             itemBuilder: (ctx, index) {
-              final category = productProvider.categories[index];
+              final category = _localCategories[index];
               return Card(
+                key: ValueKey(category.id),
                 margin:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 child: ListTile(
@@ -94,15 +154,28 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                       style: TextStyle(
                           color: theme.colorScheme.onSurface,
                           fontWeight: FontWeight.bold)),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete_outline, color: Colors.red),
-                    onPressed: () async {
-                      try {
-                        await productProvider.deleteCategory(category.id);
-                      } catch (e) {
-                        _showErrorDialog(e.toString());
-                      }
-                    },
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon:
+                            const Icon(Icons.delete_outline, color: Colors.red),
+                        onPressed: () async {
+                          try {
+                            await productProvider.deleteCategory(category.id);
+                          } catch (e) {
+                            _showErrorDialog(e.toString());
+                          }
+                        },
+                      ),
+                      ReorderableDragStartListener(
+                        index: index,
+                        child: const Padding(
+                          padding: EdgeInsets.all(8.0),
+                          child: Icon(Icons.drag_indicator),
+                        ),
+                      ),
+                    ],
                   ),
                   onTap: () {
                     navProvider.navigateTo(context,
@@ -111,6 +184,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                 ),
               );
             },
+            onReorder: _onReorder,
           ),
         );
       },

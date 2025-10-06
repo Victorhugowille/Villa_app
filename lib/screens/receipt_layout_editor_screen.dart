@@ -1,4 +1,3 @@
-// lib/screens/receipt_layout_editor_screen.dart
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
@@ -116,9 +115,10 @@ class _ReceiptLayoutEditorScreenState extends State<ReceiptLayoutEditorScreen> {
     return printingService.getReceiptPdfBytes(
       orders: [
         app_data.Order(
-          id: '1',
+          id: "1",
           items: [
             app_data.CartItem(
+                id: 'prev1',
                 product: app_data.Product(
                     id: '1',
                     name: 'Produto Exemplo 1',

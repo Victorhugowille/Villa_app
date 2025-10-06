@@ -57,6 +57,7 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
     return printingService.buildKitchenOrderWidget(
       items: [
         app_data.CartItem(
+            id: 'p1',
             product: app_data.Product(
                 id: '1',
                 name: 'Produto Exemplo 1',
@@ -67,6 +68,7 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
                 isSoldOut: false),
             quantity: 2),
         app_data.CartItem(
+            id: 'p2',
             product: app_data.Product(
                 id: '2',
                 name: 'Produto Exemplo 2',
@@ -237,7 +239,7 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
                       File(currentSettings.logoPath!).existsSync()
                   ? Image.file(
                       File(currentSettings.logoPath!),
-                      key: UniqueKey(), // Força a atualização da imagem
+                      key: UniqueKey(),
                       height: 80,
                       errorBuilder: (c, e, s) =>
                           const Icon(Icons.error, color: Colors.red),

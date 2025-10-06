@@ -9,6 +9,8 @@ class TableProvider with ChangeNotifier {
   final String _tableMesa = 'mesas';
 
   String? _lastFetchedCompanyId;
+  final Set<String> _partiallyPaidTableIds = {};
+  final Map<String, Set<String>> _partiallyPaidItemIdsByTable = {};
 
   List<app_data.Table> _tables = [];
   bool _isLoading = true;
@@ -31,7 +33,38 @@ class TableProvider with ChangeNotifier {
     final newCompanyId = newAuthProvider.companyId;
 
     if (newCompanyId != null && newCompanyId != _lastFetchedCompanyId) {
+      _partiallyPaidTableIds.clear();
+      _partiallyPaidItemIdsByTable.clear();
       fetchAndSetTables();
+    }
+  }
+
+  void registerPartialPayment(String tableId, Set<String> paidItemIds) {
+    final index = _tables.indexWhere((table) => table.id == tableId);
+    if (index != -1) {
+      _tables[index].isPartiallyPaid = true;
+      _tables[index].isOccupied = true;
+      _partiallyPaidTableIds.add(tableId);
+
+      if (!_partiallyPaidItemIdsByTable.containsKey(tableId)) {
+        _partiallyPaidItemIdsByTable[tableId] = {};
+      }
+      _partiallyPaidItemIdsByTable[tableId]!.addAll(paidItemIds);
+
+      notifyListeners();
+    }
+  }
+
+  Set<String> getPaidItemIdsForTable(String tableId) {
+    return _partiallyPaidItemIdsByTable[tableId] ?? {};
+  }
+
+  void _clearLocalTableState(String tableId) {
+    _partiallyPaidTableIds.remove(tableId);
+    _partiallyPaidItemIdsByTable.remove(tableId);
+    final index = _tables.indexWhere((table) => table.id == tableId);
+    if (index != -1) {
+      _tables[index].isPartiallyPaid = false;
     }
   }
 
@@ -48,7 +81,6 @@ class TableProvider with ChangeNotifier {
       _isLoading = true;
       notifyListeners();
     }
-
     final companyId = _getCompanyId();
     if (companyId == null) {
       _tables = [];
@@ -57,16 +89,22 @@ class TableProvider with ChangeNotifier {
       notifyListeners();
       return;
     }
-    
     _lastFetchedCompanyId = companyId;
-
     try {
       final data = await _supabase
           .from(_tableMesa)
           .select()
           .eq('company_id', companyId)
           .order('numero', ascending: true);
-      _tables = data.map((item) => app_data.Table.fromJson(item)).toList();
+
+      _tables = data.map((item) {
+        final table = app_data.Table.fromJson(item);
+        if (_partiallyPaidTableIds.contains(table.id)) {
+          table.isPartiallyPaid = true;
+          table.isOccupied = true;
+        }
+        return table;
+      }).toList();
     } catch (error) {
       _errorMessage = "Erro ao buscar mesas: $error";
       _tables = [];
@@ -146,55 +184,55 @@ class TableProvider with ChangeNotifier {
     await _supabase.from(_tableMesa).delete().eq('id', response['id']);
     await fetchAndSetTables();
   }
-
-  Future<void> updateStatus(String tableId, String newStatus) async {
-    await _supabase
-        .from(_tableMesa)
-        .update({'status': newStatus})
-        .eq('id', tableId);
-    await fetchAndSetTables();
-  }
-
-  Future<void> placeOrder(
-      {required String tableId, required List<app_data.CartItem> items}) async {
+  
+  Future<void> placeOrder({
+    required String tableId,
+    required List<app_data.CartItem> items,
+    String? orderObservation,
+  }) async {
     final companyId = _getCompanyId();
     if (companyId == null) throw Exception('Empresa não encontrada.');
 
-    final orderResponse = await _supabase
-        .from('pedidos')
-        .insert({
-          'mesa_id': tableId,
-          'status': 'awaiting_print',
-          'type': 'mesa',
-          'company_id': companyId,
-        })
-        .select()
-        .single();
+    final orderResponse = await _supabase.from('pedidos').insert({
+      'mesa_id': tableId,
+      'status': 'awaiting_print',
+      'type': 'mesa',
+      'company_id': companyId,
+      'observacao': orderObservation,
+    }).select().single();
     final orderId = orderResponse['id'];
 
     final itemsToInsert = items.map((cartItem) {
-      final adicionaisJson = cartItem.selectedAdicionais.map((itemAd) {
-        return {
-          'adicional_id': itemAd.adicional.id,
-          'quantity': itemAd.quantity,
-          'adicional': {
-            'id': itemAd.adicional.id,
-            'name': itemAd.adicional.name,
-            'price': itemAd.adicional.price,
-          }
-        };
-      }).toList();
+        final adicionaisJson = cartItem.selectedAdicionais.map((itemAd) {
+          return {
+            'adicional_id': itemAd.adicional.id,
+            'quantity': itemAd.quantity,
+            'adicional': {
+              'id': itemAd.adicional.id,
+              'name': itemAd.adicional.name,
+              'price': itemAd.adicional.price,
+            }
+          };
+        }).toList();
 
       return {
         'pedido_id': orderId,
         'produto_id': cartItem.product.id,
         'quantidade': cartItem.quantity,
         'adicionais_selecionados': adicionaisJson,
+        'observacao': cartItem.observacao,
       };
     }).toList();
 
     await _supabase.from('itens_pedido').insert(itemsToInsert);
-    await updateStatus(tableId, 'ocupada');
+    
+    final tableIndex = _tables.indexWhere((t) => t.id == tableId);
+    if (tableIndex != -1 && _tables[tableIndex].isPartiallyPaid) {
+        _tables[tableIndex].isOccupied = true;
+        notifyListeners();
+    } else {
+        await updateStatus(tableId, 'ocupada');
+    }
   }
 
   Future<List<app_data.Order>> getOrdersForTable(String tableId) async {
@@ -205,7 +243,7 @@ class TableProvider with ChangeNotifier {
       final response = await _supabase
           .from('pedidos')
           .select(
-              '*, itens_pedido(*, adicionais_selecionados, produtos(*, categorias(*))), mesas!inner(numero)')
+              '*, itens_pedido(*, produtos(*, categorias(*))), mesas!inner(numero)')
           .eq('mesa_id', tableId)
           .eq('company_id', companyId)
           .neq('status', 'finalizado');
@@ -222,19 +260,16 @@ class TableProvider with ChangeNotifier {
   Future<void> clearTable(String tableId) async {
     final companyId = _getCompanyId();
     if (companyId == null) return;
-
-    final orders = await getOrdersForTable(tableId);
-    final orderIds = orders.map((o) => o.id).toList();
-
-    if (orderIds.isNotEmpty) {
-      final filter = orderIds.map((id) => 'id.eq.$id').join(',');
-      await _supabase
-          .from('pedidos')
-          .update({'status': 'finalizado'})
-          .or(filter);
-    }
-
+    
+    await _supabase
+        .from('pedidos')
+        .update({'status': 'finalizado'})
+        .eq('mesa_id', tableId)
+        .eq('company_id', companyId)
+        .neq('status', 'finalizado');
+    
     await updateStatus(tableId, 'livre');
+    _clearLocalTableState(tableId);
   }
 
   Future<void> deleteOrder(String orderId) async {
@@ -245,17 +280,14 @@ class TableProvider with ChangeNotifier {
     required app_data.Table table,
     required double totalAmount,
     required String paymentMethod,
+    double discount = 0.0,
+    double surcharge = 0.0,
   }) async {
     final companyId = _getCompanyId();
     final userId = _getUserId();
 
-    if (companyId == null) {
-      throw Exception(
-          'Empresa não encontrada. Não é possível salvar a transação.');
-    }
-    if (userId == null) {
-      throw Exception(
-          'Usuário não autenticado. Não é possível salvar a transação.');
+    if (companyId == null || userId == null) {
+      throw Exception('Usuário ou empresa não autenticados.');
     }
 
     final payload = {
@@ -264,26 +296,33 @@ class TableProvider with ChangeNotifier {
       'payment_method': paymentMethod,
       'company_id': companyId,
       'user_id': userId,
+      'discount': discount,
+      'surcharge': surcharge,
     };
 
-    final transactionResponse = await _supabase
-        .from('transacoes')
-        .insert(payload)
-        .select()
-        .single();
-
+    final transactionResponse =
+        await _supabase.from('transacoes').insert(payload).select().single();
     final transactionId = transactionResponse['id'];
 
     await _supabase
         .from('pedidos')
         .update({
-          'status': 'completed',
+          'status': 'finalizado',
           'transaction_id': transactionId,
         })
         .eq('mesa_id', table.id)
         .eq('company_id', companyId)
-        .neq('status', 'completed');
+        .neq('status', 'finalizado');
 
     await updateStatus(table.id, 'livre');
+    _clearLocalTableState(table.id);
+  }
+
+  Future<void> updateStatus(String tableId, String newStatus) async {
+    await _supabase
+        .from(_tableMesa)
+        .update({'status': newStatus})
+        .eq('id', tableId);
+    await fetchAndSetTables();
   }
 }

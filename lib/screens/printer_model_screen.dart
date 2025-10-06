@@ -11,6 +11,7 @@ import 'package:villabistromobile/providers/product_provider.dart';
 import 'package:villabistromobile/services/printing_service.dart';
 import 'package:villabistromobile/widgets/side_menu.dart';
 import 'package:villabistromobile/screens/kitchen_printer_screen.dart';
+import 'package:collection/collection.dart';
 
 class PrinterModelScreen extends StatelessWidget {
   const PrinterModelScreen({super.key});
@@ -22,14 +23,16 @@ class PrinterModelScreen extends StatelessWidget {
     final tabs = [
       const Tab(icon: Icon(Icons.print), text: 'Destinos'),
       const Tab(icon: Icon(Icons.dvr), text: 'Estação'),
+      const Tab(icon: Icon(Icons.receipt), text: 'Conferência'),
       const Tab(icon: Icon(Icons.receipt_long), text: 'Cupom Cliente'),
       const Tab(icon: Icon(Icons.kitchen), text: 'Pedido Cozinha'),
     ];
 
     final tabViews = [
-      _CategoryPrinterSettingsTab(),
+      const _CategoryPrinterSettingsTab(),
       const KitchenPrinterScreen(),
-      _ReceiptLayoutEditorTab(),
+      const _ConferencePrinterSettingsTab(),
+      const _ReceiptLayoutEditorTab(),
       const _KitchenLayoutEditorTab(),
     ];
 
@@ -50,7 +53,7 @@ class PrinterModelScreen extends StatelessWidget {
             title: const Text('Impressão'),
             bottom: TabBar(
               isScrollable: true,
-              tabs: tabs.map((t) => Tab(text: (t.text ?? ''))).toList(),
+              tabs: tabs,
             ),
           ),
           body: TabBarView(children: tabViews),
@@ -257,6 +260,104 @@ class _CategoryPrinterSettingsTabState
   }
 }
 
+class _ConferencePrinterSettingsTab extends StatefulWidget {
+  const _ConferencePrinterSettingsTab();
+
+  @override
+  State<_ConferencePrinterSettingsTab> createState() =>
+      __ConferencePrinterSettingsTabState();
+}
+
+class __ConferencePrinterSettingsTabState
+    extends State<_ConferencePrinterSettingsTab> {
+  List<Printer> _printers = [];
+  Printer? _selectedPrinter;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPrinters();
+  }
+
+  Future<void> _loadPrinters() async {
+    setState(() => _isLoading = true);
+    try {
+      final availablePrinters = await Printing.listPrinters();
+       if (!mounted) return;
+      final printerProvider = Provider.of<PrinterProvider>(context, listen: false);
+      setState(() {
+        _printers = availablePrinters;
+        _selectedPrinter = printerProvider.conferencePrinter != null 
+        ? availablePrinters.firstWhereOrNull((p) => p.url == printerProvider.conferencePrinter!.url)
+        : null;
+        _isLoading = false;
+      });
+    } catch (e) {
+       if (!mounted) return;
+       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro ao buscar impressoras: $e')));
+       setState(() => _isLoading = false);
+    }
+  }
+  
+  void _saveConferencePrinter() {
+    final printerProvider = Provider.of<PrinterProvider>(context, listen: false);
+    printerProvider.saveConferencePrinter(_selectedPrinter);
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      content: Text('Impressora de conferência salva!'),
+      backgroundColor: Colors.green,
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Impressora para Conferência', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 8),
+          const Text('Selecione a impressora que será usada para imprimir a conferência da mesa (conta do cliente). A impressão será feita diretamente, sem abrir a caixa de diálogo.'),
+          const SizedBox(height: 24),
+          DropdownButtonFormField<Printer>(
+            value: _selectedPrinter,
+            items: _printers.map<DropdownMenuItem<Printer>>((Printer printer) {
+              return DropdownMenuItem<Printer>(
+                value: printer,
+                child: Text(printer.name),
+              );
+            }).toList(),
+            onChanged: (Printer? newValue) {
+              setState(() {
+                _selectedPrinter = newValue;
+              });
+            },
+            decoration: const InputDecoration(
+              labelText: 'Selecione uma impressora',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const Spacer(),
+           SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _saveConferencePrinter,
+              style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16)),
+              child: const Text('Salvar'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ReceiptLayoutEditorTab extends StatefulWidget {
   const _ReceiptLayoutEditorTab();
 
@@ -289,6 +390,7 @@ class __ReceiptLayoutEditorTabState extends State<_ReceiptLayoutEditorTab> {
             id: 'teste-id',
             items: [
               app_data.CartItem(
+                  id: 'ci1',
                   product: app_data.Product(
                       id: '1',
                       name: 'Produto Teste 1',
@@ -299,21 +401,23 @@ class __ReceiptLayoutEditorTabState extends State<_ReceiptLayoutEditorTab> {
                       isSoldOut: false),
                   quantity: 2,
                   selectedAdicionais: [
-                     app_data.CartItemAdicional(
-                      adicional: app_data.Adicional(id: 'ad1', name: 'Bacon Extra', price: 3.0),
-                      quantity: 1
-                    )
+                    app_data.CartItemAdicional(
+                        adicional: app_data.Adicional(
+                            id: 'ad1', name: 'Bacon Extra', price: 3.0, displayOrder: 1),
+                        quantity: 1)
                   ]),
               app_data.CartItem(
-                  product: app_data.Product(
-                      id: '2',
-                      name: 'Produto Teste 2',
-                      price: 8.50,
-                      categoryId: 'cat1',
-                      categoryName: 'Exemplo',
-                      displayOrder: 2,
-                      isSoldOut: false),
-                  quantity: 1),
+                id: 'ci2',
+                product: app_data.Product(
+                    id: '2',
+                    name: 'Produto Teste 2',
+                    price: 8.50,
+                    categoryId: 'cat1',
+                    categoryName: 'Exemplo',
+                    displayOrder: 2,
+                    isSoldOut: false),
+                quantity: 1,
+              ),
             ],
             timestamp: DateTime.now(),
             status: 'completed',
@@ -339,6 +443,7 @@ class __ReceiptLayoutEditorTabState extends State<_ReceiptLayoutEditorTab> {
                 id: 'preview-id',
                 items: [
                   app_data.CartItem(
+                      id: 'pci1',
                       product: app_data.Product(
                           id: '1',
                           name: 'Produto Exemplo 1',
@@ -349,6 +454,7 @@ class __ReceiptLayoutEditorTabState extends State<_ReceiptLayoutEditorTab> {
                           isSoldOut: false),
                       quantity: 2),
                   app_data.CartItem(
+                      id: 'pci2',
                       product: app_data.Product(
                           id: '2',
                           name: 'Produto 2 com nome longo',
@@ -360,9 +466,9 @@ class __ReceiptLayoutEditorTabState extends State<_ReceiptLayoutEditorTab> {
                       quantity: 1,
                       selectedAdicionais: [
                         app_data.CartItemAdicional(
-                          adicional: app_data.Adicional(id: 'ad1', name: 'Molho Extra', price: 2.0),
-                          quantity: 2
-                        )
+                            adicional: app_data.Adicional(
+                                id: 'ad1', name: 'Molho Extra', price: 2.0, displayOrder: 1),
+                            quantity: 2)
                       ]),
                 ],
                 timestamp: DateTime.now(),
@@ -370,7 +476,7 @@ class __ReceiptLayoutEditorTabState extends State<_ReceiptLayoutEditorTab> {
                 type: 'mesa')
           ],
           tableNumber: 'XX',
-          totalAmount: 20.49,
+          totalAmount: 34.48,
           settings: settings,
         );
 
@@ -575,8 +681,8 @@ class __ReceiptLayoutEditorTabState extends State<_ReceiptLayoutEditorTab> {
               (newText) =>
                   _autoSaveSettings(settings.copyWith(subtitleText: newText)),
               settings.subtitleStyle,
-              (newStyle) =>
-                  _autoSaveSettings(settings.copyWith(subtitleStyle: newStyle)),
+              (newStyle) => _autoSaveSettings(
+                  settings.copyWith(subtitleStyle: newStyle)),
             ),
             _buildTextAndStyleEditor(
               'Endereço',
@@ -641,18 +747,33 @@ class __KitchenLayoutEditorTabState extends State<_KitchenLayoutEditorTab> {
     final pdfBytes = await PrintingService().getKitchenOrderPdfBytes(
       items: [
         app_data.CartItem(
-            product: app_data.Product(id: '1', name: 'Produto Teste 1', price: 10.0, categoryId: '1', categoryName: 'Bebidas', displayOrder: 1, isSoldOut: false),
+            id: 'ci1',
+            product: app_data.Product(
+                id: '1',
+                name: 'Produto Teste 1',
+                price: 10.0,
+                categoryId: '1',
+                categoryName: 'Bebidas',
+                displayOrder: 1,
+                isSoldOut: false),
             quantity: 2,
             selectedAdicionais: [
               app_data.CartItemAdicional(
-                adicional: app_data.Adicional(id: 'ad1', name: 'Gelo e Limão', price: 0.5),
-                quantity: 1
-              )
-            ]
-        ),
+                  adicional: app_data.Adicional(
+                      id: 'ad1', name: 'Gelo e Limão', price: 0.5, displayOrder: 1),
+                  quantity: 1)
+            ]),
         app_data.CartItem(
-            product: app_data.Product(id: '2', name: 'Produto Teste 2', price: 15.0, categoryId: '1', categoryName: 'Bebidas', displayOrder: 2, isSoldOut: false),
-            quantity: 1
+          id: 'ci2',
+          product: app_data.Product(
+              id: '2',
+              name: 'Produto Teste 2',
+              price: 15.0,
+              categoryId: '1',
+              categoryName: 'Bebidas',
+              displayOrder: 2,
+              isSoldOut: false),
+          quantity: 1,
         ),
       ],
       tableNumber: '99',
@@ -673,27 +794,44 @@ class __KitchenLayoutEditorTabState extends State<_KitchenLayoutEditorTab> {
         final previewWidget = PrintingService().buildKitchenOrderWidget(
           items: [
             app_data.CartItem(
-              product: app_data.Product(id: '1', name: 'Produto Exemplo 1', price: 10.0, categoryId: '1', categoryName: 'Bebidas', displayOrder: 1, isSoldOut: false),
-              quantity: 2,
-              selectedAdicionais: [
-                app_data.CartItemAdicional(
-                  adicional: app_data.Adicional(id: 'ad1', name: 'Bacon Extra', price: 3.0),
-                  quantity: 1
-                ),
-                app_data.CartItemAdicional(
-                  adicional: app_data.Adicional(id: 'ad2', name: 'Cheddar', price: 2.0),
-                  quantity: 2
-                )
-              ]
-            ),
+                id: 'pci1',
+                product: app_data.Product(
+                    id: '1',
+                    name: 'Produto Exemplo 1',
+                    price: 10.0,
+                    categoryId: '1',
+                    categoryName: 'Bebidas',
+                    displayOrder: 1,
+                    isSoldOut: false),
+                quantity: 2,
+                observacao: "Sem cebola",
+                selectedAdicionais: [
+                  app_data.CartItemAdicional(
+                      adicional: app_data.Adicional(
+                          id: 'ad1', name: 'Bacon Extra', price: 3.0, displayOrder: 1),
+                      quantity: 1),
+                  app_data.CartItemAdicional(
+                      adicional: app_data.Adicional(
+                          id: 'ad2', name: 'Cheddar', price: 2.0, displayOrder: 1),
+                      quantity: 2)
+                ]),
             app_data.CartItem(
-              product: app_data.Product(id: '2', name: 'Produto Exemplo 2', price: 15.0, categoryId: '1', categoryName: 'Bebidas', displayOrder: 2, isSoldOut: false),
-              quantity: 1
+              id: 'pci2',
+              product: app_data.Product(
+                  id: '2',
+                  name: 'Produto Exemplo 2',
+                  price: 15.0,
+                  categoryId: '1',
+                  categoryName: 'Bebidas',
+                  displayOrder: 2,
+                  isSoldOut: false),
+              quantity: 1,
             ),
           ],
           tableNumber: 'XX',
           orderId: 'preview-123',
           templateSettings: settings,
+          orderObservation: "Pedido para viagem.",
         );
 
         if (isWideScreen) {
@@ -764,8 +902,8 @@ class __KitchenLayoutEditorTabState extends State<_KitchenLayoutEditorTab> {
               (newText) =>
                   _autoSaveSettings(settings.copyWith(footerText: newText)),
               settings.footerStyle,
-              (newStyle) =>
-                  _autoSaveSettings(settings.copyWith(footerStyle: newStyle))),
+              (newStyle) => _autoSaveSettings(
+                  settings.copyWith(footerStyle: newStyle))),
           if (!(MediaQuery.of(context).size.width > 800))
             Padding(
               padding: const EdgeInsets.only(top: 24.0),

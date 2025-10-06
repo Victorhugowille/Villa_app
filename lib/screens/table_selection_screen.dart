@@ -24,11 +24,28 @@ class _TableSelectionScreenState extends State<TableSelectionScreen> {
     });
   }
 
+  Color _getTableColor(app_data.Table table, ThemeData theme) {
+    if (table.isPartiallyPaid) {
+      return Colors.amber.shade700;
+    }
+    if (table.isOccupied) {
+      return Colors.red.shade700;
+    }
+    return theme.cardColor;
+  }
+
+  Color _getForegroundColor(app_data.Table table, ThemeData theme) {
+    if (table.isOccupied || table.isPartiallyPaid) {
+      return Colors.white;
+    }
+    return theme.colorScheme.onSurface;
+  }
+
   void _handleTableTap(BuildContext context, app_data.Table table) {
     Provider.of<CartProvider>(context, listen: false).clearCart();
     final bool isDesktop = MediaQuery.of(context).size.width > 800;
 
-    if (table.isOccupied) {
+    if (table.isOccupied || table.isPartiallyPaid) {
       if (isDesktop) {
         _showDesktopOptions(context, table);
       } else {
@@ -144,7 +161,7 @@ class _TableSelectionScreenState extends State<TableSelectionScreen> {
       builder: (dialogCtx) => AlertDialog(
         title: const Text('Confirmar Ação'),
         content: const Text(
-            'Tem certeza que deseja limpar a mesa e apagar todos os pedidos abertos?'),
+            'Tem certeza que deseja limpar a mesa? Esta ação irá liberar a mesa e finalizar todos os pedidos em aberto.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogCtx),
@@ -229,11 +246,12 @@ class _TableSelectionScreenState extends State<TableSelectionScreen> {
             itemCount: tables.length,
             itemBuilder: (context, index) {
               final app_data.Table table = tables[index];
-              final bool isOccupied = table.isOccupied;
+              final Color backgroundColor = _getTableColor(table, theme);
+              final Color foregroundColor = _getForegroundColor(table, theme);
 
               return Card(
                 elevation: 4,
-                color: isOccupied ? Colors.red.shade700 : theme.cardColor,
+                color: backgroundColor,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -247,18 +265,14 @@ class _TableSelectionScreenState extends State<TableSelectionScreen> {
                         Icon(
                           Icons.table_restaurant,
                           size: 40,
-                          color: isOccupied
-                              ? Colors.white
-                              : theme.colorScheme.onSurface.withOpacity(0.7),
+                          color: foregroundColor.withOpacity(0.8),
                         ),
                         const SizedBox(height: 8),
                         Text(
                           'Mesa ${table.tableNumber}',
                           style: theme.textTheme.headlineSmall?.copyWith(
                             fontWeight: FontWeight.bold,
-                            color: isOccupied
-                                ? Colors.white
-                                : theme.colorScheme.onSurface,
+                            color: foregroundColor,
                           ),
                         ),
                       ],

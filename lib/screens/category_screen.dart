@@ -5,7 +5,7 @@ import 'package:villabistromobile/providers/cart_provider.dart';
 import 'package:villabistromobile/providers/navigation_provider.dart';
 import 'package:villabistromobile/providers/product_provider.dart';
 import 'package:villabistromobile/screens/cart_screen.dart';
-import 'package:villabistromobile/screens/product_selection_screen.dart';
+import 'package:villabistromobile/screens/product_selection_screen.dart' as pss;
 
 class CategoryScreen extends StatefulWidget {
   final app_data.Table table;
@@ -56,16 +56,18 @@ class _CategoryScreenState extends State<CategoryScreen> {
         if (!productProvider.isLoading && productProvider.categories.isEmpty) {
           return RefreshIndicator(
             onRefresh: _refreshData,
-            child: ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              children: [
-                SizedBox(
-                  height: MediaQuery.of(context).size.height * 0.7,
-                  child: const Center(
-                    child: Text("Nenhuma categoria encontrada."),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: SizedBox(
+                    height: constraints.maxHeight,
+                    child: const Center(
+                      child: Text("Nenhuma categoria encontrada."),
+                    ),
                   ),
-                ),
-              ],
+                );
+              },
             ),
           );
         }
@@ -93,7 +95,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
                 onTap: () {
                   navProvider.navigateTo(
                     context,
-                    ProductSelectionScreen(
+                    pss.ProductSelectionScreen(
                       table: widget.table,
                       category: category,
                       products: productsInCategory,
@@ -175,15 +177,16 @@ class _CategoryScreenState extends State<CategoryScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         navProvider.setScreenActions(appBarActions);
       });
-      return bodyContent;
-    } else {
-      return Scaffold(
-        appBar: AppBar(
-          title: Text(navProvider.currentTitle),
-          actions: appBarActions,
-        ),
-        body: bodyContent,
-      );
     }
+
+    return Scaffold(
+      appBar: isDesktop
+          ? null
+          : AppBar(
+              title: Text(navProvider.currentTitle),
+              actions: appBarActions,
+            ),
+      body: bodyContent,
+    );
   }
 }

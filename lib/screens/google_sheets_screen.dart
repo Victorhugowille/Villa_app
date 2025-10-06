@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:webview_flutter/webview_flutter.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 class GoogleSheetsScreen extends StatefulWidget {
   const GoogleSheetsScreen({super.key});
@@ -9,21 +9,47 @@ class GoogleSheetsScreen extends StatefulWidget {
 }
 
 class _GoogleSheetsScreenState extends State<GoogleSheetsScreen> {
-  late final WebViewController _controller;
+  final GlobalKey webViewKey = GlobalKey();
+  InAppWebViewController? webViewController;
+  bool isLoading = true;
 
-  @override
-  void initState() {
-    super.initState();
-    _controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(const Color(0x00000000))
-      ..loadRequest(Uri.parse('https://docs.google.com/spreadsheets/'));
-  }
+  final initialUrl = "https://docs.google.com/spreadsheets/";
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: WebViewWidget(controller: _controller),
+      body: Stack(
+        children: [
+          InAppWebView(
+            key: webViewKey,
+            initialUrlRequest: URLRequest(url: WebUri(initialUrl)),
+            onWebViewCreated: (controller) {
+              webViewController = controller;
+            },
+            onLoadStart: (controller, url) {
+              setState(() {
+                isLoading = true;
+              });
+            },
+            onLoadStop: (controller, url) {
+              setState(() {
+                isLoading = false;
+              });
+            },
+            onProgressChanged: (controller, progress) {
+              if (progress == 100) {
+                setState(() {
+                  isLoading = false;
+                });
+              }
+            },
+          ),
+          if (isLoading)
+            const Center(
+              child: CircularProgressIndicator(),
+            ),
+        ],
+      ),
     );
   }
 }

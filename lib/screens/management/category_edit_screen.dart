@@ -50,15 +50,23 @@ class _CategoryEditScreenState extends State<CategoryEditScreen> {
 
     setState(() => _isLoading = true);
     final productProvider = Provider.of<ProductProvider>(context, listen: false);
+    final navProvider = Provider.of<NavigationProvider>(context, listen: false);
 
     try {
       if (_isEditMode) {
         await productProvider.updateCategory(widget.category!.id, _name, _icon);
       } else {
-        await productProvider.addCategory(_name, _icon);
+        await productProvider.addCategory(_name, _icon,);
       }
       if (mounted) {
-        Navigator.of(context).pop(); // Apenas fecha a tela
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                'Categoria "${_name}" salva com sucesso!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        navProvider.pop();
       }
     } catch (e) {
       if (mounted) {
@@ -139,19 +147,20 @@ class _CategoryEditScreenState extends State<CategoryEditScreen> {
               ),
             ),
             const SizedBox(height: 40),
-            ElevatedButton(
-              onPressed: _isLoading ? null : _saveForm,
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 12),
+            if (!isDesktop)
+              ElevatedButton(
+                onPressed: _isLoading ? null : _saveForm,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                child: _isLoading
+                    ? const SizedBox(
+                        height: 24,
+                        width: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(_isEditMode ? 'Salvar Alterações' : 'Criar Categoria'),
               ),
-              child: _isLoading
-                  ? const SizedBox(
-                      height: 24,
-                      width: 24,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Text(_isEditMode ? 'Salvar Alterações' : 'Criar Categoria'),
-            ),
           ],
         ),
       ),

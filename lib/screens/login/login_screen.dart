@@ -20,7 +20,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool _isLoading = false;
   bool _isCheckingCnpj = false;
-  bool _rememberMe = false;
   bool _acceptedPrivacy = false;
 
   String _companyName = '';

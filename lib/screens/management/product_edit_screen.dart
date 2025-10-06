@@ -1,3 +1,4 @@
+// lib/screens/management/product_edit_screen.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -48,7 +49,6 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
       _categoryId = null;
       _isSoldOut = false;
     }
-    // Usamos addPostFrameCallback para garantir que o context esteja disponível
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadInitialData();
     });
@@ -57,39 +57,36 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
   Future<void> _loadInitialData() async {
     if (!mounted) return;
     setState(() => _isLoading = true);
-    final productProvider = Provider.of<ProductProvider>(context, listen: false);
+    final productProvider =
+        Provider.of<ProductProvider>(context, listen: false);
 
-    // Força a busca por novos dados para garantir que a lista de categorias está atualizada
     await productProvider.fetchData();
-    
+
     if (!mounted) return;
     _availableCategories = productProvider.categories;
 
-    // Se não há categorias, não há como continuar
     if (_availableCategories.isEmpty && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Nenhuma categoria cadastrada. Crie uma categoria primeiro.'),
+        content:
+            Text('Nenhuma categoria cadastrada. Crie uma categoria primeiro.'),
         backgroundColor: Colors.red,
       ));
       Navigator.of(context).pop();
       return;
     }
 
-    // Valida se a categoria do produto que estamos editando ainda existe
     if (_isEditMode) {
-      final categoryExists = _availableCategories.any((c) => c.id == _categoryId);
+      final categoryExists =
+          _availableCategories.any((c) => c.id == _categoryId);
       if (!categoryExists) {
-        // Se não existe, define a primeira categoria da lista como padrão
         _categoryId = _availableCategories.first.id;
       }
     } else {
-      // Se for um novo produto, seleciona a primeira categoria por padrão
       if (_categoryId == null && _availableCategories.isNotEmpty) {
         _categoryId = _availableCategories.first.id;
       }
     }
 
-    // Carrega os grupos de adicionais apenas se estiver editando um produto existente
     if (_isEditMode) {
       _gruposDeAdicionais = await productProvider
           .getGruposAdicionaisParaProduto(_currentProduct!.id);
@@ -101,7 +98,8 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
   }
 
   Future<XFile?> _pickImageFromGallery() async {
-    return await _picker.pickImage(source: ImageSource.gallery, imageQuality: 50);
+    return await _picker.pickImage(
+        source: ImageSource.gallery, imageQuality: 50);
   }
 
   void _saveForm() async {
@@ -115,7 +113,8 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
     _formKey.currentState!.save();
 
     setState(() => _isSaving = true);
-    final productProvider = Provider.of<ProductProvider>(context, listen: false);
+    final productProvider =
+        Provider.of<ProductProvider>(context, listen: false);
     final navProvider = Provider.of<NavigationProvider>(context, listen: false);
     final isMobile = MediaQuery.of(context).size.width <= 800;
 
@@ -123,36 +122,38 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
       if (_isEditMode) {
         await productProvider.updateProduct(_currentProduct!.id, _name, _price,
             _categoryId!, _isSoldOut, _imageFile);
-        
-        // Em modo de edição, apenas voltamos para a tela anterior
+
         if (!mounted) return;
         isMobile ? Navigator.of(context).pop() : navProvider.pop();
-
       } else {
-        final productsInCategory =
-            productProvider.products.where((p) => p.categoryId == _categoryId!).length;
-        final newProductId = await productProvider.addProduct(
-            _name, _price, _categoryId!, productsInCategory, _isSoldOut, _imageFile);
-        
-        await productProvider.fetchData(); // Atualiza a lista para encontrar o novo produto
-        
+        final productsInCategory = productProvider.products
+            .where((p) => p.categoryId == _categoryId!)
+            .length;
+
+        // CORREÇÃO AQUI
+        final newProductId = await productProvider.addProduct(_name, _price,
+            _categoryId!, productsInCategory, _isSoldOut, _imageFile);
+
+        await productProvider
+            .fetchData(); 
+
         if (!mounted) return;
-        final newProduct = productProvider.products.firstWhere((p) => p.id == newProductId);
-        
-        // Em modo de criação, transforma a tela em modo de edição para o produto recém-criado
+        final newProduct =
+            productProvider.products.firstWhere((p) => p.id == newProductId);
+
         setState(() {
           _currentProduct = newProduct;
           _gruposDeAdicionais = [];
         });
-        
+
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content: Text('Produto criado! Agora você pode adicionar grupos.'),
             backgroundColor: Colors.green));
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Erro ao salvar produto: ${e.toString()}')));
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao salvar produto: ${e.toString()}')));
     } finally {
       if (mounted) {
         setState(() => _isSaving = false);
@@ -193,15 +194,15 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
       isMobile ? Navigator.of(context).pop() : navProvider.pop();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Erro ao apagar: ${e.toString()}')));
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao apagar: ${e.toString()}')));
     } finally {
       if (mounted) {
         setState(() => _isSaving = false);
       }
     }
   }
-  
+
   void _registerActions() {
     if (!mounted) return;
     final navProvider = Provider.of<NavigationProvider>(context, listen: false);
@@ -216,7 +217,9 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
         const Padding(
           padding: EdgeInsets.all(12.0),
           child: SizedBox(
-              width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)),
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(strokeWidth: 2)),
         )
       else
         IconButton(
@@ -244,7 +247,8 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
                 TextFormField(
                   initialValue: _name,
                   enabled: !_isSaving,
-                  decoration: const InputDecoration(labelText: 'Nome do Produto'),
+                  decoration:
+                      const InputDecoration(labelText: 'Nome do Produto'),
                   validator: (v) =>
                       (v == null || v.isEmpty) ? 'Insira um nome.' : null,
                   onSaved: (v) => _name = v!,
@@ -253,22 +257,24 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
                   initialValue: _price > 0 ? _price.toStringAsFixed(2) : '',
                   enabled: !_isSaving,
                   decoration: const InputDecoration(labelText: 'Preço'),
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true),
                   validator: (v) => (v == null ||
                           v.isEmpty ||
                           double.tryParse(v.replaceAll(',', '.')) == null)
                       ? 'Insira um preço válido.'
                       : null,
-                  onSaved: (v) => _price = double.parse(v!.replaceAll(',', '.')),
+                  onSaved: (v) =>
+                      _price = double.parse(v!.replaceAll(',', '.')),
                 ),
                 DropdownButtonFormField<String>(
                   value: _categoryId,
                   items: _availableCategories
-                      .map((c) =>
-                          DropdownMenuItem<String>(value: c.id, child: Text(c.name)))
+                      .map((c) => DropdownMenuItem<String>(
+                          value: c.id, child: Text(c.name)))
                       .toList(),
-                  onChanged: _isSaving ? null : (v) => setState(() => _categoryId = v),
+                  onChanged:
+                      _isSaving ? null : (v) => setState(() => _categoryId = v),
                   validator: (v) =>
                       (v == null) ? 'Selecione uma categoria.' : null,
                   decoration: const InputDecoration(labelText: 'Categoria'),
@@ -277,8 +283,9 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
                 SwitchListTile(
                   title: const Text('Produto Esgotado'),
                   value: _isSoldOut,
-                  onChanged:
-                      _isSaving ? null : (value) => setState(() => _isSoldOut = value),
+                  onChanged: _isSaving
+                      ? null
+                      : (value) => setState(() => _isSoldOut = value),
                   activeColor: theme.primaryColor,
                 ),
                 const SizedBox(height: 24),
@@ -358,30 +365,40 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: nameController,
-                      decoration: const InputDecoration(labelText: 'Nome do Grupo (Ex: "Escolha o molho")'),
+                      decoration: const InputDecoration(
+                          labelText: 'Nome do Grupo (Ex: "Escolha o molho")'),
                     ),
                   ],
                 ),
               ),
               actions: [
-                TextButton(onPressed: () => Navigator.of(stfContext).pop(), child: const Text('Cancelar')),
+                TextButton(
+                    onPressed: () => Navigator.of(stfContext).pop(),
+                    child: const Text('Cancelar')),
                 ElevatedButton(
                   onPressed: () async {
                     if (nameController.text.isEmpty) return;
-                    
+
                     final navigator = Navigator.of(stfContext);
-                    
+
                     try {
-                      final productProvider = Provider.of<ProductProvider>(context, listen: false);
-                      if(isEditing) {
-                        await productProvider.updateGrupoAdicional(grupo.id, nameController.text, dialogImageFile);
+                      final productProvider =
+                          Provider.of<ProductProvider>(context, listen: false);
+                      if (isEditing) {
+                        await productProvider.updateGrupoAdicional(
+                            grupo.id, nameController.text, dialogImageFile);
                       } else {
-                        await productProvider.addGrupoAdicional(nameController.text, _currentProduct!.id, dialogImageFile);
+                        await productProvider.addGrupoAdicional(
+                            nameController.text,
+                            _currentProduct!.id,
+                            dialogImageFile);
                       }
                       await _loadInitialData();
                       navigator.pop();
                     } catch (e) {
-                        if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro: ${e.toString()}')));
+                      if (mounted)
+                        ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Erro: ${e.toString()}')));
                     }
                   },
                   child: const Text('Salvar'),
@@ -393,11 +410,13 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
       },
     );
   }
-  
+
   void _showAdicionalDialog({Adicional? adicional, required String grupoId}) {
     final isEditing = adicional != null;
     final nameController = TextEditingController(text: adicional?.name ?? '');
-    final priceController = TextEditingController(text: adicional != null ? adicional.price.toStringAsFixed(2) : '');
+    final priceController = TextEditingController(
+        text:
+            adicional != null ? adicional.price.toStringAsFixed(2) : '');
     final formKey = GlobalKey<FormState>();
     XFile? dialogImageFile;
     String? existingImageUrl = adicional?.imageUrl;
@@ -405,7 +424,7 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
     showDialog(
       context: context,
       builder: (ctx) {
-          return StatefulBuilder(
+        return StatefulBuilder(
           builder: (stfContext, setDialogState) {
             return AlertDialog(
               title: Text(isEditing ? 'Editar Adicional' : 'Novo Adicional'),
@@ -415,63 +434,84 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                        _buildDialogImagePicker(
-                          existingImageUrl: existingImageUrl,
-                          pickedFile: dialogImageFile,
-                          onPickImage: () async {
-                            final file = await _pickImageFromGallery();
-                            if (file != null) {
-                              setDialogState(() => dialogImageFile = file);
-                            }
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: nameController,
-                          decoration: const InputDecoration(labelText: 'Nome'),
-                          validator: (v) => v == null || v.isEmpty ? 'Insira um nome' : null,
-                        ),
-                        TextFormField(
-                          controller: priceController,
-                          decoration: const InputDecoration(labelText: 'Preço (0 para sem custo)'),
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          validator: (v) => (v == null || v.isEmpty || double.tryParse(v.replaceAll(',', '.')) == null) ? 'Preço inválido' : null,
-                        ),
+                      _buildDialogImagePicker(
+                        existingImageUrl: existingImageUrl,
+                        pickedFile: dialogImageFile,
+                        onPickImage: () async {
+                          final file = await _pickImageFromGallery();
+                          if (file != null) {
+                            setDialogState(() => dialogImageFile = file);
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: nameController,
+                        decoration: const InputDecoration(labelText: 'Nome'),
+                        validator: (v) =>
+                            v == null || v.isEmpty ? 'Insira um nome' : null,
+                      ),
+                      TextFormField(
+                        controller: priceController,
+                        decoration: const InputDecoration(
+                            labelText: 'Preço (0 para sem custo)'),
+                        keyboardType:
+                            const TextInputType.numberWithOptions(decimal: true),
+                        validator: (v) => (v == null ||
+                                v.isEmpty ||
+                                double.tryParse(v.replaceAll(',', '.')) ==
+                                    null)
+                            ? 'Preço inválido'
+                            : null,
+                      ),
                     ],
                   ),
                 ),
               ),
               actions: [
-                TextButton(onPressed: () => Navigator.of(stfContext).pop(), child: const Text('Cancelar')),
+                TextButton(
+                    onPressed: () => Navigator.of(stfContext).pop(),
+                    child: const Text('Cancelar')),
                 ElevatedButton(
                   onPressed: () async {
                     if (!formKey.currentState!.validate()) return;
 
                     final name = nameController.text;
-                    final price = double.parse(priceController.text.replaceAll(',', '.'));
+                    final price =
+                        double.parse(priceController.text.replaceAll(',', '.'));
                     final navigator = Navigator.of(stfContext);
 
                     try {
-                      final productProvider = Provider.of<ProductProvider>(context, listen: false);
+                      final productProvider =
+                          Provider.of<ProductProvider>(context, listen: false);
                       if (isEditing) {
-                        await productProvider.updateAdicional(id: adicional.id, name: name, price: price, imageFile: dialogImageFile);
+                        await productProvider.updateAdicional(
+                            id: adicional.id,
+                            name: name,
+                            price: price,
+                            imageFile: dialogImageFile);
                       } else {
-                        await productProvider.addAdicionalToGrupo(name: name, price: price, grupoId: grupoId, imageFile: dialogImageFile);
+                        await productProvider.addAdicionalToGrupo(
+                            name: name,
+                            price: price,
+                            grupoId: grupoId,
+                            imageFile: dialogImageFile);
                       }
-                      await _loadInitialData(); 
+                      await _loadInitialData();
                       navigator.pop();
                     } catch (e) {
                       if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro: ${e.toString()}')));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Erro: ${e.toString()}')));
                       }
                     }
-                  }, 
+                  },
                   child: const Text('Salvar'),
                 ),
               ],
             );
           },
-          );
+        );
       },
     );
   }
@@ -484,7 +524,8 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text('Grupos de Adicionais', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text('Grupos de Adicionais',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             if (_isEditMode)
               IconButton(
                 icon: const Icon(Icons.add_circle),
@@ -502,7 +543,10 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
         if (_isEditMode && _gruposDeAdicionais.isEmpty)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 16.0),
-            child: Text('Nenhum grupo de adicionais cadastrado.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
+            child: Text(
+                'Nenhum grupo de adicionais cadastrado.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey)),
           )
         else
           ListView.builder(
@@ -517,47 +561,77 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
                 elevation: 2,
                 child: ExpansionTile(
                   leading: CircleAvatar(
-                    backgroundImage: (grupo.imageUrl != null ? NetworkImage(grupo.imageUrl!) : null) as ImageProvider?,
-                    child: grupo.imageUrl == null ? const Icon(Icons.layers) : null,
+                    backgroundImage: (grupo.imageUrl != null
+                        ? NetworkImage(grupo.imageUrl!)
+                        : null) as ImageProvider?,
+                    child:
+                        grupo.imageUrl == null ? const Icon(Icons.layers) : null,
                   ),
-                  title: Text(grupo.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                  title: Text(grupo.name,
+                      style: const TextStyle(fontWeight: FontWeight.w600)),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      IconButton(icon: const Icon(Icons.edit, size: 20, color: Colors.blueGrey), onPressed: () => _showGrupoDialog(grupo: grupo)),
-                      IconButton(icon: const Icon(Icons.delete, size: 20, color: Colors.redAccent), onPressed: () async {
-                        await Provider.of<ProductProvider>(context, listen: false).deleteGrupoAdicional(grupo.id);
-                        await _loadInitialData();
-                      }),
+                      IconButton(
+                          icon: const Icon(Icons.edit,
+                              size: 20, color: Colors.blueGrey),
+                          onPressed: () => _showGrupoDialog(grupo: grupo)),
+                      IconButton(
+                          icon: const Icon(Icons.delete,
+                              size: 20, color: Colors.redAccent),
+                          onPressed: () async {
+                            await Provider.of<ProductProvider>(context,
+                                    listen: false)
+                                .deleteGrupoAdicional(grupo.id);
+                            await _loadInitialData();
+                          }),
                     ],
                   ),
                   children: [
-                    ...grupo.adicionais.map((adicional) => ListTile(
-                      leading: CircleAvatar(
-                        backgroundImage: (adicional.imageUrl != null ? NetworkImage(adicional.imageUrl!) : null) as ImageProvider?,
-                          child: adicional.imageUrl == null ? const Icon(Icons.add, size: 20) : null,
-                      ),
-                      title: Text(adicional.name),
-                      subtitle: Text('R\$ ${adicional.price.toStringAsFixed(2)}'),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(icon: const Icon(Icons.edit, size: 18), onPressed: () => _showAdicionalDialog(adicional: adicional, grupoId: grupo.id)),
-                          IconButton(icon: const Icon(Icons.delete, size: 18), onPressed: () async {
-                              await Provider.of<ProductProvider>(context, listen: false).deleteAdicional(adicional.id);
-                              await _loadInitialData();
-                          }),
-                        ],
-                      ),
-                    )).toList(),
+                    ...grupo.adicionais
+                        .map((adicional) => ListTile(
+                              leading: CircleAvatar(
+                                backgroundImage: (adicional.imageUrl != null
+                                    ? NetworkImage(adicional.imageUrl!)
+                                    : null) as ImageProvider?,
+                                child: adicional.imageUrl == null
+                                    ? const Icon(Icons.add, size: 20)
+                                    : null,
+                              ),
+                              title: Text(adicional.name),
+                              subtitle: Text(
+                                  'R\$ ${adicional.price.toStringAsFixed(2)}'),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                      icon: const Icon(Icons.edit, size: 18),
+                                      onPressed: () => _showAdicionalDialog(
+                                          adicional: adicional,
+                                          grupoId: grupo.id)),
+                                  IconButton(
+                                      icon: const Icon(Icons.delete, size: 18),
+                                      onPressed: () async {
+                                        await Provider.of<ProductProvider>(
+                                                context,
+                                                listen: false)
+                                            .deleteAdicional(adicional.id);
+                                        await _loadInitialData();
+                                      }),
+                                ],
+                              ),
+                            ))
+                        .toList(),
                     Padding(
-                      padding: const EdgeInsets.only(right: 16.0, bottom: 8.0, top: 8.0),
+                      padding: const EdgeInsets.only(
+                          right: 16.0, bottom: 8.0, top: 8.0),
                       child: Align(
                         alignment: Alignment.centerRight,
                         child: TextButton.icon(
                           icon: const Icon(Icons.add_circle_outline),
                           label: const Text('Adicionar Item'),
-                          onPressed: () => _showAdicionalDialog(grupoId: grupo.id),
+                          onPressed: () =>
+                              _showAdicionalDialog(grupoId: grupo.id),
                         ),
                       ),
                     ),
@@ -593,7 +667,8 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
               backgroundColor: theme.primaryColor.withOpacity(0.1),
               backgroundImage: backgroundImage,
               child: backgroundImage == null
-                  ? Icon(Icons.fastfood, size: 80, color: theme.primaryColor.withOpacity(0.5))
+                  ? Icon(Icons.fastfood,
+                      size: 80, color: theme.primaryColor.withOpacity(0.5))
                   : null,
             ),
             Positioned(
@@ -601,7 +676,8 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
               right: 0,
               child: CircleAvatar(
                 backgroundColor: theme.primaryColor,
-                child: Icon(Icons.camera_alt, color: theme.colorScheme.onPrimary),
+                child:
+                    Icon(Icons.camera_alt, color: theme.colorScheme.onPrimary),
               ),
             ),
           ],
@@ -610,7 +686,10 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
     );
   }
 
-  Widget _buildDialogImagePicker({String? existingImageUrl, XFile? pickedFile, required VoidCallback onPickImage}) {
+  Widget _buildDialogImagePicker(
+      {String? existingImageUrl,
+      XFile? pickedFile,
+      required VoidCallback onPickImage}) {
     final theme = Theme.of(context);
     ImageProvider? image;
     if (pickedFile != null) {
@@ -625,7 +704,9 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
         radius: 40,
         backgroundColor: theme.primaryColor.withOpacity(0.1),
         backgroundImage: image,
-        child: image == null ? Icon(Icons.add_a_photo, color: theme.primaryColor) : const Icon(Icons.edit, color: Colors.white70),
+        child: image == null
+            ? Icon(Icons.add_a_photo, color: theme.primaryColor)
+            : const Icon(Icons.edit, color: Colors.white70),
       ),
     );
   }

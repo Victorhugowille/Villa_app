@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-
 class AuthProvider with ChangeNotifier {
   final SupabaseClient _supabase = Supabase.instance.client;
   User? _user;
@@ -16,38 +15,61 @@ class AuthProvider with ChangeNotifier {
     _initialize();
   }
 
-  Future<void> _initialize() async {
-    _user = _supabase.auth.currentUser;
-    if (_user != null) {
-      await _loadUserProfile();
-    }
+  void _initialize() {
+    _handleUserChange(_supabase.auth.currentUser);
     _isLoading = false;
     notifyListeners();
 
     _supabase.auth.onAuthStateChange.listen((data) {
-      _user = data.session?.user;
-      if (_user != null) {
-        _loadUserProfile();
-      } else {
-        _companyId = null;
-        notifyListeners();
-      }
+      _handleUserChange(data.session?.user);
     });
   }
 
-  Future<void> _loadUserProfile() async {
-    if (_user == null) return;
-    try {
-      final response = await _supabase
-          .from('profiles')
-          .select('company_id')
-          .eq('user_id', _user!.id)
-          .single();
-      _companyId = response['company_id'] as String?;
-    } catch (e) {
-      debugPrint("AuthProvider - Erro ao carregar perfil: $e");
+  void _handleUserChange(User? user) {
+    _user = user;
+    if (_user != null && _user!.appMetadata.containsKey('company_id')) {
+      _companyId = _user!.appMetadata['company_id'] as String?;
+    } else {
       _companyId = null;
     }
     notifyListeners();
+  }
+
+  Future<void> signUp({
+    required String email,
+    required String password,
+    required String companyId,
+    String? fullName,
+  }) async {
+    final authResponse = await _supabase.auth.signUp(
+      email: email,
+      password: password,
+      data: {
+        'company_id': companyId,
+        if (fullName != null) 'full_name': fullName,
+      },
+    );
+
+    if (authResponse.user != null) {
+      await _supabase.from('profiles').insert({
+        'user_id': authResponse.user!.id,
+        'company_id': companyId,
+        'full_name': fullName,
+      });
+    }
+  }
+
+  Future<void> signIn({
+    required String email,
+    required String password,
+  }) async {
+    await _supabase.auth.signInWithPassword(
+      email: email,
+      password: password,
+    );
+  }
+
+  Future<void> signOut() async {
+    await _supabase.auth.signOut();
   }
 }
