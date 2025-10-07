@@ -3,10 +3,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AuthProvider with ChangeNotifier {
   final SupabaseClient _supabase = Supabase.instance.client;
-
-  // IMPORTANTE: Troque pelo ID da sua empresa de demonstração no Supabase
-  static const String GUEST_COMPANY_ID = 'coloque-aqui-o-uuid-da-sua-empresa-demo';
-
   User? _user;
   String? _companyId;
   bool _isLoading = true;
@@ -14,7 +10,6 @@ class AuthProvider with ChangeNotifier {
   User? get user => _user;
   String? get companyId => _companyId;
   bool get isLoading => _isLoading;
-  bool get isGuest => _user == null;
 
   AuthProvider() {
     _initialize();
@@ -35,7 +30,7 @@ class AuthProvider with ChangeNotifier {
     if (_user != null && _user!.appMetadata.containsKey('company_id')) {
       _companyId = _user!.appMetadata['company_id'] as String?;
     } else {
-      _companyId = GUEST_COMPANY_ID;
+      _companyId = null;
     }
     notifyListeners();
   }

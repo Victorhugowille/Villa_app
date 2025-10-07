@@ -86,6 +86,13 @@ class _CategoryPrinterSettingsTabState
   Future<void> _loadInitialData() async {
     if (!mounted) return;
     setState(() => _isLoadingPrinters = true);
+
+    // Garante que as categorias sejam buscadas se ainda não estiverem carregadas
+    final productProvider = Provider.of<ProductProvider>(context, listen: false);
+    if (productProvider.categories.isEmpty) {
+      await productProvider.fetchData();
+    }
+    
     try {
       final loadedPrinters = await Printing.listPrinters();
       final uniquePrintersByName = <String, Printer>{};
@@ -284,7 +291,7 @@ class __ConferencePrinterSettingsTabState
     setState(() => _isLoading = true);
     try {
       final availablePrinters = await Printing.listPrinters();
-       if (!mounted) return;
+      if (!mounted) return;
       final printerProvider = Provider.of<PrinterProvider>(context, listen: false);
       setState(() {
         _printers = availablePrinters;
@@ -294,9 +301,9 @@ class __ConferencePrinterSettingsTabState
         _isLoading = false;
       });
     } catch (e) {
-       if (!mounted) return;
-       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro ao buscar impressoras: $e')));
-       setState(() => _isLoading = false);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro ao buscar impressoras: $e')));
+      setState(() => _isLoading = false);
     }
   }
   
@@ -343,7 +350,7 @@ class __ConferencePrinterSettingsTabState
             ),
           ),
           const Spacer(),
-           SizedBox(
+            SizedBox(
             width: double.infinity,
             child: ElevatedButton(
               onPressed: _saveConferencePrinter,
