@@ -1,4 +1,3 @@
-// lib/widgets/product_list.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:villabistromobile/data/app_data.dart';
@@ -30,39 +29,43 @@ class _ProductListState extends State<ProductList> {
 
   void _syncLocalList() {
     final productProvider = Provider.of<ProductProvider>(context, listen: false);
-    setState(() {
-      _localProducts = List<Product>.from(productProvider.products);
-    });
+    if (mounted) {
+      setState(() {
+        _localProducts = List<Product>.from(productProvider.products);
+      });
+    }
   }
 
-  Future<void> _handleReorder(int oldIndex, int newIndex, List<Product> productsInCategory, Category category, List<Category> allCategories) async {
+  Future<void> _handleReorder(int oldIndex, int newIndex,
+      List<Product> productsInCategory, Category category) async {
     if (_isSavingOrder) return;
+
+    final productProvider =
+        Provider.of<ProductProvider>(context, listen: false);
 
     setState(() {
       _isSavingOrder = true;
+
       if (newIndex > oldIndex) {
         newIndex -= 1;
       }
-      
-      final reorderedCategoryProducts = List<Product>.from(productsInCategory);
-      final movedProduct = reorderedCategoryProducts.removeAt(oldIndex);
-      reorderedCategoryProducts.insert(newIndex, movedProduct);
+      final movedProduct = productsInCategory.removeAt(oldIndex);
+      productsInCategory.insert(newIndex, movedProduct);
 
-      final List<Product> newFullList = [];
-      for (var cat in allCategories) {
+      final List<Product> updatedFullList = [];
+      for (final cat in productProvider.categories) {
         if (cat.id == category.id) {
-          newFullList.addAll(reorderedCategoryProducts);
+          updatedFullList.addAll(productsInCategory);
         } else {
-          newFullList.addAll(_localProducts.where((p) => p.categoryId == cat.id));
+          updatedFullList
+              .addAll(_localProducts.where((p) => p.categoryId == cat.id));
         }
       }
-      
-      _localProducts = newFullList;
+      _localProducts = updatedFullList;
     });
 
     try {
-      await Provider.of<ProductProvider>(context, listen: false)
-          .updateProductOrder(_localProducts);
+      await productProvider.updateProductOrder(productsInCategory);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('Ordem salva com sucesso!'),
@@ -76,7 +79,7 @@ class _ProductListState extends State<ProductList> {
           content: Text('Erro ao salvar ordem: ${e.toString()}'),
           backgroundColor: Colors.red,
         ));
-        _syncLocalList(); // Reverte a ordem em caso de erro
+        _syncLocalList();
       }
     } finally {
       if (mounted) {
@@ -92,7 +95,8 @@ class _ProductListState extends State<ProductList> {
     final theme = Theme.of(context);
     final productProvider = context.watch<ProductProvider>();
 
-    if (productProvider.products.length != _localProducts.length && !_isSavingOrder) {
+    if (productProvider.products.length != _localProducts.length &&
+        !_isSavingOrder) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _syncLocalList());
     }
 
@@ -109,7 +113,7 @@ class _ProductListState extends State<ProductList> {
 
     return Column(
       children: [
-        if (_isSavingOrder) 
+        if (_isSavingOrder)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 8.0),
             child: LinearProgressIndicator(),
@@ -143,6 +147,7 @@ class _ProductListState extends State<ProductList> {
                     ),
                   ),
                   ReorderableListView.builder(
+                    buildDefaultDragHandles: false,
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: productsInCategory.length,
@@ -162,7 +167,7 @@ class _ProductListState extends State<ProductList> {
                         ),
                         child: ListTile(
                           contentPadding: const EdgeInsets.only(
-                              left: 16, top: 8, bottom: 8, right: 0),
+                              left: 16, top: 8, bottom: 8, right: 8),
                           leading: CircleAvatar(
                             radius: 28,
                             backgroundColor: Colors.grey.shade200,
@@ -170,7 +175,8 @@ class _ProductListState extends State<ProductList> {
                                 ? NetworkImage(item.imageUrl!)
                                 : null,
                             child: item.imageUrl == null
-                                ? const Icon(Icons.fastfood, color: Colors.grey)
+                                ? const Icon(Icons.fastfood,
+                                    color: Colors.grey)
                                 : null,
                           ),
                           title: Text(item.name,
@@ -179,26 +185,65 @@ class _ProductListState extends State<ProductList> {
                           subtitle:
                               Text('R\$ ${item.price.toStringAsFixed(2)}'),
                           onTap: () => widget.onProductSelected(item),
-                          tileColor:
-                              isSelected ? theme.primaryColor.withOpacity(0.1) : null,
+                          tileColor: isSelected
+                              ? theme.primaryColor.withOpacity(0.1)
+                              : null,
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12)),
-                          trailing: ReorderableDragStartListener(
-                            index: itemIndex,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 12),
-                              child: const Icon(
-                                Icons.drag_indicator,
-                                color: Colors.grey,
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.copy_outlined,
+                                    color: Colors.blue),
+                                tooltip: 'Duplicar Produto',
+                                onPressed: () async {
+                                  try {
+                                    await Provider.of<ProductProvider>(context,
+                                            listen: false)
+                                        .duplicateProduct(item.id);
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                              'Produto duplicado com sucesso!'),
+                                          backgroundColor: Colors.green,
+                                        ),
+                                      );
+                                    }
+                                  } catch (e) {
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                              'Erro ao duplicar: ${e.toString()}'),
+                                          backgroundColor: Colors.red,
+                                        ),
+                                      );
+                                    }
+                                  }
+                                },
                               ),
-                            ),
+                              ReorderableDragStartListener(
+                                index: itemIndex,
+                                child: const Padding(
+                                  padding: EdgeInsets.all(8.0),
+                                  child: Icon(
+                                    Icons.drag_indicator,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       );
                     },
                     onReorder: (oldIndex, newIndex) {
-                      _handleReorder(oldIndex, newIndex, productsInCategory, category, categories);
+                      _handleReorder(
+                          oldIndex, newIndex, productsInCategory, category);
                     },
                   ),
                 ],

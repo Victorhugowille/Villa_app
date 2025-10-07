@@ -1,4 +1,3 @@
-// lib/providers/kds_provider.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -75,11 +74,14 @@ class KdsProvider with ChangeNotifier {
     final companyId = _getCompanyId();
     if (companyId == null) return;
 
-    _isLoading = true;
+    if (_allOrders.isEmpty) {
+      _isLoading = true;
+    }
+    
     try {
       final response = await _supabase
           .from('pedidos')
-          .select('*, mesa_id(id, numero), itens_pedido(*, produtos(*))')
+          .select('*, mesas(id, numero), itens_pedido(*, produtos(*))')
           .eq('company_id', companyId)
           .inFilter('status', ['awaiting_print', 'production', 'ready']);
 

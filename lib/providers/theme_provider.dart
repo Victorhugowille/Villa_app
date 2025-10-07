@@ -26,6 +26,56 @@ class AppColorPalette {
 class AppThemes {
   static const palettes = [
     AppColorPalette(
+      name: 'Vinho e Ouro',
+      primary: Color(0xFFC09553), // Ouro envelhecido
+      onPrimary: Colors.black,
+      secondary: Color(0xFFF5F5DC), // Bege
+      background: Color(0xFF2B2B2B), // Carvão escuro
+      onBackground: Color(0xFFEAEAEA),
+      surface: Color(0xFF3D3D3D), // Grafite
+      onSurface: Color(0xFFEAEAEA),
+    ),
+    AppColorPalette(
+      name: 'Mármore e Grafite',
+      primary: Color(0xFF343A40), // Grafite escuro
+      onPrimary: Colors.white,
+      secondary: Color(0xFF6C757D), // Cinza ardósia
+      background: Color(0xFFF8F9FA), // Mármore claro
+      onBackground: Color(0xFF212529),
+      surface: Color(0xFFFFFFFF), // Branco puro
+      onSurface: Color(0xFF212529),
+    ),
+    AppColorPalette(
+      name: 'Oliva e Terracota',
+      primary: Color(0xFFE87461), // Terracota
+      onPrimary: Color(0xFFFAF3E0),
+      secondary: Color(0xFF556B2F), // Verde Oliva
+      background: Color(0xFFFAF3E0), // Creme
+      onBackground: Color(0xFF4A403A), // Marrom escuro
+      surface: Color(0xFFEADDC6), // Linho
+      onSurface: Color(0xFF4A403A),
+    ),
+    AppColorPalette(
+      name: 'Azul Noturno',
+      primary: Color(0xFF415A77), // Azul aço
+      onPrimary: Color(0xFFE0E1DD),
+      secondary: Color(0xFFE0E1DD), // Cinza claro
+      background: Color(0xFF0D1B2A), // Azul noite
+      onBackground: Color(0xFFE0E1DD),
+      surface: Color(0xFF1B263B), // Azul escuro
+      onSurface: Color(0xFFE0E1DD),
+    ),
+    AppColorPalette(
+      name: 'Café e Creme',
+      primary: Color(0xFFA37B73), // Caramelo
+      onPrimary: Color(0xFF3D2C2E),
+      secondary: Color(0xFFE4D8C8), // Creme
+      background: Color(0xFF3D2C2E), // Café expresso
+      onBackground: Color(0xFFE4D8C8),
+      surface: Color(0xFF6A5A5A), // Chocolate ao leite
+      onSurface: Color(0xFFE4D8C8),
+    ),
+    AppColorPalette(
       name: 'Verde e Bege',
       primary: Color(0xFFD4A373),
       onPrimary: Color(0xFF1E392A),
@@ -56,16 +106,6 @@ class AppThemes {
       onSurface: Colors.white,
     ),
     AppColorPalette(
-      name: 'Floresta Viva',
-      primary: Color(0xFF27ae60),
-      onPrimary: Colors.white,
-      secondary: Color(0xFF2ecc71),
-      background: Color(0xFF2980b9),
-      onBackground: Colors.white,
-      surface: Color(0xFF3498db),
-      onSurface: Colors.white,
-    ),
-    AppColorPalette(
       name: 'Ouro e Preto',
       primary: Color(0xFFf1c40f),
       onPrimary: Colors.black,
@@ -86,26 +126,6 @@ class AppThemes {
       onSurface: Colors.white,
     ),
     AppColorPalette(
-      name: 'Rústico',
-      primary: Color(0xFF8e44ad),
-      onPrimary: Colors.white,
-      secondary: Color(0xFF9b59b6),
-      background: Color(0xFF7f8c8d),
-      onBackground: Colors.white,
-      surface: Color(0xFF95a5a6),
-      onSurface: Colors.white,
-    ),
-    AppColorPalette(
-      name: 'Verão',
-      primary: Color(0xFFf1c40f),
-      onPrimary: Colors.black,
-      secondary: Color(0xFFe67e22),
-      background: Color(0xFFf39c12),
-      onBackground: Colors.black,
-      surface: Color(0xFFf1c40f),
-      onSurface: Colors.black,
-    ),
-    AppColorPalette(
       name: 'Noite Estrelada',
       primary: Color(0xFF34495e),
       onPrimary: Colors.white,
@@ -113,16 +133,6 @@ class AppThemes {
       background: Color(0xFF2c3e50),
       onBackground: Colors.white,
       surface: Color(0xFF34495e),
-      onSurface: Colors.white,
-    ),
-    AppColorPalette(
-      name: 'Chocolate',
-      primary: Color(0xFFd35400),
-      onPrimary: Colors.white,
-      secondary: Color(0xFFe67e22),
-      background: Color(0xFF95a5a6),
-      onBackground: Colors.white,
-      surface: Color(0xFF7f8c8d),
       onSurface: Colors.white,
     ),
     AppColorPalette(
@@ -148,66 +158,95 @@ class AppThemes {
   ];
 
   static Map<String, ThemeData> get themes {
-    final Map<String, ThemeData> map = {};
-    for (final palette in palettes) {
-      final brightness = _getBrightness(palette.background);
-      map[palette.name] = ThemeData(
-        brightness: brightness,
-        scaffoldBackgroundColor: palette.background,
-        primaryColor: palette.primary,
-        colorScheme: ColorScheme(
-          brightness: brightness,
-          primary: palette.primary,
-          onPrimary: palette.onPrimary,
-          secondary: palette.secondary,
-          onSecondary: Colors.white,
-          background: palette.background,
-          onBackground: palette.onBackground,
-          surface: palette.surface,
-          onSurface: palette.onSurface,
-          error: Colors.red,
-          onError: Colors.white,
-        ),
-        appBarTheme: AppBarTheme(
-          backgroundColor: palette.background,
-          foregroundColor: palette.onBackground,
-          elevation: 0,
-        ),
-        cardColor: palette.surface,
-        dialogBackgroundColor: palette.surface,
-        textButtonTheme: TextButtonThemeData(
-          style: TextButton.styleFrom(
-            foregroundColor: palette.primary,
-          ),
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: palette.primary,
-            foregroundColor: palette.onPrimary,
-          ),
-        ),
-      );
-    }
-    return map;
+    return {
+      for (var palette in palettes)
+        palette.name: _createThemeFromPalette(palette)
+    };
   }
 
   static Brightness _getBrightness(Color color) {
     return ThemeData.estimateBrightnessForColor(color);
   }
+
+  static ThemeData _createThemeFromPalette(AppColorPalette palette) {
+    final brightness = _getBrightness(palette.background);
+    final onSecondary = _getBrightness(palette.secondary) == Brightness.dark ? Colors.white : Colors.black;
+
+    return ThemeData(
+      brightness: brightness,
+      primaryColor: palette.primary,
+      scaffoldBackgroundColor: palette.background,
+      cardColor: palette.surface,
+      dialogBackgroundColor: palette.surface,
+      colorScheme: ColorScheme(
+        brightness: brightness,
+        primary: palette.primary,
+        onPrimary: palette.onPrimary,
+        secondary: palette.secondary,
+        onSecondary: onSecondary,
+        background: palette.background,
+        onBackground: palette.onBackground,
+        surface: palette.surface,
+        onSurface: palette.onSurface,
+        error: Colors.red.shade700,
+        onError: Colors.white,
+      ),
+      appBarTheme: AppBarTheme(
+        backgroundColor: palette.background,
+        foregroundColor: palette.onBackground,
+        elevation: 0,
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: palette.primary,
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: palette.primary,
+          foregroundColor: palette.onPrimary,
+        ),
+      ),
+    );
+  }
+
+  static ThemeData createCustomTheme({
+    required Color primary,
+    required Color background,
+  }) {
+    // Deriva a cor secundária a partir da primária
+    final Color secondary = Color.lerp(
+        primary,
+        _getBrightness(primary) == Brightness.dark ? Colors.white : Colors.black,
+        0.2)!;
+
+    final palette = AppColorPalette(
+      name: 'Personalizado',
+      primary: primary,
+      onPrimary: _getBrightness(primary) == Brightness.dark ? Colors.white : Colors.black,
+      secondary: secondary,
+      background: background,
+      onBackground: _getBrightness(background) == Brightness.dark ? Colors.white : Colors.black,
+      surface: Color.lerp(background, _getBrightness(background) == Brightness.dark ? Colors.white : Colors.black, 0.08)!,
+      onSurface: _getBrightness(background) == Brightness.dark ? Colors.white : Colors.black,
+    );
+    return _createThemeFromPalette(palette);
+  }
 }
 
 class ThemeProvider with ChangeNotifier {
-  // Inicialize com um tema padrão para evitar valores nulos
-  late String _themeName = AppThemes.palettes.first.name;
-  late ThemeData _themeData = AppThemes.themes[_themeName]!;
+  late ThemeData _themeData;
+  late String _themeName;
 
   ThemeProvider() {
-    // Carregue o tema salvo, mas não espere o resultado aqui
+    final defaultPalette = AppThemes.palettes.first;
+    _themeName = defaultPalette.name;
+    _themeData = AppThemes.themes[_themeName]!;
     loadTheme();
   }
 
-  String get getThemeName => _themeName;
   ThemeData get getTheme => _themeData;
+  String get getThemeName => _themeName;
 
   Future<void> loadTheme() async {
     final prefs = await SharedPreferences.getInstance();
@@ -215,53 +254,41 @@ class ThemeProvider with ChangeNotifier {
 
     if (isCustom) {
       final primaryHex = prefs.getInt('customPrimaryColor');
-      final secondaryHex = prefs.getInt('customSecondaryColor');
       final backgroundHex = prefs.getInt('customBackgroundColor');
+      
+      final defaultPalette = AppThemes.palettes.first;
 
-      // Use valores padrão se as cores forem nulas
-      final primaryColor = primaryHex != null ? Color(primaryHex) : Colors.blue;
-      final secondaryColor = secondaryHex != null ? Color(secondaryHex) : Colors.red;
-      final backgroundColor = backgroundHex != null ? Color(backgroundHex) : Colors.black;
-
-      setCustomTheme(primaryColor, secondaryColor, backgroundColor);
+      if (primaryHex != null && backgroundHex != null) {
+        setCustomTheme(
+          primaryColor: Color(primaryHex),
+          backgroundColor: Color(backgroundHex),
+        );
+      } else {
+        setTheme(defaultPalette.name);
+      }
     } else {
       final themeName = prefs.getString('theme') ?? AppThemes.palettes.first.name;
       setTheme(themeName);
     }
   }
 
-  void setTheme(String themeName) async {
+  Future<void> setTheme(String themeName) async {
     _themeName = themeName;
     _themeData = AppThemes.themes[_themeName] ?? AppThemes.themes.values.first;
     notifyListeners();
-    _saveTheme(themeName);
+    await _saveTheme(themeName);
   }
 
-  void setCustomTheme(Color primaryColor, Color secondaryColor, Color backgroundColor) async {
-    final brightness = ThemeData.estimateBrightnessForColor(backgroundColor);
-
-    _themeData = ThemeData(
-      brightness: brightness,
-      primaryColor: primaryColor,
-      scaffoldBackgroundColor: backgroundColor,
-      colorScheme: ColorScheme.fromSwatch(
-        primarySwatch: MaterialColor(primaryColor.value, const {}),
-        accentColor: secondaryColor,
-        brightness: brightness,
-      ).copyWith(
-        primary: primaryColor,
-        secondary: secondaryColor,
-        background: backgroundColor,
-        onBackground: brightness == Brightness.dark ? Colors.white : Colors.black,
-      ),
-      appBarTheme: AppBarTheme(
-        backgroundColor: primaryColor,
-        foregroundColor: secondaryColor,
-      ),
+  Future<void> setCustomTheme(
+      {required Color primaryColor,
+      required Color backgroundColor}) async {
+    _themeData = AppThemes.createCustomTheme(
+      primary: primaryColor,
+      background: backgroundColor,
     );
     _themeName = 'Personalizado';
     notifyListeners();
-    _saveCustomTheme(primaryColor, secondaryColor, backgroundColor);
+    await _saveCustomTheme(primaryColor, backgroundColor);
   }
 
   Future<void> _saveTheme(String themeName) async {
@@ -270,11 +297,11 @@ class ThemeProvider with ChangeNotifier {
     await prefs.setString('theme', themeName);
   }
 
-  Future<void> _saveCustomTheme(Color primaryColor, Color secondaryColor, Color backgroundColor) async {
+  Future<void> _saveCustomTheme(Color primaryColor, Color backgroundColor) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('isCustomTheme', true);
     await prefs.setInt('customPrimaryColor', primaryColor.value);
-    await prefs.setInt('customSecondaryColor', secondaryColor.value);
+    await prefs.remove('customSecondaryColor'); // Remove a chave antiga
     await prefs.setInt('customBackgroundColor', backgroundColor.value);
   }
 }

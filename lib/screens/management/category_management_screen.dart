@@ -55,6 +55,52 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
     );
   }
 
+  Future<void> _confirmDeleteCategory(Category category) async {
+    final productProvider =
+        Provider.of<ProductProvider>(context, listen: false);
+
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirmar Exclusão'),
+        content: Text(
+            'Tem certeza que deseja apagar a categoria "${category.name}"? Todos os produtos dentro dela também serão apagados.'),
+        actions: [
+          TextButton(
+            child: const Text('Cancelar'),
+            onPressed: () {
+              Navigator.of(ctx).pop(false);
+            },
+          ),
+          TextButton(
+            child: Text('Apagar',
+                style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            onPressed: () {
+              Navigator.of(ctx).pop(true);
+            },
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await productProvider.deleteCategory(category.id);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Categoria apagada com sucesso.'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 1),
+            ),
+          );
+        }
+      } catch (e) {
+        _showErrorDialog(e.toString());
+      }
+    }
+  }
+
   void _registerActions() {
     final navProvider = Provider.of<NavigationProvider>(context, listen: false);
     navProvider.setScreenActions([
@@ -118,7 +164,6 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
               child: CircularProgressIndicator(color: theme.primaryColor));
         }
 
-        // CORREÇÃO APLICADA AQUI
         if (productProvider.categories.length != _localCategories.length &&
             !_isSavingOrder) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -140,6 +185,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
         return RefreshIndicator(
           onRefresh: _refreshData,
           child: ReorderableListView.builder(
+            buildDefaultDragHandles: false,
             itemCount: _localCategories.length,
             itemBuilder: (ctx, index) {
               final category = _localCategories[index];
@@ -159,13 +205,29 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                     children: [
                       IconButton(
                         icon:
-                            const Icon(Icons.delete_outline, color: Colors.red),
+                            const Icon(Icons.copy_outlined, color: Colors.blue),
+                        tooltip: 'Duplicar',
                         onPressed: () async {
                           try {
-                            await productProvider.deleteCategory(category.id);
+                            await productProvider.duplicateCategory(category.id);
+                            if (mounted) {
+                              ScaffoldMessenger.of(context)
+                                  .showSnackBar(const SnackBar(
+                                content: Text('Categoria duplicada com sucesso!'),
+                                backgroundColor: Colors.green,
+                                duration: Duration(seconds: 1),
+                              ));
+                            }
                           } catch (e) {
                             _showErrorDialog(e.toString());
                           }
+                        },
+                      ),
+                      IconButton(
+                        icon:
+                            const Icon(Icons.delete_outline, color: Colors.red),
+                        onPressed: () {
+                          _confirmDeleteCategory(category);
                         },
                       ),
                       ReorderableDragStartListener(

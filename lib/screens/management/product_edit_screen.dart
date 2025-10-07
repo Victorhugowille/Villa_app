@@ -1,4 +1,3 @@
-// lib/screens/management/product_edit_screen.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -31,7 +30,7 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
   XFile? _imageFile;
   final ImagePicker _picker = ImagePicker();
 
-  List<GrupoAdicional> _gruposDeAdicionais = [];
+  List<GrupoAdicional> _localGrupos = [];
 
   @override
   void initState() {
@@ -60,8 +59,15 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
     final productProvider =
         Provider.of<ProductProvider>(context, listen: false);
 
-    await productProvider.fetchData();
+    if (_isEditMode) {
+      _localGrupos = await productProvider
+          .getGruposAdicionaisParaProduto(_currentProduct!.id);
+    }
 
+    if (productProvider.categories.isEmpty) {
+      await productProvider.fetchData();
+    }
+    
     if (!mounted) return;
     _availableCategories = productProvider.categories;
 
@@ -75,21 +81,8 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
       return;
     }
 
-    if (_isEditMode) {
-      final categoryExists =
-          _availableCategories.any((c) => c.id == _categoryId);
-      if (!categoryExists) {
-        _categoryId = _availableCategories.first.id;
-      }
-    } else {
-      if (_categoryId == null && _availableCategories.isNotEmpty) {
-        _categoryId = _availableCategories.first.id;
-      }
-    }
-
-    if (_isEditMode) {
-      _gruposDeAdicionais = await productProvider
-          .getGruposAdicionaisParaProduto(_currentProduct!.id);
+    if (_categoryId == null && _availableCategories.isNotEmpty) {
+      _categoryId = _availableCategories.first.id;
     }
 
     if (mounted) {
@@ -126,24 +119,19 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
         if (!mounted) return;
         isMobile ? Navigator.of(context).pop() : navProvider.pop();
       } else {
-        final productsInCategory = productProvider.products
-            .where((p) => p.categoryId == _categoryId!)
-            .length;
+        final newProductId = await productProvider.addProduct(
+            _name, _price, _categoryId!, _isSoldOut, _imageFile);
 
-        // CORREÇÃO AQUI
-        final newProductId = await productProvider.addProduct(_name, _price,
-            _categoryId!, productsInCategory, _isSoldOut, _imageFile);
-
-        await productProvider
-            .fetchData(); 
+        await productProvider.fetchData();
 
         if (!mounted) return;
         final newProduct =
-            productProvider.products.firstWhere((p) => p.id == newProductId);
+            productProvider.products.firstWhere((p) => p.id == newProductId, orElse: () => _currentProduct!);
+
 
         setState(() {
           _currentProduct = newProduct;
-          _gruposDeAdicionais = [];
+          _localGrupos = [];
         });
 
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -203,10 +191,63 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
     }
   }
 
+  void _duplicateProduct() async {
+    if (_currentProduct == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Duplicar Produto'),
+        content: Text(
+            'Deseja criar uma cópia de "${_currentProduct!.name}"? Todos os seus grupos e adicionais também serão duplicados.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Duplicar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isSaving = true);
+    final navProvider = Provider.of<NavigationProvider>(context, listen: false);
+    final isMobile = MediaQuery.of(context).size.width <= 800;
+
+    try {
+      await Provider.of<ProductProvider>(context, listen: false)
+          .duplicateProduct(_currentProduct!.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Produto duplicado com sucesso!'),
+        backgroundColor: Colors.green,
+      ));
+      isMobile ? Navigator.of(context).pop() : navProvider.pop();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao duplicar: ${e.toString()}')));
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
+  }
+
   void _registerActions() {
     if (!mounted) return;
     final navProvider = Provider.of<NavigationProvider>(context, listen: false);
     navProvider.setScreenActions([
+      if (_isEditMode)
+        IconButton(
+          icon: const Icon(Icons.copy_outlined),
+          tooltip: 'Duplicar Produto',
+          onPressed: _isSaving ? null : _duplicateProduct,
+        ),
       if (_isEditMode)
         IconButton(
           icon: const Icon(Icons.delete_outline),
@@ -228,6 +269,45 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
           onPressed: _saveForm,
         ),
     ]);
+  }
+
+  Future<void> _onReorderGrupo(int oldIndex, int newIndex) async {
+    setState(() {
+      if (newIndex > oldIndex) {
+        newIndex -= 1;
+      }
+      final item = _localGrupos.removeAt(oldIndex);
+      _localGrupos.insert(newIndex, item);
+    });
+
+    try {
+      await Provider.of<ProductProvider>(context, listen: false)
+          .updateGrupoAdicionalOrder(_localGrupos);
+    } catch (e) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Erro: ${e.toString()}')));
+      _loadInitialData();
+    }
+  }
+
+  Future<void> _onReorderAdicional(
+      int oldIndex, int newIndex, GrupoAdicional grupo) async {
+    setState(() {
+      if (newIndex > oldIndex) {
+        newIndex -= 1;
+      }
+      final item = grupo.adicionais.removeAt(oldIndex);
+      grupo.adicionais.insert(newIndex, item);
+    });
+
+    try {
+      await Provider.of<ProductProvider>(context, listen: false)
+          .updateAdicionalOrder(grupo.adicionais);
+    } catch (e) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Erro: ${e.toString()}')));
+      _loadInitialData();
+    }
   }
 
   @override
@@ -257,8 +337,8 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
                   initialValue: _price > 0 ? _price.toStringAsFixed(2) : '',
                   enabled: !_isSaving,
                   decoration: const InputDecoration(labelText: 'Preço'),
-                  keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
                   validator: (v) => (v == null ||
                           v.isEmpty ||
                           double.tryParse(v.replaceAll(',', '.')) == null)
@@ -306,6 +386,12 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
       appBar: AppBar(
         title: Text(_isEditMode ? 'Editar Produto' : 'Adicionar Produto'),
         actions: [
+          if (_isEditMode)
+            IconButton(
+              icon: const Icon(Icons.copy_outlined),
+              tooltip: 'Duplicar Produto',
+              onPressed: _isSaving ? null : _duplicateProduct,
+            ),
           if (_isEditMode)
             IconButton(
               icon: const Icon(Icons.delete_outline),
@@ -540,7 +626,7 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
               ),
           ],
         ),
-        if (_isEditMode && _gruposDeAdicionais.isEmpty)
+        if (_isEditMode && _localGrupos.isEmpty)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 16.0),
             child: Text(
@@ -549,13 +635,16 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
                 style: TextStyle(color: Colors.grey)),
           )
         else
-          ListView.builder(
+          ReorderableListView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            itemCount: _gruposDeAdicionais.length,
+            itemCount: _localGrupos.length,
+            buildDefaultDragHandles: false,
+            onReorder: _onReorderGrupo,
             itemBuilder: (context, index) {
-              final grupo = _gruposDeAdicionais[index];
+              final grupo = _localGrupos[index];
               return Card(
+                key: ValueKey(grupo.id),
                 clipBehavior: Clip.antiAlias,
                 margin: const EdgeInsets.symmetric(vertical: 8),
                 elevation: 2,
@@ -573,6 +662,24 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
+                        icon: const Icon(Icons.copy_outlined,
+                            size: 20, color: Colors.blueGrey),
+                        tooltip: 'Duplicar Grupo',
+                        onPressed: () async {
+                          try {
+                            await Provider.of<ProductProvider>(context,
+                                    listen: false)
+                                .duplicateGrupoAdicional(grupo.id);
+                            await _loadInitialData();
+                          } catch (e) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Erro: ${e.toString()}')));
+                            }
+                          }
+                        },
+                      ),
+                      IconButton(
                           icon: const Icon(Icons.edit,
                               size: 20, color: Colors.blueGrey),
                           onPressed: () => _showGrupoDialog(grupo: grupo)),
@@ -585,43 +692,86 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
                                 .deleteGrupoAdicional(grupo.id);
                             await _loadInitialData();
                           }),
+                      ReorderableDragStartListener(
+                        index: index,
+                        child: const Padding(
+                          padding: EdgeInsets.all(8.0),
+                          child: Icon(Icons.drag_indicator),
+                        ),
+                      ),
                     ],
                   ),
                   children: [
-                    ...grupo.adicionais
-                        .map((adicional) => ListTile(
-                              leading: CircleAvatar(
-                                backgroundImage: (adicional.imageUrl != null
-                                    ? NetworkImage(adicional.imageUrl!)
-                                    : null) as ImageProvider?,
-                                child: adicional.imageUrl == null
-                                    ? const Icon(Icons.add, size: 20)
-                                    : null,
-                              ),
-                              title: Text(adicional.name),
-                              subtitle: Text(
-                                  'R\$ ${adicional.price.toStringAsFixed(2)}'),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                      icon: const Icon(Icons.edit, size: 18),
-                                      onPressed: () => _showAdicionalDialog(
-                                          adicional: adicional,
-                                          grupoId: grupo.id)),
-                                  IconButton(
-                                      icon: const Icon(Icons.delete, size: 18),
-                                      onPressed: () async {
-                                        await Provider.of<ProductProvider>(
-                                                context,
-                                                listen: false)
-                                            .deleteAdicional(adicional.id);
-                                        await _loadInitialData();
-                                      }),
-                                ],
-                              ),
-                            ))
-                        .toList(),
+                    ReorderableListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      buildDefaultDragHandles: false,
+                      itemCount: grupo.adicionais.length,
+                      itemBuilder: (ctx, adicionalIndex) {
+                        final adicional = grupo.adicionais[adicionalIndex];
+                        return ListTile(
+                          key: ValueKey(adicional.id),
+                          leading: CircleAvatar(
+                            backgroundImage: (adicional.imageUrl != null
+                                ? NetworkImage(adicional.imageUrl!)
+                                : null) as ImageProvider?,
+                            child: adicional.imageUrl == null
+                                ? const Icon(Icons.add, size: 20)
+                                : null,
+                          ),
+                          title: Text(adicional.name),
+                          subtitle: Text(
+                              'R\$ ${adicional.price.toStringAsFixed(2)}'),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                  icon: const Icon(Icons.copy_outlined, size: 18),
+                                  tooltip: 'Duplicar Item',
+                                  onPressed: () async {
+                                    try {
+                                      await Provider.of<ProductProvider>(
+                                              context,
+                                              listen: false)
+                                          .duplicateAdicional(adicional.id);
+                                      await _loadInitialData();
+                                    } catch (e) {
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(SnackBar(
+                                                content: Text(
+                                                    'Erro: ${e.toString()}')));
+                                      }
+                                    }
+                                  }),
+                              IconButton(
+                                  icon: const Icon(Icons.edit, size: 18),
+                                  onPressed: () => _showAdicionalDialog(
+                                      adicional: adicional,
+                                      grupoId: grupo.id)),
+                              IconButton(
+                                  icon: const Icon(Icons.delete, size: 18),
+                                  onPressed: () async {
+                                    await Provider.of<ProductProvider>(
+                                            context,
+                                            listen: false)
+                                        .deleteAdicional(adicional.id);
+                                    await _loadInitialData();
+                                  }),
+                              ReorderableDragStartListener(
+                                index: adicionalIndex,
+                                child: const Padding(
+                                  padding: EdgeInsets.all(8.0),
+                                  child: Icon(Icons.drag_indicator, size: 20),
+                                ),
+                              )
+                            ],
+                          ),
+                        );
+                      },
+                      onReorder: (oldI, newI) =>
+                          _onReorderAdicional(oldI, newI, grupo),
+                    ),
                     Padding(
                       padding: const EdgeInsets.only(
                           right: 16.0, bottom: 8.0, top: 8.0),

@@ -5,6 +5,7 @@ import 'package:villabistromobile/providers/company_provider.dart';
 import 'package:villabistromobile/screens/configuracao/company_requests_screen.dart';
 import 'package:villabistromobile/screens/configuracao/estabelecimento_screen.dart';
 import 'package:villabistromobile/screens/configuracao/pending_requests_screen.dart';
+import 'package:villabistromobile/screens/management/theme_management_screen.dart';
 import 'package:villabistromobile/widgets/side_menu.dart';
 
 class ConfiguracaoScreen extends StatelessWidget {
@@ -67,6 +68,22 @@ class ConfiguracaoScreen extends StatelessWidget {
                   );
                 },
               ),
+              const Divider(),
+            ListTile(
+              leading: const Icon(Icons.color_lens),
+              title: const Text('Gestao de Temas'),
+              subtitle:
+                  const Text('personalize as cores do seu app'),
+              trailing: const Icon(Icons.arrow_forward_ios),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ThemeManagementScreen(),
+                  ),
+                );
+              },
+            ),
             if (currentUserEmail == 'victorhugowille@gmail.com')
               const Divider(),
           ],

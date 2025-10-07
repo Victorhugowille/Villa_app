@@ -1,4 +1,3 @@
-// lib/data/app_data.dart
 import 'package:flutter/material.dart';
 
 class SavedReport {
@@ -8,9 +7,9 @@ class SavedReport {
   SavedReport({required this.id, required this.name, required this.createdAt});
   factory SavedReport.fromJson(Map<String, dynamic> json) {
     return SavedReport(
-        id: json['id'],
-        name: json['name'],
-        createdAt: DateTime.parse(json['created_at']));
+        id: json['id']?.toString() ?? '',
+        name: json['name'] ?? 'Relatório Inválido',
+        createdAt: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now());
   }
 }
 
@@ -19,7 +18,7 @@ class GrupoAdicional {
   final String name;
   final String produtoId;
   final String? imageUrl;
-  final List<Adicional> adicionais;
+  List<Adicional> adicionais;
   final int displayOrder;
 
   GrupoAdicional(
@@ -32,15 +31,16 @@ class GrupoAdicional {
 
   factory GrupoAdicional.fromJson(Map<String, dynamic> json) {
     List<Adicional> items = [];
-    if (json['adicionais'] != null) {
+    if (json['adicionais'] is List) {
       items = (json['adicionais'] as List)
           .map((item) => Adicional.fromJson(item))
           .toList();
+      items.sort((a, b) => a.displayOrder.compareTo(b.displayOrder));
     }
     return GrupoAdicional(
-        id: json['id'].toString(),
-        name: json['name'],
-        produtoId: json['produto_id'].toString(),
+        id: json['id']?.toString() ?? '',
+        name: json['name'] ?? 'Grupo Inválido',
+        produtoId: json['produto_id']?.toString() ?? '',
         imageUrl: json['image_url'],
         adicionais: items,
         displayOrder: json['display_order'] ?? 0);
@@ -65,9 +65,9 @@ class Adicional {
 
   factory Adicional.fromJson(Map<String, dynamic> json) {
     return Adicional(
-        id: json['id'].toString(),
-        name: json['name'],
-        price: (json['price'] as num).toDouble(),
+        id: json['id']?.toString() ?? '',
+        name: json['name'] ?? 'Adicional Inválido',
+        price: (json['price'] as num?)?.toDouble() ?? 0.0,
         grupoId: json['grupo_id']?.toString(),
         imageUrl: json['image_url'],
         displayOrder: json['display_order'] ?? 0);
@@ -88,9 +88,9 @@ class Category {
 
   factory Category.fromJson(Map<String, dynamic> jsonData) {
     return Category(
-      id: jsonData['id'].toString(),
-      name: jsonData['name'],
-      icon: IconData(jsonData['icon_code_point'],
+      id: jsonData['id']?.toString() ?? '',
+      name: jsonData['name'] ?? 'Categoria Inválida',
+      icon: IconData(jsonData['icon_code_point'] ?? 0xe1de,
           fontFamily: jsonData['icon_font_family']),
       displayOrder: jsonData['display_order'] ?? 0,
     );
@@ -101,11 +101,12 @@ class Product {
   final String id;
   final String name;
   final double price;
-  final String categoryId;
+  final String? categoryId;
   final String categoryName;
   final int displayOrder;
   final String? imageUrl;
   final bool isSoldOut;
+
   Product(
       {required this.id,
       required this.name,
@@ -115,14 +116,15 @@ class Product {
       required this.displayOrder,
       this.imageUrl,
       required this.isSoldOut});
+
   factory Product.fromJson(Map<String, dynamic> jsonData) {
     return Product(
-        id: jsonData['id'].toString(),
-        name: jsonData['name'],
-        price: (jsonData['price'] as num).toDouble(),
-        categoryId: jsonData['category_id'].toString(),
-        categoryName: (jsonData['categorias'] != null)
-            ? jsonData['categorias']['name']
+        id: jsonData['id']?.toString() ?? '',
+        name: jsonData['name'] ?? 'Produto Inválido',
+        price: (jsonData['price'] as num?)?.toDouble() ?? 0.0,
+        categoryId: jsonData['category_id']?.toString(),
+        categoryName: (jsonData['categorias'] is Map)
+            ? jsonData['categorias']['name'] ?? 'Sem Categoria'
             : 'Sem Categoria',
         displayOrder: jsonData['display_order'] ?? 0,
         imageUrl: jsonData['image_url'],
@@ -145,7 +147,7 @@ class Table {
 
   factory Table.fromJson(Map<String, dynamic> jsonData) {
     return Table(
-      id: jsonData['id'].toString(),
+      id: jsonData['id']?.toString() ?? '',
       tableNumber: jsonData['numero'] ?? 0,
       isOccupied: jsonData['status'] == 'ocupada',
       isPartiallyPaid: false,
@@ -161,7 +163,7 @@ class CartItemAdicional {
 
   factory CartItemAdicional.fromJson(Map<String, dynamic> json) {
     return CartItemAdicional(
-      adicional: Adicional.fromJson(json['adicional']),
+      adicional: Adicional.fromJson(json['adicional'] ?? {}),
       quantity: json['quantity'] ?? 1,
     );
   }
@@ -190,9 +192,9 @@ class CartItem {
 
   factory CartItem.fromJson(Map<String, dynamic> json) {
     return CartItem(
-      id: json['id'].toString(),
-      product: Product.fromJson(json['produtos']),
-      quantity: json['quantidade'],
+      id: json['id']?.toString() ?? '',
+      product: Product.fromJson(json['produtos'] ?? {}),
+      quantity: json['quantidade'] ?? 0,
       selectedAdicionais: (json['adicionais_selecionados'] as List? ?? [])
           .map((item) => CartItemAdicional.fromJson(item))
           .toList(),
@@ -238,21 +240,29 @@ class Order {
 
   factory Order.fromJson(Map<String, dynamic> json) {
     var itemsList = <CartItem>[];
-    if (json['itens_pedido'] != null) {
+    if (json['itens_pedido'] is List) {
       itemsList = (json['itens_pedido'] as List)
           .map((itemJson) => CartItem.fromJson(itemJson))
           .toList();
     }
+
+    int? tableNum;
+    if (json['table_number'] != null) {
+      tableNum = (json['table_number'] as num?)?.toInt();
+    } else if (json['mesas'] is Map) {
+      tableNum = (json['mesas']['numero'] as num?)?.toInt();
+    }
+
     return Order(
-        id: json['id'].toString(),
+        id: json['id']?.toString() ?? '',
         items: itemsList,
-        timestamp: DateTime.parse(json['created_at']),
+        timestamp: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
         status: json['status'] ?? 'production',
         type: json['type'] ?? 'mesa',
-        tableNumber: (json['mesas'] is Map) ? json['mesas']['numero'] : null,
+        tableNumber: tableNum,
         tableId: (json['mesas'] is Map)
             ? json['mesas']['id'].toString()
-            : json['mesa_id'].toString());
+            : json['mesa_id']?.toString());
   }
 
   double get total => items.fold(0.0, (sum, item) => sum + item.totalPrice);
@@ -279,10 +289,10 @@ class Transaction {
 
   factory Transaction.fromJson(Map<String, dynamic> jsonData) {
     return Transaction(
-      id: jsonData['id'].toString(),
-      tableNumber: jsonData['table_number'],
-      totalAmount: (jsonData['total_amount'] as num).toDouble(),
-      timestamp: DateTime.parse(jsonData['created_at']),
+      id: jsonData['id']?.toString() ?? '',
+      tableNumber: jsonData['table_number'] ?? 0,
+      totalAmount: (jsonData['total_amount'] as num?)?.toDouble() ?? 0.0,
+      timestamp: DateTime.tryParse(jsonData['created_at'] ?? '') ?? DateTime.now(),
       paymentMethod: jsonData['payment_method'] ?? 'N/A',
       discount: (jsonData['discount'] as num?)?.toDouble() ?? 0.0,
       surcharge: (jsonData['surcharge'] as num?)?.toDouble() ?? 0.0,
@@ -304,15 +314,18 @@ class CustomSpreadsheet {
   });
 
   factory CustomSpreadsheet.fromJson(Map<String, dynamic> json) {
-    List<List<String>> data = (json['sheet_data'] as List)
-        .map((row) => (row as List).map((cell) => cell.toString()).toList())
-        .toList();
+    List<List<String>> data = [];
+    if (json['sheet_data'] is List) {
+      data = (json['sheet_data'] as List)
+          .map((row) => (row as List).map((cell) => cell.toString()).toList())
+          .toList();
+    }
 
     return CustomSpreadsheet(
       id: json['id'],
-      name: json['name'],
+      name: json['name'] ?? '',
       sheetData: data,
-      createdAt: DateTime.parse(json['created_at']),
+      createdAt: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
     );
   }
 }

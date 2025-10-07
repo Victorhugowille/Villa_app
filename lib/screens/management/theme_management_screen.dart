@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:villabistromobile/providers/theme_provider.dart';
+import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 
 class ThemeManagementScreen extends StatefulWidget {
   const ThemeManagementScreen({super.key});
@@ -10,122 +11,73 @@ class ThemeManagementScreen extends StatefulWidget {
 }
 
 class _ThemeManagementScreenState extends State<ThemeManagementScreen> {
-  // Inicialize as cores com os valores do tema atual
   late Color _primaryColor;
-  late Color _secondaryColor;
   late Color _backgroundColor;
-
-  final List<Color> _colorOptions = [
-    // Cores primárias padrão
-    ...Colors.primaries,
-    
-    // Novas cores escuras e tons de verde
-    const Color(0xFF004d40),
-    const Color(0xFF00695c),
-    const Color(0xFF01579b),
-    const Color(0xFF0d47a1),
-    const Color(0xFF1b5e20),
-    const Color(0xFF2e7d32),
-    const Color(0xFF33691e),
-    const Color(0xFF455a64),
-    const Color(0xFF37474f),
-    const Color(0xFF263238),
-    const Color(0xFF424242),
-    const Color(0xFF212121),
-
-    // Cores básicas
-    Colors.black,
-    Colors.white,
-  ];
 
   @override
   void initState() {
     super.initState();
-    final theme = Provider.of<ThemeProvider>(context, listen: false).getTheme;
-    _primaryColor = theme.primaryColor;
-    _secondaryColor = theme.colorScheme.secondary;
-    _backgroundColor = theme.scaffoldBackgroundColor;
+    _loadCurrentColors();
   }
 
-  // Função para mostrar um seletor de cores simples
-  Future<void> _showColorPickerDialog(
-      BuildContext context, int colorType) async {
-    await showDialog(
+  void _loadCurrentColors() {
+    final theme = Provider.of<ThemeProvider>(context, listen: false).getTheme;
+    setState(() {
+      _primaryColor = theme.primaryColor;
+      _backgroundColor = theme.scaffoldBackgroundColor;
+    });
+  }
+
+  Future<void> _showAdvancedColorPicker(
+      BuildContext context, Color initialColor, Function(Color) onColorSelected) async {
+    Color pickerColor = initialColor;
+
+    final newColor = await showDialog<Color>(
       context: context,
-      builder: (BuildContext dialogContext) {
+      builder: (BuildContext context) {
         return AlertDialog(
-          title: Text(
-            colorType == 1
-                ? 'Escolha a Cor Primária'
-                : colorType == 2
-                    ? 'Escolha a Cor Secundária'
-                    : 'Escolha a Cor de Fundo',
-            style: const TextStyle(fontSize: 18),
-          ),
+          title: const Text('Escolha uma cor'),
           content: SingleChildScrollView(
-            child: Column(
-              children: [
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final color in _colorOptions)
-                      GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            if (colorType == 1) {
-                              _primaryColor = color;
-                            } else if (colorType == 2) {
-                              _secondaryColor = color;
-                            } else {
-                              _backgroundColor = color;
-                            }
-                          });
-                          Navigator.of(context).pop();
-                        },
-                        child: Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: color,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                                color: color == Colors.white ? Colors.black : Colors.white, width: 2),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ],
+            child: ColorPicker(
+              pickerColor: pickerColor,
+              onColorChanged: (color) => pickerColor = color,
+              pickerAreaHeightPercent: 0.8,
+              enableAlpha: false,
+              displayThumbColor: true,
+              paletteType: PaletteType.hsv,
             ),
           ),
-          actions: [
+          actions: <Widget>[
             TextButton(
+              child: const Text('Cancelar'),
               onPressed: () {
                 Navigator.of(context).pop();
               },
-              child: const Text('Fechar'),
+            ),
+            TextButton(
+              child: const Text('OK'),
+              onPressed: () {
+                Navigator.of(context).pop(pickerColor);
+              },
             ),
           ],
         );
       },
     );
+
+    if (newColor != null) {
+      onColorSelected(newColor);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
-    final theme = themeProvider.getTheme;
+    final theme = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(''),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.color_lens, color: theme.primaryColor),
-            onPressed: () {},
-          ),
-        ],
+        title: const Text('Gerenciar Tema'),
       ),
       body: SingleChildScrollView(
         child: Padding(
@@ -133,110 +85,140 @@ class _ThemeManagementScreenState extends State<ThemeManagementScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Seção de Cores Personalizadas
               Text(
                 'Cores Personalizadas',
-                style: theme.textTheme.titleLarge,
+                style: theme.textTheme.headlineSmall,
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  Column(
-                    children: [
-                      GestureDetector(
-                        onTap: () => _showColorPickerDialog(context, 1),
-                        child: Container(
-                          width: 80,
-                          height: 80,
-                          decoration: BoxDecoration(
-                            color: _primaryColor,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: theme.colorScheme.onSurface, width: 3),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text('Primária'),
-                    ],
+                  _buildColorSelector(
+                    'Primária',
+                    _primaryColor,
+                    (color) => setState(() => _primaryColor = color),
                   ),
-                  Column(
-                    children: [
-                      GestureDetector(
-                        onTap: () => _showColorPickerDialog(context, 2),
-                        child: Container(
-                          width: 80,
-                          height: 80,
-                          decoration: BoxDecoration(
-                            color: _secondaryColor,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: theme.colorScheme.onSurface, width: 3),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text('Secundária'),
-                    ],
-                  ),
-                  Column(
-                    children: [
-                      GestureDetector(
-                        onTap: () => _showColorPickerDialog(context, 3),
-                        child: Container(
-                          width: 80,
-                          height: 80,
-                          decoration: BoxDecoration(
-                            color: _backgroundColor,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: theme.colorScheme.onSurface, width: 3),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text('Fundo'),
-                    ],
+                  _buildColorSelector(
+                    'Fundo',
+                    _backgroundColor,
+                    (color) => setState(() => _backgroundColor = color),
                   ),
                 ],
               ),
               const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: () {
-                  themeProvider.setCustomTheme(_primaryColor, _secondaryColor, _backgroundColor);
-                },
-                child: const Text('Aplicar Cores Personalizadas'),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                   Expanded(
+                    child: OutlinedButton(
+                      onPressed: _loadCurrentColors,
+                      child: const Text('Resetar'),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    flex: 2,
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.save),
+                      label: const Text('Salvar Tema'),
+                      onPressed: () {
+                        themeProvider.setCustomTheme(
+                          primaryColor: _primaryColor,
+                          backgroundColor: _backgroundColor,
+                        );
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Tema personalizado salvo!'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 32),
-
-              // Seção de Temas Pré-definidos
+              const Divider(height: 48),
               Text(
                 'Temas Pré-definidos',
-                style: theme.textTheme.titleLarge,
+                style: theme.textTheme.headlineSmall,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
-              ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                padding: EdgeInsets.zero,
-                itemCount: AppThemes.themes.length,
-                itemBuilder: (context, index) {
-                  final themeName = AppThemes.themes.keys.elementAt(index);
-                  return Card(
-                    color: theme.cardColor,
-                    child: ListTile(
-                      title: Text(themeName,
-                          style: TextStyle(color: theme.colorScheme.onSurface)),
-                      onTap: () {
-                        themeProvider.setTheme(themeName);
-                      },
-                      trailing: themeProvider.getThemeName == themeName
-                          ? Icon(Icons.check_circle, color: theme.primaryColor)
-                          : null,
-                    ),
-                  );
-                },
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                alignment: WrapAlignment.center,
+                children: AppThemes.palettes.map((palette) {
+                  return _buildPredefinedThemeCard(palette, themeProvider);
+                }).toList(),
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildColorSelector(String label, Color color, Function(Color) onColorSelected) {
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: () => _showAdvancedColorPicker(context, color, onColorSelected),
+          child: Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              border: Border.all(color: Theme.of(context).colorScheme.onSurface, width: 3),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 5,
+                  offset: const Offset(0, 2),
+                )
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(label),
+      ],
+    );
+  }
+
+  Widget _buildPredefinedThemeCard(AppColorPalette palette, ThemeProvider themeProvider) {
+    bool isSelected = themeProvider.getThemeName == palette.name;
+    return GestureDetector(
+      onTap: () => themeProvider.setTheme(palette.name),
+      child: Card(
+        elevation: isSelected ? 8 : 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: isSelected
+              ? BorderSide(color: Theme.of(context).primaryColor, width: 2)
+              : BorderSide.none,
+        ),
+        child: Container(
+          width: 150,
+          padding: const EdgeInsets.all(12.0),
+          child: Column(
+            children: [
+              Text(
+                palette.name,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  Container(width: 24, height: 24, decoration: BoxDecoration(color: palette.primary, shape: BoxShape.circle)),
+                  Container(width: 24, height: 24, decoration: BoxDecoration(color: palette.secondary, shape: BoxShape.circle)),
+                  Container(width: 24, height: 24, decoration: BoxDecoration(color: palette.background, shape: BoxShape.circle)),
+                ],
+              )
             ],
           ),
         ),

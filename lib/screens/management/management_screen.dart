@@ -5,7 +5,6 @@ import 'package:villabistromobile/providers/navigation_provider.dart';
 import 'package:villabistromobile/screens/management/category_management_screen.dart';
 import 'package:villabistromobile/screens/management/product_management_screen.dart';
 import 'package:villabistromobile/screens/management/table_management_screen.dart';
-import 'package:villabistromobile/screens/management/theme_management_screen.dart';
 import 'package:villabistromobile/widgets/side_menu.dart';
 
 class ManagementScreen extends StatelessWidget {
@@ -48,16 +47,6 @@ class ManagementScreen extends StatelessWidget {
                 context, const TableManagementScreen(), 'Gerenciar Mesas');
           },
         ),
-        const SizedBox(height: 16),
-        _buildManagementCard(
-          context: context,
-          icon: Icons.color_lens_outlined,
-          title: 'Gerenciar Tema',
-          onTap: () {
-            navProvider.navigateTo(
-                context, const ThemeManagementScreen(), 'Gestão de Tema');
-          },
-        ),
       ],
     );
 
@@ -83,19 +72,18 @@ class ManagementScreen extends StatelessWidget {
     final theme = Theme.of(context);
     return Card(
       elevation: 4,
-      color: theme.primaryColor.withOpacity(0.1),
       child: ListTile(
         leading: Icon(icon, color: theme.primaryColor, size: 40),
         title: Text(
           title,
           style: TextStyle(
-            color: theme.colorScheme.onBackground,
+            color: theme.primaryColor,
             fontSize: 18,
             fontWeight: FontWeight.bold,
           ),
         ),
         trailing:
-            Icon(Icons.arrow_forward_ios, color: theme.colorScheme.onBackground),
+            Icon(Icons.arrow_forward_ios, color: theme.primaryColor),
         onTap: onTap,
       ),
     );
