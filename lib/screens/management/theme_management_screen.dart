@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:villabistromobile/providers/company_provider.dart';
 import 'package:villabistromobile/providers/theme_provider.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+import 'package:villabistromobile/screens/management/site_theme_screen.dart';
 
 class ThemeManagementScreen extends StatefulWidget {
   const ThemeManagementScreen({super.key});
@@ -73,6 +75,7 @@ class _ThemeManagementScreenState extends State<ThemeManagementScreen> {
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
+    final companyProvider = Provider.of<CompanyProvider>(context, listen: false);
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -157,6 +160,18 @@ class _ThemeManagementScreenState extends State<ThemeManagementScreen> {
           ),
         ),
       ),
+      floatingActionButton: companyProvider.role == 'owner'
+        ? FloatingActionButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SiteThemeScreen()),
+              );
+            },
+            tooltip: 'Editar Tema do Site',
+            child: const Icon(Icons.web),
+          )
+        : null,
     );
   }
 
@@ -225,4 +240,5 @@ class _ThemeManagementScreenState extends State<ThemeManagementScreen> {
       ),
     );
   }
+
 }

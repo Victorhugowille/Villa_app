@@ -43,7 +43,9 @@ class ProductProvider with ChangeNotifier {
     if (_isLoading) return;
 
     _isLoading = true;
-    notifyListeners();
+     Future.microtask(() {
+      notifyListeners();
+    });
 
     try {
       final categoryData = await _supabase
@@ -53,16 +55,17 @@ class ProductProvider with ChangeNotifier {
           .order('display_order', ascending: true)
           .order('name', ascending: true);
 
-      final productData = await _supabase.rpc(
-        'get_sorted_products',
-        params: {'p_company_id': companyId},
-      );
+      final productData = await _supabase
+          .from('produtos')
+          .select('*, categorias(name)')
+          .eq('company_id', companyId)
+          .order('display_order', ascending: true);
 
-      _products =
-          (productData as List).map((item) => app_data.Product.fromJson(item)).toList();
+      _products = (productData as List)
+          .map((item) => app_data.Product.fromJson(item))
+          .toList();
       _categories =
           categoryData.map((item) => app_data.Category.fromJson(item)).toList();
-          
     } catch (error, stackTrace) {
       debugPrint("ERRO AO BUSCAR DADOS: $error");
       debugPrint("STACK TRACE: $stackTrace");
@@ -127,14 +130,17 @@ class ProductProvider with ChangeNotifier {
           .from('grupos_adicionais')
           .select('id, image_url')
           .eq('produto_id', productId);
-      
-      final List<String> grupoIds = grupos.map((g) => g['id'].toString()).toList();
-      
+
+      final List<String> grupoIds =
+          grupos.map((g) => g['id'].toString()).toList();
+
       if (grupoIds.isNotEmpty) {
+        final orFilter = grupoIds.map((id) => 'grupo_id.eq.$id').join(',');
+
         final adicionais = await _supabase
             .from('adicionais')
             .select('id, image_url')
-            .eq('grupo_id', grupoIds);
+            .or(orFilter);
 
         final List<String> adicionalImagePaths = adicionais
             .map((a) => a['image_url'] as String?)
@@ -145,7 +151,7 @@ class ProductProvider with ChangeNotifier {
           await _supabase.storage.from('product_images').remove(adicionalImagePaths);
         }
 
-        await _supabase.from('adicionais').delete().eq('grupo_id', grupoIds);
+        await _supabase.from('adicionais').delete().or(orFilter);
 
         final List<String> grupoImagePaths = grupos
             .map((g) => g['image_url'] as String?)
@@ -155,20 +161,25 @@ class ProductProvider with ChangeNotifier {
         if (grupoImagePaths.isNotEmpty) {
           await _supabase.storage.from('product_images').remove(grupoImagePaths);
         }
-        
+
         await _supabase.from('grupos_adicionais').delete().eq('produto_id', productId);
       }
-      
-      final product = await _supabase.from('produtos').select('image_url').eq('id', productId).maybeSingle();
+
+      final product = await _supabase
+          .from('produtos')
+          .select('image_url')
+          .eq('id', productId)
+          .maybeSingle();
       if (product != null && product['image_url'] != null) {
-        final path = (product['image_url'] as String).split('/product_images/').last;
+        final path =
+            (product['image_url'] as String).split('/product_images/').last;
         await _supabase.storage.from('product_images').remove([path]);
       }
 
       await _supabase.from('produtos').delete().eq('id', productId);
-
     } catch (error) {
-        throw Exception('Falha no processo de deleção em cascata do produto.');
+      debugPrint("Falha na deleção em cascata: $error");
+      throw Exception('Falha no processo de deleção em cascata do produto.');
     }
   }
 
@@ -185,7 +196,7 @@ class ProductProvider with ChangeNotifier {
   Future<void> deleteCategory(String categoryId) async {
     final companyId = _getCompanyId();
     if (companyId == null) throw Exception('Usuário não autenticado.');
-    
+
     try {
       final productsToDelete = await _supabase
           .from('produtos')
@@ -201,7 +212,7 @@ class ProductProvider with ChangeNotifier {
           .delete()
           .eq('id', categoryId)
           .eq('company_id', companyId);
-          
+
       await fetchData();
     } catch (error) {
       debugPrint(error.toString());
@@ -216,7 +227,7 @@ class ProductProvider with ChangeNotifier {
     try {
       final response = await _supabase
           .from('grupos_adicionais')
-          .select('*, adicionais(*, display_order)')
+          .select('*, adicionais(*)')
           .eq('produto_id', produtoId)
           .eq('company_id', companyId)
           .order('display_order', ascending: true);
@@ -228,66 +239,75 @@ class ProductProvider with ChangeNotifier {
       return [];
     }
   }
+// ATUALIZAÇÃO 1: Adicionar os parâmetros min e max
+Future<void> addGrupoAdicional(
+    String name, String produtoId, XFile? imageFile, int min, int? max) async {
+  final companyId = _getCompanyId();
+  if (companyId == null) throw Exception('Usuário não autenticado.');
+  try {
+    final response = await _supabase
+        .from('grupos_adicionais')
+        .select()
+        .eq('produto_id', produtoId)
+        .count();
+    final newDisplayOrder = response.count;
 
-  Future<void> addGrupoAdicional(
-      String name, String produtoId, XFile? imageFile) async {
-    final companyId = _getCompanyId();
-    if (companyId == null) throw Exception('Usuário não autenticado.');
-    try {
-      final response = await _supabase
-          .from('grupos_adicionais')
-          .select()
-          .eq('produto_id', produtoId)
-          .count();
-      final newDisplayOrder = response.count;
+    final newGrupo = await _supabase.from('grupos_adicionais').insert({
+      'name': name,
+      'produto_id': produtoId,
+      'company_id': companyId,
+      'display_order': newDisplayOrder,
+      'min_quantity': min, // NOVO
+      'max_quantity': max, // NOVO
+    }).select().maybeSingle();
 
-      final newGrupo = await _supabase.from('grupos_adicionais').insert({
-        'name': name,
-        'produto_id': produtoId,
-        'company_id': companyId,
-        'display_order': newDisplayOrder,
-      }).select().maybeSingle();
-
-      if (newGrupo == null) {
-        throw Exception(
-            'Falha ao criar grupo: não foi possível obter o retorno do banco de dados.');
-      }
-
-      if (imageFile != null) {
-        final newGrupoId = newGrupo['id'].toString();
-        final imageUrl = await _uploadImage(imageFile, 'grupos', newGrupoId);
-        if (imageUrl != null) {
-          await _supabase
-              .from('grupos_adicionais')
-              .update({'image_url': imageUrl}).eq('id', newGrupoId);
-        }
-      }
-    } catch (e) {
-      throw Exception('Falha ao criar grupo de adicionais.');
+    if (newGrupo == null) {
+      throw Exception(
+          'Falha ao criar grupo: não foi possível obter o retorno do banco de dados.');
     }
-  }
 
-  Future<void> updateGrupoAdicional(
-      String id, String name, XFile? imageFile) async {
-    final companyId = _getCompanyId();
-    if (companyId == null) throw Exception('Usuário não autenticado.');
-    try {
-      final updates = <String, dynamic>{'name': name};
-      if (imageFile != null) {
-        final imageUrl = await _uploadImage(imageFile, 'grupos', id);
-        if (imageUrl != null) {
-          updates['image_url'] = imageUrl;
-        }
+    if (imageFile != null) {
+      final newGrupoId = newGrupo['id'].toString();
+      final imageUrl = await _uploadImage(imageFile, 'grupos', newGrupoId);
+      if (imageUrl != null) {
+        await _supabase
+            .from('grupos_adicionais')
+            .update({'image_url': imageUrl}).eq('id', newGrupoId);
       }
-      await _supabase
-          .from('grupos_adicionais')
-          .update(updates)
-          .eq('id', id)
-          .eq('company_id', companyId);
-    } catch (e) {
-      throw Exception('Falha ao atualizar grupo de adicionais.');
     }
+  } catch (e) {
+    throw Exception('Falha ao criar grupo de adicionais.');
   }
+}
+
+// ATUALIZAÇÃO 2: Adicionar os parâmetros min e max
+Future<void> updateGrupoAdicional(
+    String id, String name, XFile? imageFile, int min, int? max) async {
+  final companyId = _getCompanyId();
+  if (companyId == null) throw Exception('Usuário não autenticado.');
+  try {
+    // Adicionado min_quantity e max_quantity ao objeto de atualização
+    final updates = <String, dynamic>{
+      'name': name,
+      'min_quantity': min,
+      'max_quantity': max,
+    };
+
+    if (imageFile != null) {
+      final imageUrl = await _uploadImage(imageFile, 'grupos', id);
+      if (imageUrl != null) {
+        updates['image_url'] = imageUrl;
+      }
+    }
+    await _supabase
+        .from('grupos_adicionais')
+        .update(updates)
+        .eq('id', id)
+        .eq('company_id', companyId);
+  } catch (e) {
+    throw Exception('Falha ao atualizar grupo de adicionais.');
+  }
+}
 
   Future<void> deleteGrupoAdicional(String id) async {
     final companyId = _getCompanyId();
@@ -554,8 +574,7 @@ class ProductProvider with ChangeNotifier {
       throw Exception('Falha ao reordenar adicionais.');
     }
   }
-  
-  Future<String> _getNewCopyName({
+Future<String> _getNewCopyName({
     required String tableName,
     required String nameColumn,
     required String baseName,
@@ -565,7 +584,7 @@ class ProductProvider with ChangeNotifier {
     final companyId = _getCompanyId();
     if (companyId == null) throw Exception('Usuário não autenticado.');
 
-    final cleanBaseName = baseName.replaceAll(RegExp(r'_copia\(\d+\)$'), '');
+    final cleanBaseName = baseName.replaceAll(RegExp(r'_copia\(\d+\)$'), '').trim();
 
     final response = await _supabase
         .from(tableName)
@@ -598,12 +617,17 @@ class ProductProvider with ChangeNotifier {
 
     try {
       final uri = Uri.parse(originalUrl);
-      final originalPath = uri.path.split('/product_images/').last;
+      final pathSegments = uri.pathSegments;
+      final bucketName = 'product_images';
+      final bucketIndex = pathSegments.indexOf(bucketName);
+      if (bucketIndex == -1) throw Exception('Bucket não encontrado na URL');
+      
+      final originalPath = pathSegments.sublist(bucketIndex + 1).join('/');
       final fileExt = originalPath.split('.').last;
       final newPath = '$companyId/$folder/$newEntityId.$fileExt';
 
-      await _supabase.storage.from('product_images').copy(originalPath, newPath);
-      return _supabase.storage.from('product_images').getPublicUrl(newPath);
+      await _supabase.storage.from(bucketName).copy(originalPath, newPath);
+      return _supabase.storage.from(bucketName).getPublicUrl(newPath);
     } catch (e) {
       debugPrint("Erro ao copiar imagem: $e");
       return null;
@@ -683,7 +707,7 @@ class ProductProvider with ChangeNotifier {
 
     final originalGrupo = await _supabase
         .from('grupos_adicionais')
-        .select('*, adicionais(*)')
+        .select('*, adicionais:adicionais(*)')
         .eq('id', idStr)
         .eq('company_id', companyId)
         .single();
@@ -754,7 +778,7 @@ class ProductProvider with ChangeNotifier {
 
     final originalProduct = await _supabase
         .from('produtos')
-        .select('*, grupos_adicionais(*)')
+        .select('*, grupos_adicionais:grupos_adicionais(*, adicionais:adicionais(*))')
         .eq('id', idStr)
         .eq('company_id', companyId)
         .single();
@@ -850,10 +874,12 @@ class ProductProvider with ChangeNotifier {
     final newCategoryId = inserted['id'].toString();
 
     for (final product in productsToCopy) {
+      // ===== A CORREÇÃO ESTÁ AQUI =====
+      // Ao duplicar uma categoria, os produtos dentro dela também devem ser
+      // criados como cópias, não com o nome original.
       await _duplicateProductInternal(product['id'], newCategoryId,
-          keepOriginalName: true);
+          keepOriginalName: false); 
     }
 
     await fetchData();
-  }
-}
+  }}

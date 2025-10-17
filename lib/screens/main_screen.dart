@@ -10,23 +10,26 @@ class MainScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Usamos context.watch para que a tela reconstrua quando a navegação mudar
     final navProvider = context.watch<NavigationProvider>();
 
     return Scaffold(
       body: Row(
         children: [
+          // Menu Lateral Fixo
           const SizedBox(
             width: 280,
             child: SideMenu(),
           ),
           const VerticalDivider(width: 1, thickness: 1),
+          // Conteúdo Principal Dinâmico
           Expanded(
             child: Column(
               children: [
-                CustomAppBar(
-                  actions: navProvider.currentActions,
-                ),
+                // Nossa AppBar customizada que reage ao provider
+                const CustomAppBar(),
                 Expanded(
+                  // A tela atual é exibida aqui
                   child: navProvider.currentScreen,
                 ),
               ],

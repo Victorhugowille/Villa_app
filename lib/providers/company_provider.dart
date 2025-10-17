@@ -1,12 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
-class Company {
-  final String id;
-  final String name;
-
-  Company({required this.id, required this.name});
-}
+import 'package:villabistromobile/data/app_data.dart';
 
 class CompanyProvider with ChangeNotifier {
   final SupabaseClient _supabase = Supabase.instance.client;
@@ -20,49 +14,45 @@ class CompanyProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   String get companyName => _currentCompany?.name ?? 'Carregando...';
 
+  // ### ADIÇÃO AQUI ###
+  // Getter para facilitar o acesso ao ID da empresa
+  String? get companyId => _currentCompany?.id;
+
   Future<void> fetchCompanyForCurrentUser() async {
     if (_supabase.auth.currentUser == null) {
-      debugPrint('[DEBUG] A função fetch foi chamada, mas não há usuário logado. Saindo.');
+      debugPrint('Usuário não logado. Abortando busca de empresa.');
       return;
     }
     
-    debugPrint('[DEBUG] Iniciando a busca de dados da empresa e cargo...');
     _isLoading = true;
     notifyListeners();
 
     try {
       final userId = _supabase.auth.currentUser!.id;
-      debugPrint('[DEBUG] Buscando perfil para o user_id: $userId');
-
+      
       final response = await _supabase
           .from('profiles')
-          .select('role, company_id, companies (id, name)')
+          .select('role, company_id, companies (*)')
           .eq('user_id', userId)
           .single();
       
-      debugPrint('[DEBUG] Resposta do Supabase: $response');
-
       _role = response['role'];
-      debugPrint('[DEBUG] Cargo (role) encontrado: $_role');
 
       if (response['companies'] != null) {
-        final companyData = response['companies'];
-        _currentCompany = Company(
-          id: companyData['id'],
-          name: companyData['name'],
-        );
-        debugPrint('[DEBUG] Empresa encontrada: ${companyData['name']}');
+        final companyData = response['companies'] as Map<String, dynamic>;
+        _currentCompany = Company.fromJson(companyData);
+        debugPrint('[CompanyProvider] Empresa "${_currentCompany?.name}" carregada com sucesso.');
       } else {
-        debugPrint('[DEBUG] Nenhuma empresa associada encontrada na resposta.');
+        debugPrint('[CompanyProvider] Nenhuma empresa associada ao perfil.');
       }
+
     } catch (e) {
-      debugPrint('[DEBUG] ERRO ao buscar dados: $e');
+      debugPrint('[CompanyProvider] ERRO ao buscar dados: $e');
       _currentCompany = null;
       _role = null;
     } finally {
       _isLoading = false;
       notifyListeners();
-      debugPrint('[DEBUG] Busca finalizada.');
     }
   }
 

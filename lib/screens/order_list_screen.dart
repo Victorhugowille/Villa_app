@@ -66,10 +66,11 @@ class _OrderListScreenState extends State<OrderListScreen> {
     final conferencePrinter = printerProvider.conferencePrinter;
 
     if (conferencePrinter == null) {
-       if (!mounted) return;
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Nenhuma impressora de conferência configurada! Vá em Impressão > Conferência para configurar.'),
+            content: Text(
+                'Nenhuma impressora de conferência configurada! Vá em Impressão > Conferência para configurar.'),
             backgroundColor: Colors.red),
       );
       return;
@@ -130,7 +131,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
               child: Text('Erro ao carregar pedidos: ${snapshot.error}'));
         } else {
           final loadedOrders = snapshot.data ?? [];
-          
+
           final tableProvider = context.watch<TableProvider>();
           final paidItemIds =
               tableProvider.getPaidItemIdsForTable(widget.table.id);
@@ -149,6 +150,8 @@ class _OrderListScreenState extends State<OrderListScreen> {
             if (unpaidItems.isNotEmpty) {
               unpaidOrders.add(app_data.Order(
                   id: order.id,
+                  // CORREÇÃO AQUI: Passando o numeroPedido do pedido original
+                  numeroPedido: order.numeroPedido,
                   items: unpaidItems,
                   timestamp: order.timestamp,
                   status: order.status,
@@ -217,8 +220,9 @@ class _OrderListScreenState extends State<OrderListScreen> {
 
   Widget _buildOrderCard(
       app_data.Order order, Set<String> paidItemIds, ThemeData theme) {
-    final String orderIdDisplay =
-        order.id.length > 8 ? order.id.substring(0, 8) : order.id;
+    // CORREÇÃO AQUI: A variável de display não é mais necessária.
+    // final String orderIdDisplay =
+    //     order.id.length > 8 ? order.id.substring(0, 8) : order.id;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -228,7 +232,8 @@ class _OrderListScreenState extends State<OrderListScreen> {
         children: [
           ListTile(
             title: Text(
-              'Pedido #$orderIdDisplay',
+              // CORREÇÃO AQUI: Mostrando o novo 'numeroPedido'
+              'Pedido #${order.numeroPedido}',
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             subtitle:
@@ -273,7 +278,9 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                     padding: EdgeInsets.zero,
                                     backgroundColor: Colors.green,
                                     labelStyle: TextStyle(
-                                        color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold),
                                   ),
                                 ),
                             ],

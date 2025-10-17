@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 import 'package:provider/provider.dart';
@@ -23,6 +24,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _acceptedPrivacy = false;
 
   String _companyName = '';
+  String? _verifiedCompanyId; // MUDANÇA 1: Armazena o ID da empresa verificada
   Timer? _debounce;
 
   final _cnpjMaskFormatter =
@@ -31,10 +33,13 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    _emailController.text = 'victorhugowille@gmail.com';
-    _passwordController.text = '123456';
-    _cnpjController.text = '59.902.925/0001-70';
-    _fetchCompanyName();
+    // Preenchimento para testes
+    if(mounted) {
+      _emailController.text = 'victorhugowille@gmail.com';
+      _passwordController.text = '123456';
+      _cnpjController.text = '59.902.925/0001-70';
+      _fetchCompanyData();
+    }
   }
 
   @override
@@ -50,48 +55,56 @@ class _LoginScreenState extends State<LoginScreen> {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
     _debounce = Timer(const Duration(milliseconds: 700), () {
       if (cnpj.length == 18) {
-        _fetchCompanyName();
+        _fetchCompanyData();
       } else {
-        if (mounted) setState(() => _companyName = '');
+        if (mounted) {
+          setState(() {
+            _companyName = '';
+            _verifiedCompanyId = null; // Limpa o ID verificado
+          });
+        }
       }
     });
   }
 
-  Future<void> _fetchCompanyName() async {
+  // MUDANÇA 2: Função renomeada e agora busca o ID também
+  Future<void> _fetchCompanyData() async {
     if (!mounted) return;
     setState(() {
       _isCheckingCnpj = true;
       _companyName = '';
+      _verifiedCompanyId = null; // Limpa o ID antes de verificar
     });
 
     final unmaskedCnpj = _cnpjMaskFormatter.getUnmaskedText();
     if (unmaskedCnpj.length != 14) {
-      setState(() {
-        _isCheckingCnpj = false;
-      });
+      setState(() => _isCheckingCnpj = false);
       return;
     }
 
     try {
       final response = await Supabase.instance.client
           .from('companies')
-          .select('name')
+          .select('id, name') // Busca o ID e o nome
           .eq('cnpj', unmaskedCnpj)
           .maybeSingle();
 
-      if (mounted && response != null) {
+      if (mounted) {
         setState(() {
-          _companyName = response['name'];
-        });
-      } else if (mounted) {
-        setState(() {
-          _companyName = 'Empresa não encontrada';
+          if (response != null) {
+            _companyName = response['name'];
+            _verifiedCompanyId = response['id']; // Armazena o ID
+          } else {
+            _companyName = 'Empresa não encontrada';
+            _verifiedCompanyId = null;
+          }
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _companyName = 'Erro ao buscar';
+          _verifiedCompanyId = null;
         });
       }
     } finally {
@@ -101,6 +114,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  // MUDANÇA 3: Lógica de login mais robusta
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (!_acceptedPrivacy) {
@@ -109,21 +123,78 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       return;
     }
+    // Verificação extra: garante que uma empresa válida foi encontrada antes de prosseguir
+    if (_verifiedCompanyId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Por favor, informe um CNPJ de uma empresa válida.'),
+        backgroundColor: Colors.orange,
+      ));
+      return;
+    }
 
     setState(() => _isLoading = true);
+    
+    final supabase = Supabase.instance.client;
 
     try {
-      await Supabase.instance.client.auth.signInWithPassword(
+      // 1. Tenta autenticar o usuário com e-mail e senha
+      await supabase.auth.signInWithPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
-      if (mounted) {
-        await Provider.of<CompanyProvider>(context, listen: false).fetchCompanyForCurrentUser();
-        Navigator.of(context).pushReplacementNamed('/home');
+
+      final userId = supabase.auth.currentUser!.id;
+
+      // 2. Busca o company_id associado ao perfil do usuário
+      final profileResponse = await supabase
+          .from('profiles')
+          .select('company_id')
+          .eq('user_id', userId)
+          .single();
+      
+      final userCompanyId = profileResponse['company_id'];
+
+      // 3. Compara o ID do perfil do usuário com o ID da empresa digitada
+      if (userCompanyId != null && userCompanyId == _verifiedCompanyId) {
+        // SUCESSO! Os IDs correspondem.
+        if (mounted) {
+          await Provider.of<CompanyProvider>(context, listen: false).fetchCompanyForCurrentUser();
+          Navigator.of(context).pushReplacementNamed('/home');
+        }
+      } else {
+        // FALHA! O usuário não pertence a esta empresa.
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Este usuário não tem permissão para acessar esta empresa.'),
+            backgroundColor: Colors.red,
+          ));
+        }
+        await supabase.auth.signOut();
+      }
+
+    } on SocketException catch (_) {
+      if (mounted){
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Sem conexão com a internet. Verifique sua rede.'),
+          backgroundColor: Colors.orange,
+        ));
       }
     } on AuthException catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(error.message),
+          backgroundColor: Colors.red,
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Ocorreu um erro inesperado: $e'),
+          backgroundColor: Colors.red,
+        ));
+      }
+      if (supabase.auth.currentUser != null) {
+        await supabase.auth.signOut();
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -133,9 +204,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final bool empresaValida = _companyName.isNotEmpty &&
-        _companyName != 'Empresa não encontrada' &&
-        _companyName != 'Erro ao buscar';
+    final bool empresaValida = _verifiedCompanyId != null;
 
     return Scaffold(
       body: SafeArea(

@@ -1,3 +1,4 @@
+// lib/models/print_style_settings.dart
 import 'package:flutter/material.dart' show CrossAxisAlignment;
 
 String alignmentToString(CrossAxisAlignment alignment) {
@@ -55,11 +56,12 @@ class PrintStyle {
 }
 
 class KitchenTemplateSettings {
-  final PrintStyle headerStyle;
-  final PrintStyle tableStyle;
+  // --- MUDANÇA: Simplificação dos estilos ---
+  final PrintStyle headerStyle; // Unifica 'tableStyle' e o antigo 'headerStyle'
   final PrintStyle orderInfoStyle;
   final PrintStyle itemStyle;
-  final PrintStyle observationStyle;
+  final PrintStyle observationStyle; // Para observações de itens E GERAIS
+  final PrintStyle deliveryInfoStyle;
   final String footerText;
   final PrintStyle footerStyle;
   final String? logoPath;
@@ -68,10 +70,10 @@ class KitchenTemplateSettings {
 
   KitchenTemplateSettings({
     required this.headerStyle,
-    required this.tableStyle,
     required this.orderInfoStyle,
     required this.itemStyle,
     required this.observationStyle,
+    required this.deliveryInfoStyle,
     required this.footerText,
     required this.footerStyle,
     this.logoPath,
@@ -81,10 +83,10 @@ class KitchenTemplateSettings {
 
   KitchenTemplateSettings copyWith({
     PrintStyle? headerStyle,
-    PrintStyle? tableStyle,
     PrintStyle? orderInfoStyle,
     PrintStyle? itemStyle,
     PrintStyle? observationStyle,
+    PrintStyle? deliveryInfoStyle,
     String? footerText,
     PrintStyle? footerStyle,
     String? logoPath,
@@ -93,10 +95,10 @@ class KitchenTemplateSettings {
   }) {
     return KitchenTemplateSettings(
       headerStyle: headerStyle ?? this.headerStyle,
-      tableStyle: tableStyle ?? this.tableStyle,
       orderInfoStyle: orderInfoStyle ?? this.orderInfoStyle,
       itemStyle: itemStyle ?? this.itemStyle,
       observationStyle: observationStyle ?? this.observationStyle,
+      deliveryInfoStyle: deliveryInfoStyle ?? this.deliveryInfoStyle,
       footerText: footerText ?? this.footerText,
       footerStyle: footerStyle ?? this.footerStyle,
       logoPath: logoPath ?? this.logoPath,
@@ -106,11 +108,11 @@ class KitchenTemplateSettings {
   }
 
   factory KitchenTemplateSettings.defaults() => KitchenTemplateSettings(
-        headerStyle: PrintStyle(fontSize: 14, isBold: true, alignment: CrossAxisAlignment.center),
-        tableStyle: PrintStyle(fontSize: 16, isBold: true, alignment: CrossAxisAlignment.center),
+        headerStyle: PrintStyle(fontSize: 16, isBold: true, alignment: CrossAxisAlignment.center),
         orderInfoStyle: PrintStyle(fontSize: 10, isBold: false, alignment: CrossAxisAlignment.center),
         itemStyle: PrintStyle(fontSize: 10, isBold: true, alignment: CrossAxisAlignment.start),
         observationStyle: PrintStyle(fontSize: 9, isBold: false, alignment: CrossAxisAlignment.start),
+        deliveryInfoStyle: PrintStyle(fontSize: 10, isBold: false, alignment: CrossAxisAlignment.start),
         footerText: 'Obrigado!',
         footerStyle: PrintStyle(fontSize: 10, isBold: false, alignment: CrossAxisAlignment.center),
         logoPath: null,
@@ -118,26 +120,32 @@ class KitchenTemplateSettings {
         logoAlignment: CrossAxisAlignment.center,
       );
 
-  factory KitchenTemplateSettings.fromJson(Map<String, dynamic> json) =>
-      KitchenTemplateSettings(
-        headerStyle: PrintStyle.fromJson(json['headerStyle'] ?? {}),
-        tableStyle: PrintStyle.fromJson(json['tableStyle'] ?? {}),
-        orderInfoStyle: PrintStyle.fromJson(json['orderInfoStyle'] ?? {}),
-        itemStyle: PrintStyle.fromJson(json['itemStyle'] ?? {}),
-        observationStyle: PrintStyle.fromJson(json['observationStyle'] ?? {}),
-        footerText: json['footerText'] ?? 'Obrigado!',
-        footerStyle: PrintStyle.fromJson(json['footerStyle'] ?? {}),
-        logoPath: json['logoPath'],
-        logoHeight: (json['logoHeight'] as num? ?? 40.0).toDouble(),
-        logoAlignment: alignmentFromString(json['logoAlignment'] as String? ?? 'center'),
-      );
+  factory KitchenTemplateSettings.fromJson(Map<String, dynamic> json) {
+    // Lógica para compatibilidade com versões antigas das configurações salvas
+    final oldTableStyle = json['tableStyle'] != null ? PrintStyle.fromJson(json['tableStyle']) : null;
+    final newHeaderStyle = json['headerStyle'] != null ? PrintStyle.fromJson(json['headerStyle']) : null;
+    
+    return KitchenTemplateSettings(
+      headerStyle: newHeaderStyle ?? oldTableStyle ?? PrintStyle.fromJson(json['headerStyle'] ?? {}),
+      orderInfoStyle: PrintStyle.fromJson(json['orderInfoStyle'] ?? {}),
+      itemStyle: PrintStyle.fromJson(json['itemStyle'] ?? {}),
+      observationStyle: PrintStyle.fromJson(json['observationStyle'] ?? {}),
+      deliveryInfoStyle: PrintStyle.fromJson(json['deliveryInfoStyle'] ?? {}),
+      footerText: json['footerText'] ?? 'Obrigado!',
+      footerStyle: PrintStyle.fromJson(json['footerStyle'] ?? {}),
+      logoPath: json['logoPath'],
+      logoHeight: (json['logoHeight'] as num? ?? 40.0).toDouble(),
+      logoAlignment: alignmentFromString(json['logoAlignment'] as String? ?? 'center'),
+    );
+  }
+
 
   Map<String, dynamic> toJson() => {
         'headerStyle': headerStyle.toJson(),
-        'tableStyle': tableStyle.toJson(),
         'orderInfoStyle': orderInfoStyle.toJson(),
         'itemStyle': itemStyle.toJson(),
         'observationStyle': observationStyle.toJson(),
+        'deliveryInfoStyle': deliveryInfoStyle.toJson(),
         'footerText': footerText,
         'footerStyle': footerStyle.toJson(),
         'logoPath': logoPath,
@@ -146,10 +154,11 @@ class KitchenTemplateSettings {
       };
 }
 
+
 class ReceiptTemplateSettings {
   final String? logoPath;
   final double logoHeight;
-  final CrossAxisAlignment logoAlignment; // Novo campo para alinhamento do logo
+  final CrossAxisAlignment logoAlignment;
   final PrintStyle headerStyle;
   final String subtitleText;
   final PrintStyle subtitleStyle;
@@ -162,11 +171,12 @@ class ReceiptTemplateSettings {
   final PrintStyle totalStyle;
   final String finalMessageText;
   final PrintStyle finalMessageStyle;
+  final PrintStyle deliveryInfoStyle;
 
   ReceiptTemplateSettings({
     this.logoPath,
     this.logoHeight = 40.0,
-    required this.logoAlignment, // Inicialização
+    required this.logoAlignment,
     required this.headerStyle,
     required this.subtitleText,
     required this.subtitleStyle,
@@ -179,12 +189,13 @@ class ReceiptTemplateSettings {
     required this.totalStyle,
     required this.finalMessageText,
     required this.finalMessageStyle,
+    required this.deliveryInfoStyle,
   });
 
   ReceiptTemplateSettings copyWith({
     String? logoPath,
     double? logoHeight,
-    CrossAxisAlignment? logoAlignment, // Para o copyWith
+    CrossAxisAlignment? logoAlignment,
     PrintStyle? headerStyle,
     String? subtitleText,
     PrintStyle? subtitleStyle,
@@ -197,11 +208,12 @@ class ReceiptTemplateSettings {
     PrintStyle? totalStyle,
     String? finalMessageText,
     PrintStyle? finalMessageStyle,
+    PrintStyle? deliveryInfoStyle,
   }) {
     return ReceiptTemplateSettings(
       logoPath: logoPath ?? this.logoPath,
       logoHeight: logoHeight ?? this.logoHeight,
-      logoAlignment: logoAlignment ?? this.logoAlignment, // Aplica o novo campo
+      logoAlignment: logoAlignment ?? this.logoAlignment,
       headerStyle: headerStyle ?? this.headerStyle,
       subtitleText: subtitleText ?? this.subtitleText,
       subtitleStyle: subtitleStyle ?? this.subtitleStyle,
@@ -214,6 +226,7 @@ class ReceiptTemplateSettings {
       totalStyle: totalStyle ?? this.totalStyle,
       finalMessageText: finalMessageText ?? this.finalMessageText,
       finalMessageStyle: finalMessageStyle ?? this.finalMessageStyle,
+      deliveryInfoStyle: deliveryInfoStyle ?? this.deliveryInfoStyle,
     );
   }
 
@@ -221,7 +234,7 @@ class ReceiptTemplateSettings {
     return ReceiptTemplateSettings(
       logoPath: null,
       logoHeight: 40.0,
-      logoAlignment: CrossAxisAlignment.center, // Valor padrão
+      logoAlignment: CrossAxisAlignment.center,
       headerStyle: PrintStyle(
           fontSize: 16, isBold: true, alignment: CrossAxisAlignment.center),
       subtitleText: 'CNPJ: 00.000.000/0001-00',
@@ -242,13 +255,14 @@ class ReceiptTemplateSettings {
       finalMessageText: 'Obrigado pela preferência!',
       finalMessageStyle: PrintStyle(
           fontSize: 10, isBold: false, alignment: CrossAxisAlignment.center),
+      deliveryInfoStyle: PrintStyle(fontSize: 10, isBold: false, alignment: CrossAxisAlignment.start),
     );
   }
 
   Map<String, dynamic> toJson() => {
         'logoPath': logoPath,
         'logoHeight': logoHeight,
-        'logoAlignment': alignmentToString(logoAlignment), // Serialização
+        'logoAlignment': alignmentToString(logoAlignment),
         'headerStyle': headerStyle.toJson(),
         'subtitleText': subtitleText,
         'subtitleStyle': subtitleStyle.toJson(),
@@ -261,6 +275,7 @@ class ReceiptTemplateSettings {
         'totalStyle': totalStyle.toJson(),
         'finalMessageText': finalMessageText,
         'finalMessageStyle': finalMessageStyle.toJson(),
+        'deliveryInfoStyle': deliveryInfoStyle.toJson(),
       };
 
   factory ReceiptTemplateSettings.fromJson(Map<String, dynamic> json) =>
@@ -268,7 +283,7 @@ class ReceiptTemplateSettings {
         logoPath: json['logoPath'],
         logoHeight: (json['logoHeight'] as num? ?? 40.0).toDouble(),
         logoAlignment:
-            alignmentFromString(json['logoAlignment'] as String? ?? 'center'), // Desserialização
+            alignmentFromString(json['logoAlignment'] as String? ?? 'center'),
         headerStyle: PrintStyle.fromJson(json['headerStyle'] ?? {}),
         subtitleText: json['subtitleText'] ?? '',
         subtitleStyle: PrintStyle.fromJson(json['subtitleStyle'] ?? {}),
@@ -283,5 +298,6 @@ class ReceiptTemplateSettings {
             json['finalMessageText'] ?? 'Obrigado pela preferência!',
         finalMessageStyle:
             PrintStyle.fromJson(json['finalMessageStyle'] ?? {}),
+        deliveryInfoStyle: PrintStyle.fromJson(json['deliveryInfoStyle'] ?? {}),
       );
 }

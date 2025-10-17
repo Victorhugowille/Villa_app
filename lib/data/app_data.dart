@@ -1,5 +1,105 @@
 import 'package:flutter/material.dart';
 
+class Company {
+  final String id;
+  final String name;
+  final String? logoUrl; // NOVO CAMPO
+  final String? cnpj;
+  final String? telefone;
+  final String? rua;
+  final String? numero;
+  final String? bairro;
+  final String? cidade;
+  final String? estado;
+  final String? zapiInstanceId;
+  final String? zapiToken;
+  final String? notificationEmail;
+  final String? slug;
+  final String? colorSite;
+  final double? latitude;
+  final double? longitude;
+
+  Company({
+    required this.id,
+    required this.name,
+    this.logoUrl, // NOVO CAMPO
+    this.cnpj,
+    this.telefone,
+    this.rua,
+    this.numero,
+    this.bairro,
+    this.cidade,
+    this.estado,
+    this.zapiInstanceId,
+    this.zapiToken,
+    this.notificationEmail,
+    this.slug,
+    this.colorSite,
+    this.latitude,
+    this.longitude,
+  });
+
+  factory Company.fromJson(Map<String, dynamic> json) {
+    return Company(
+      id: json['id']?.toString() ?? '',
+      name: json['name'] ?? '',
+      logoUrl: json['logo_url'], // NOVO CAMPO
+      cnpj: json['cnpj'],
+      telefone: json['telefone'],
+      rua: json['rua'],
+      numero: json['numero'],
+      bairro: json['bairro'],
+      cidade: json['cidade'],
+      estado: json['estado'],
+      zapiInstanceId: json['zapi_instance_id'],
+      zapiToken: json['zapi_token'],
+      notificationEmail: json['notification_email'],
+      slug: json['slug'],
+      colorSite: json['color_site'],
+      latitude: (json['latitude'] as num?)?.toDouble(),
+      longitude: (json['longitude'] as num?)?.toDouble(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'logo_url': logoUrl, // NOVO CAMPO
+      'cnpj': cnpj,
+      'telefone': telefone,
+      'rua': rua,
+      'numero': numero,
+      'bairro': bairro,
+      'cidade': cidade,
+      'estado': estado,
+      'latitude': latitude,
+      'longitude': longitude,
+    };
+  }
+}
+class DestaqueSite {
+  final int id;
+  final String companyId;
+  final String imageUrl;
+  final int slotNumber;
+
+  DestaqueSite({
+    required this.id,
+    required this.companyId,
+    required this.imageUrl,
+    required this.slotNumber,
+  });
+
+  factory DestaqueSite.fromJson(Map<String, dynamic> json) {
+    return DestaqueSite(
+      id: json['id'],
+      companyId: json['company_id'],
+      imageUrl: json['image_url'],
+      slotNumber: json['slot_number'],
+    );
+  }
+}
 class SavedReport {
   final String id;
   final String name;
@@ -9,7 +109,8 @@ class SavedReport {
     return SavedReport(
         id: json['id']?.toString() ?? '',
         name: json['name'] ?? 'Relatório Inválido',
-        createdAt: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now());
+        createdAt:
+            DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now());
   }
 }
 
@@ -20,6 +121,8 @@ class GrupoAdicional {
   final String? imageUrl;
   List<Adicional> adicionais;
   final int displayOrder;
+  final int minQuantity;
+  final int? maxQuantity;
 
   GrupoAdicional(
       {required this.id,
@@ -27,7 +130,9 @@ class GrupoAdicional {
       required this.produtoId,
       this.imageUrl,
       this.adicionais = const [],
-      required this.displayOrder});
+      required this.displayOrder,
+      required this.minQuantity,
+      this.maxQuantity});
 
   factory GrupoAdicional.fromJson(Map<String, dynamic> json) {
     List<Adicional> items = [];
@@ -43,7 +148,9 @@ class GrupoAdicional {
         produtoId: json['produto_id']?.toString() ?? '',
         imageUrl: json['image_url'],
         adicionais: items,
-        displayOrder: json['display_order'] ?? 0);
+        displayOrder: json['display_order'] ?? 0,
+        minQuantity: json['min_quantity'] ?? 0,
+        maxQuantity: json['max_quantity']);
   }
 }
 
@@ -162,8 +269,14 @@ class CartItemAdicional {
   CartItemAdicional({required this.adicional, required this.quantity});
 
   factory CartItemAdicional.fromJson(Map<String, dynamic> json) {
+    final adicionalJson = json['adicional'] as Map<String, dynamic>? ?? {};
     return CartItemAdicional(
-      adicional: Adicional.fromJson(json['adicional'] ?? {}),
+      adicional: Adicional(
+        id: adicionalJson['id']?.toString() ?? '',
+        name: adicionalJson['name'] ?? 'Adicional Inválido',
+        price: (adicionalJson['price'] as num?)?.toDouble() ?? 0.0,
+        displayOrder: 0,
+      ),
       quantity: json['quantity'] ?? 1,
     );
   }
@@ -219,23 +332,76 @@ class CartItem {
   }
 }
 
+// **CLASSE ATUALIZADA**
+class DeliveryInfo {
+  final String id;
+  final String pedidoId;
+  final String nomeCliente;
+  final String telefoneCliente;
+  final String enderecoEntrega;
+  final String? companyId;
+  final String? locationLink; // NOVO CAMPO: Para o link do mapa
+
+  DeliveryInfo({
+    required this.id,
+    required this.pedidoId,
+    required this.nomeCliente,
+    required this.telefoneCliente,
+    required this.enderecoEntrega,
+    this.companyId,
+    this.locationLink, // NOVO CAMPO
+  });
+
+  factory DeliveryInfo.fromJson(Map<String, dynamic> json) {
+    return DeliveryInfo(
+      id: json['id']?.toString() ?? '',
+      pedidoId: json['pedido_id']?.toString() ?? '',
+      nomeCliente: json['nome_cliente'] ?? '',
+      telefoneCliente: json['telefone_cliente'] ?? '',
+      enderecoEntrega: json['endereco_entrega'] ?? '',
+      companyId: json['company_id']?.toString(),
+      locationLink: json['location_link'], // NOVO CAMPO
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'pedido_id': int.tryParse(pedidoId) ?? 0,
+      'nome_cliente': nomeCliente,
+      'telefone_cliente': telefoneCliente,
+      'endereco_entrega': enderecoEntrega,
+      'company_id': companyId,
+      'location_link': locationLink,
+    };
+  }
+}
 class Order {
   final String id;
+  final int numeroPedido; 
   final List<CartItem> items;
   final DateTime timestamp;
   final String status;
   final String type;
   final int? tableNumber;
   final String? tableId;
+  final DeliveryInfo? deliveryInfo;
+  final String? observacao;
+  final double? deliveryFee;
+  final Map<String, dynamic>? paymentInfo;
 
   Order({
     required this.id,
+    required this.numeroPedido,
     required this.items,
     required this.timestamp,
     required this.status,
     required this.type,
     this.tableNumber,
     this.tableId,
+    this.deliveryInfo,
+    this.observacao,
+    this.deliveryFee,
+    this.paymentInfo,
   });
 
   factory Order.fromJson(Map<String, dynamic> json) {
@@ -247,25 +413,77 @@ class Order {
     }
 
     int? tableNum;
-    if (json['table_number'] != null) {
-      tableNum = (json['table_number'] as num?)?.toInt();
-    } else if (json['mesas'] is Map) {
+    if (json['mesas'] is Map && json['mesas'] != null) {
       tableNum = (json['mesas']['numero'] as num?)?.toInt();
+    } else if (json['table_number'] != null) {
+      tableNum = (json['table_number'] as num?)?.toInt();
+    }
+
+    DeliveryInfo? deliveryData;
+    final dynamic deliveryJson = json['delivery'];
+
+    if (deliveryJson != null) {
+      if (deliveryJson is List && deliveryJson.isNotEmpty) {
+        final firstItem = deliveryJson.first;
+        if (firstItem is Map<String, dynamic>) {
+          deliveryData = DeliveryInfo.fromJson(firstItem);
+        }
+      } else if (deliveryJson is Map<String, dynamic>) {
+        deliveryData = DeliveryInfo.fromJson(deliveryJson);
+      }
     }
 
     return Order(
-        id: json['id']?.toString() ?? '',
-        items: itemsList,
-        timestamp: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
-        status: json['status'] ?? 'production',
-        type: json['type'] ?? 'mesa',
-        tableNumber: tableNum,
-        tableId: (json['mesas'] is Map)
-            ? json['mesas']['id'].toString()
-            : json['mesa_id']?.toString());
+      id: json['id']?.toString() ?? '',
+      numeroPedido: json['numero_pedido'] ?? 0,
+      items: itemsList,
+      timestamp:
+          DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
+      status: json['status'] ?? 'production',
+      type: json['type'] ?? 'mesa',
+      tableNumber: tableNum,
+      tableId: (json['mesas'] is Map)
+          ? json['mesas']['id'].toString()
+          : json['mesa_id']?.toString(),
+      deliveryInfo: deliveryData,
+      observacao: json['observacao'],
+      deliveryFee: (json['delivery_fee'] as num?)?.toDouble(),
+      paymentInfo: json['payment_info'] as Map<String, dynamic>?,
+    );
   }
 
   double get total => items.fold(0.0, (sum, item) => sum + item.totalPrice);
+
+  // **MÉTODO ADICIONADO AQUI**
+  Order copyWith({
+    String? id,
+    int? numeroPedido,
+    List<CartItem>? items,
+    DateTime? timestamp,
+    String? status,
+    String? type,
+    int? tableNumber,
+    String? tableId,
+    DeliveryInfo? deliveryInfo,
+    String? observacao,
+    double? deliveryFee,
+    Map<String, dynamic>? paymentInfo,
+  }) {
+    return Order(
+      id: id ?? this.id,
+      numeroPedido: numeroPedido ?? this.numeroPedido,
+      items: items ?? this.items,
+      timestamp: timestamp ?? this.timestamp,
+      status: status ?? this.status,
+      type: type ?? this.type,
+      tableNumber: tableNumber ?? this.tableNumber,
+      tableId: tableId ?? this.tableId,
+      deliveryInfo: deliveryInfo ?? this.deliveryInfo,
+      observacao: observacao ?? this.observacao,
+      deliveryFee: deliveryFee ?? this.deliveryFee,
+      paymentInfo: paymentInfo ?? this.paymentInfo,
+    );
+  }
 }
 
 class Transaction {
@@ -292,7 +510,8 @@ class Transaction {
       id: jsonData['id']?.toString() ?? '',
       tableNumber: jsonData['table_number'] ?? 0,
       totalAmount: (jsonData['total_amount'] as num?)?.toDouble() ?? 0.0,
-      timestamp: DateTime.tryParse(jsonData['created_at'] ?? '') ?? DateTime.now(),
+      timestamp:
+          DateTime.tryParse(jsonData['created_at'] ?? '') ?? DateTime.now(),
       paymentMethod: jsonData['payment_method'] ?? 'N/A',
       discount: (jsonData['discount'] as num?)?.toDouble() ?? 0.0,
       surcharge: (jsonData['surcharge'] as num?)?.toDouble() ?? 0.0,
@@ -327,57 +546,5 @@ class CustomSpreadsheet {
       sheetData: data,
       createdAt: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
     );
-  }
-}
-
-class Estabelecimento {
-  final String? id;
-  final String nomeFantasia;
-  final String cnpj;
-  final String telefone;
-  final String rua;
-  final String numero;
-  final String bairro;
-  final String cidade;
-  final String estado;
-
-  Estabelecimento({
-    this.id,
-    required this.nomeFantasia,
-    required this.cnpj,
-    required this.telefone,
-    required this.rua,
-    required this.numero,
-    required this.bairro,
-    required this.cidade,
-    required this.estado,
-  });
-
-  factory Estabelecimento.fromJson(Map<String, dynamic> json) {
-    return Estabelecimento(
-      id: json['id'],
-      nomeFantasia: json['nome_fantasia'] ?? '',
-      cnpj: json['cnpj'] ?? '',
-      telefone: json['telefone'] ?? '',
-      rua: json['rua'] ?? '',
-      numero: json['numero'] ?? '',
-      bairro: json['bairro'] ?? '',
-      cidade: json['cidade'] ?? '',
-      estado: json['estado'] ?? '',
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      if (id != null) 'id': id,
-      'nome_fantasia': nomeFantasia,
-      'cnpj': cnpj,
-      'telefone': telefone,
-      'rua': rua,
-      'numero': numero,
-      'bairro': bairro,
-      'cidade': cidade,
-      'estado': estado,
-    };
   }
 }

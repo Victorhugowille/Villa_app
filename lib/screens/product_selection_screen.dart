@@ -46,6 +46,45 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
     }
   }
 
+  // **NOVA FUNÇÃO DE VALIDAÇÃO**
+  String? _validateAdicionais() {
+    // Itera sobre cada produto que o usuário está tentando adicionar
+    for (final productEntry in _productQuantities.entries) {
+      final productId = productEntry.key;
+      final productQty = productEntry.value;
+
+      // Só valida se a quantidade do produto for maior que zero
+      if (productQty <= 0) continue;
+
+      final grupos = _cachedAdicionais[productId];
+      if (grupos == null) continue; // Pula se não houver grupos
+
+      // Para cada grupo de adicionais do produto...
+      for (final grupo in grupos) {
+        int totalSelectedInGroup = 0;
+        final selectedForProduct = _adicionalQuantities[productId] ?? {};
+
+        // Soma a quantidade de cada adicional que pertence a este grupo
+        for (final adicional in grupo.adicionais) {
+          totalSelectedInGroup += selectedForProduct[adicional.id] ?? 0;
+        }
+
+        // Verifica a regra de quantidade MÍNIMA
+        if (totalSelectedInGroup < grupo.minQuantity) {
+          return 'Para o grupo "${grupo.name}", você precisa selecionar pelo menos ${grupo.minQuantity} item(ns).';
+        }
+
+        // Verifica a regra de quantidade MÁXIMA, se ela existir
+        if (grupo.maxQuantity != null &&
+            totalSelectedInGroup > grupo.maxQuantity!) {
+          return 'Para o grupo "${grupo.name}", o limite máximo é de ${grupo.maxQuantity} item(ns).';
+        }
+      }
+    }
+
+    return null; // Retorna nulo se todas as regras foram atendidas
+  }
+
   void _updateProductQuantity(String productId, int change) {
     setState(() {
       final currentQty = _productQuantities[productId] ?? 0;
@@ -133,15 +172,36 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
                       title: Text('Escolher adicionais +',
                           style: TextStyle(color: theme.primaryColor)),
                       children: snapshot.data!.map((grupo) {
+                        // **MUDANÇA AQUI: Cria o texto da regra**
+                        String ruleText = 'Obrigatório: ${grupo.minQuantity}';
+                        if (grupo.maxQuantity != null) {
+                          ruleText += ' / Máximo: ${grupo.maxQuantity}';
+                        }
+
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Padding(
                               padding:
                                   const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                              child: Text(grupo.name,
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.bold)),
+                              // **MUDANÇA AQUI: Exibe o nome do grupo e a regra**
+                              child: RichText(
+                                text: TextSpan(
+                                  style: DefaultTextStyle.of(context).style,
+                                  children: <TextSpan>[
+                                    TextSpan(
+                                        text: grupo.name,
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.bold)),
+                                    TextSpan(
+                                        text: ' ($ruleText)',
+                                        style: TextStyle(
+                                            fontSize: 12,
+                                            fontStyle: FontStyle.italic,
+                                            color: Colors.grey.shade700)),
+                                  ],
+                                ),
+                              ),
                             ),
                             ...grupo.adicionais.map((adicional) {
                               final adicionalQty =
@@ -199,6 +259,20 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
     FloatingActionButton? fab = totalSelectedItems > 0
         ? FloatingActionButton.extended(
             onPressed: () {
+              // **MUDANÇA AQUI: Chama a validação antes de prosseguir**
+              final validationError = _validateAdicionais();
+              if (validationError != null) {
+                // Se houver um erro, mostra a mensagem e não faz nada
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(validationError),
+                    backgroundColor: Colors.red.shade700,
+                  ),
+                );
+                return;
+              }
+
+              // Se a validação passou, atualiza o carrinho
               final cart = Provider.of<CartProvider>(context, listen: false);
               cart.updateCartFromSelection(
                 productQuantities: _productQuantities,

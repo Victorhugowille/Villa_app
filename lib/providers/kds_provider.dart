@@ -38,7 +38,7 @@ class KdsProvider with ChangeNotifier {
   String? _getCompanyId() {
     return _authProvider?.companyId;
   }
-  
+
   List<app_data.Order> get productionOrders {
     final filtered = _getFilteredOrders();
     return filtered
@@ -76,12 +76,14 @@ class KdsProvider with ChangeNotifier {
 
     if (_allOrders.isEmpty) {
       _isLoading = true;
+      Future.microtask(notifyListeners);
     }
-    
+
     try {
       final response = await _supabase
           .from('pedidos')
-          .select('*, mesas(id, numero), itens_pedido(*, produtos(*))')
+          .select(
+              '*, delivery(*), mesas(id, numero), itens_pedido(*, produtos(*))')
           .eq('company_id', companyId)
           .inFilter('status', ['awaiting_print', 'production', 'ready']);
 
@@ -89,7 +91,7 @@ class KdsProvider with ChangeNotifier {
           .map((json) => app_data.Order.fromJson(json))
           .toList();
     } catch (e) {
-      debugPrint("KDS Provider - Erro ao buscar pedidos: $e");
+      debugPrint("❌ KDS Provider - ERRO CRÍTICO AO BUSCAR PEDIDOS: $e");
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -99,7 +101,7 @@ class KdsProvider with ChangeNotifier {
   void listenToOrders() {
     final companyId = _getCompanyId();
     if (companyId == null) return;
-    
+
     fetchOrders();
 
     _ordersChannel = _supabase.channel('public:pedidos:company_id=eq.$companyId');

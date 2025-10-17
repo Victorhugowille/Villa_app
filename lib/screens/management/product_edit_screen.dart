@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:villabistromobile/data/app_data.dart';
@@ -67,7 +68,7 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
     if (productProvider.categories.isEmpty) {
       await productProvider.fetchData();
     }
-    
+
     if (!mounted) return;
     _availableCategories = productProvider.categories;
 
@@ -125,9 +126,9 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
         await productProvider.fetchData();
 
         if (!mounted) return;
-        final newProduct =
-            productProvider.products.firstWhere((p) => p.id == newProductId, orElse: () => _currentProduct!);
-
+        final newProduct = productProvider.products.firstWhere(
+            (p) => p.id == newProductId,
+            orElse: () => _currentProduct!);
 
         setState(() {
           _currentProduct = newProduct;
@@ -421,9 +422,16 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
     );
   }
 
+  // **MUDANÇA AQUI**
   void _showGrupoDialog({GrupoAdicional? grupo}) {
     final isEditing = grupo != null;
     final nameController = TextEditingController(text: grupo?.name ?? '');
+    // Controladores para min e max
+    final minController =
+        TextEditingController(text: grupo?.minQuantity.toString() ?? '0');
+    final maxController =
+        TextEditingController(text: grupo?.maxQuantity?.toString() ?? '');
+
     XFile? dialogImageFile;
     String? existingImageUrl = grupo?.imageUrl;
 
@@ -454,6 +462,35 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
                       decoration: const InputDecoration(
                           labelText: 'Nome do Grupo (Ex: "Escolha o molho")'),
                     ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: minController,
+                            decoration:
+                                const InputDecoration(labelText: 'Mínimo'),
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: TextFormField(
+                            controller: maxController,
+                            decoration: const InputDecoration(
+                                labelText: 'Máximo',
+                                hintText: 'Sem limite'),
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -467,17 +504,27 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
 
                     final navigator = Navigator.of(stfContext);
 
+                    // Pega os valores de min e max
+                    final int min = int.tryParse(minController.text) ?? 0;
+                    final int? max = maxController.text.isEmpty
+                        ? null
+                        : int.tryParse(maxController.text);
+
                     try {
                       final productProvider =
                           Provider.of<ProductProvider>(context, listen: false);
                       if (isEditing) {
-                        await productProvider.updateGrupoAdicional(
-                            grupo.id, nameController.text, dialogImageFile);
+                        // Passa os novos valores
+                        await productProvider.updateGrupoAdicional(grupo.id,
+                            nameController.text, dialogImageFile, min, max);
                       } else {
+                        // Passa os novos valores
                         await productProvider.addGrupoAdicional(
                             nameController.text,
                             _currentProduct!.id,
-                            dialogImageFile);
+                            dialogImageFile,
+                            min,
+                            max);
                       }
                       await _loadInitialData();
                       navigator.pop();
@@ -501,8 +548,7 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
     final isEditing = adicional != null;
     final nameController = TextEditingController(text: adicional?.name ?? '');
     final priceController = TextEditingController(
-        text:
-            adicional != null ? adicional.price.toStringAsFixed(2) : '');
+        text: adicional != null ? adicional.price.toStringAsFixed(2) : '');
     final formKey = GlobalKey<FormState>();
     XFile? dialogImageFile;
     String? existingImageUrl = adicional?.imageUrl;
@@ -545,8 +591,7 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
                             const TextInputType.numberWithOptions(decimal: true),
                         validator: (v) => (v == null ||
                                 v.isEmpty ||
-                                double.tryParse(v.replaceAll(',', '.')) ==
-                                    null)
+                                double.tryParse(v.replaceAll(',', '.')) == null)
                             ? 'Preço inválido'
                             : null,
                       ),
@@ -630,7 +675,7 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 16.0),
             child: Text(
-                'Nenhum grupo de adicionais cadastrado.',
+                'Nenhum grupo de adicionais cadastrado para este produto.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.grey)),
           )
@@ -643,6 +688,16 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
             onReorder: _onReorderGrupo,
             itemBuilder: (context, index) {
               final grupo = _localGrupos[index];
+
+              // **MUDANÇA AQUI**
+              String subtitleText =
+                  'Obrigatório: ${grupo.minQuantity}';
+              if (grupo.maxQuantity != null) {
+                subtitleText += ', Máximo: ${grupo.maxQuantity}';
+              } else {
+                subtitleText += ', Máximo: Sem limite';
+              }
+
               return Card(
                 key: ValueKey(grupo.id),
                 clipBehavior: Clip.antiAlias,
@@ -658,6 +713,10 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
                   ),
                   title: Text(grupo.name,
                       style: const TextStyle(fontWeight: FontWeight.w600)),
+                  // **MUDANÇA AQUI**
+                  subtitle: Text(subtitleText,
+                      style: TextStyle(
+                          fontSize: 12, color: Colors.grey.shade600)),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -674,7 +733,8 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
                           } catch (e) {
                             if (mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Erro: ${e.toString()}')));
+                                  SnackBar(
+                                      content: Text('Erro: ${e.toString()}')));
                             }
                           }
                         },
@@ -720,8 +780,8 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
                                 : null,
                           ),
                           title: Text(adicional.name),
-                          subtitle: Text(
-                              'R\$ ${adicional.price.toStringAsFixed(2)}'),
+                          subtitle:
+                              Text('R\$ ${adicional.price.toStringAsFixed(2)}'),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [

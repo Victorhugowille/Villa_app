@@ -24,9 +24,8 @@ class PrinterProvider with ChangeNotifier {
   bool _isListening = false;
   bool get isListening => _isListening;
 
-  Map<String, Map<String, String>> _categoryPrinterSettings = {};
-  Map<String, Map<String, String>> get categoryPrinterSettings =>
-      _categoryPrinterSettings;
+  Map<String, dynamic> _printerSettings = {};
+  Map<String, dynamic> get printerSettings => _printerSettings;
 
   KitchenTemplateSettings _templateSettings = KitchenTemplateSettings.defaults();
   KitchenTemplateSettings get templateSettings => _templateSettings;
@@ -64,27 +63,20 @@ class PrinterProvider with ChangeNotifier {
 
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
-
-    final settingsString = prefs.getString('categoryPrinterSettings');
+    final settingsString = prefs.getString('printerToCategorySettings');
     if (settingsString != null) {
-      final decodedData = json.decode(settingsString) as Map<String, dynamic>;
-      _categoryPrinterSettings = decodedData.map((key, value) {
-        return MapEntry(key, Map<String, String>.from(value));
-      });
+      _printerSettings = Map<String, dynamic>.from(json.decode(settingsString));
     }
-
     final templateString = prefs.getString('kitchenTemplateSettings');
     if (templateString != null) {
       _templateSettings =
           KitchenTemplateSettings.fromJson(json.decode(templateString));
     }
-
     final receiptTemplateString = prefs.getString('receiptTemplateSettings');
     if (receiptTemplateString != null) {
       _receiptTemplateSettings =
           ReceiptTemplateSettings.fromJson(json.decode(receiptTemplateString));
     }
-
     final conferencePrinterString = prefs.getString('conferencePrinter');
     if (conferencePrinterString != null) {
       final printerMap = json.decode(conferencePrinterString);
@@ -97,15 +89,13 @@ class PrinterProvider with ChangeNotifier {
         isAvailable: printerMap['isAvailable'] ?? true,
       );
     }
-
     notifyListeners();
   }
 
-  Future<void> saveSettings(
-      Map<String, Map<String, String>> newSettings) async {
-    _categoryPrinterSettings = newSettings;
+  Future<void> savePrinterSettings(Map<String, dynamic> newSettings) async {
+    _printerSettings = newSettings;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('categoryPrinterSettings', json.encode(newSettings));
+    await prefs.setString('printerToCategorySettings', json.encode(newSettings));
     notifyListeners();
     _addLog('Configurações de impressora salvas.');
   }
@@ -152,19 +142,16 @@ class PrinterProvider with ChangeNotifier {
   Future<void> pickAndSaveLogo() async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-
     if (pickedFile != null) {
       try {
         final directory = await getApplicationDocumentsDirectory();
         final String fileName = path.basename(pickedFile.path);
         final String imagePath = path.join(directory.path, fileName);
-        
         final newImageFile = await File(pickedFile.path).copy(imagePath);
-
-        _templateSettings = _templateSettings.copyWith(logoPath: newImageFile.path);
+        _templateSettings =
+            _templateSettings.copyWith(logoPath: newImageFile.path);
         _receiptTemplateSettings =
             _receiptTemplateSettings.copyWith(logoPath: newImageFile.path);
-
         await saveTemplateSettings(_templateSettings);
         await saveReceiptTemplateSettings(_receiptTemplateSettings);
         _addLog('Novo logo salvo com sucesso.');
@@ -194,31 +181,23 @@ class PrinterProvider with ChangeNotifier {
 
   void startListening() {
     final companyId = _getCompanyId();
-    if (_isListening || companyId == null) {
-      _addLog('Não foi possível iniciar: Serviço já ativo ou sem ID de empresa.');
-      return;
-    }
-
-    _addLog('Tentando iniciar monitoramento de impressão...');
-
+    if (_isListening || companyId == null) return;
+    _addLog('Iniciando monitoramento de impressão...');
     _orderChannel = _supabase.channel('public:pedidos:company_id=eq.$companyId');
     _orderChannel!
         .onPostgresChanges(
-      event: PostgresChangeEvent.insert,
-      schema: 'public',
-      table: 'pedidos',
-      callback: (payload) {
-        if (payload.newRecord['status'] == 'awaiting_print') {
-          _handleNewOrder(payload.newRecord);
-        }
-      },
-    )
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'pedidos',
+          callback: (payload) {
+            if (payload.newRecord['status'] == 'awaiting_print') {
+              _handleNewOrder(payload.newRecord);
+            }
+          },
+        )
         .subscribe((status, [error]) {
       _addLog('Status da conexão de Impressão: $status');
-      if (error != null) {
-        _addLog('ERRO DE IMPRESSÃO: ${error.toString()}');
-      }
-
+      if (error != null) _addLog('ERRO DE IMPRESSÃO: ${error.toString()}');
       final newListeningStatus = (status == RealtimeSubscribeStatus.subscribed);
       if (_isListening != newListeningStatus) {
         _isListening = newListeningStatus;
@@ -239,53 +218,76 @@ class PrinterProvider with ChangeNotifier {
 
   Future<void> _handleNewOrder(Map<String, dynamic> newOrderData) async {
     if (newOrderData.isEmpty) return;
-
     final orderId = newOrderData['id'].toString();
-    final orderIdDisplay =
-        orderId.length > 8 ? orderId.substring(0, 8) : orderId;
-    _addLog('Novo pedido para impressão: #$orderIdDisplay');
-
     try {
-      final orderDetails = await _supabase
-          .from('pedidos')
-          .select(
-              '*, mesa_id(numero), itens_pedido!inner(*, produtos!inner(*, categorias(id, name)))')
-          .eq('id', orderId)
-          .single();
-      final tableNumber = orderDetails['mesa_id']['numero'].toString();
-      final orderObservation = orderDetails['observacao'] as String?;
-      final itemsData = orderDetails['itens_pedido'] as List;
-      final orderItems =
-          itemsData.map((item) => app_data.CartItem.fromJson(item)).toList();
-          
-      await _routeAndPrintOrder(orderItems, tableNumber, orderId, orderObservation: orderObservation);
+      final order = await _fetchFullOrderDetails(orderId);
+      _addLog('Novo pedido #${order.numeroPedido} para impressão.');
+      await _routeAndPrintOrder(order, isNewOrder: true);
     } catch (e) {
-      _addLog('ERRO ao buscar detalhes do pedido #$orderIdDisplay: $e');
+      _addLog('ERRO ao buscar detalhes do pedido #$orderId: $e');
     }
   }
 
-  Future<void> _routeAndPrintOrder(
-      List<app_data.CartItem> items, String tableNumber, String orderId, {String? orderObservation}) async {
-    final orderIdDisplay =
-        orderId.length > 8 ? orderId.substring(0, 8) : orderId;
+  Future<void> reprintOrder(app_data.Order orderToReprint) async {
+    final orderId = orderToReprint.id;
+    _addLog('REIMPRIMINDO pedido: #${orderToReprint.numeroPedido}');
     try {
-      final groupedBySettings = groupBy(items, (item) {
-        return _categoryPrinterSettings[item.product.categoryId];
-      });
+      final order = await _fetchFullOrderDetails(orderId);
+      await _routeAndPrintOrder(order);
+    } catch (e) {
+      _addLog('ERRO ao reimprimir pedido #${orderToReprint.numeroPedido}: $e');
+    }
+  }
 
-      if (groupedBySettings.isEmpty) {
-        _addLog('Pedido #$orderIdDisplay: Nenhum item para imprimir.');
+  Future<app_data.Order> _fetchFullOrderDetails(String orderId) async {
+    final orderDetails = await _supabase
+        .from('pedidos')
+        .select(
+            '*, delivery(*), mesas(numero), itens_pedido(*, produtos(*, categorias(id, name)))')
+        .eq('id', orderId)
+        .single();
+    return app_data.Order.fromJson(orderDetails);
+  }
+
+  Future<void> _routeAndPrintOrder(app_data.Order order,
+      {bool isNewOrder = false}) async {
+    String? findPrinterKeyForItem(app_data.CartItem item) {
+      for (final printerName in _printerSettings.keys) {
+        final settings = _printerSettings[printerName];
+        final categoryIds = List<String>.from(settings['categories'] ?? []);
+        if (categoryIds.contains(item.product.categoryId)) {
+          final paperSize = settings['size'] ?? '58';
+          return '$printerName|$paperSize';
+        }
+      }
+      return null;
+    }
+
+    try {
+      final groupedByPrinterKey =
+          groupBy(order.items, findPrinterKeyForItem);
+
+      if (groupedByPrinterKey.isEmpty) {
+        _addLog(
+            'Pedido #${order.numeroPedido}: Nenhum item corresponde a uma impressora configurada.');
       }
 
-      for (final settings in groupedBySettings.keys) {
-        if (settings == null || settings['name'] == null) {
-          _addLog('Pedido #$orderIdDisplay: Itens sem impressora configurada.');
+      for (final key in groupedByPrinterKey.keys) {
+        if (key == null) {
+          final unassignedItems = groupedByPrinterKey[key]!
+              .map((e) => e.product.name)
+              .join(', ');
+          _addLog(
+              'Pedido #${order.numeroPedido}: Itens sem impressora: $unassignedItems');
           continue;
         }
 
-        final printerName = settings['name']!;
-        final paperSize = settings['size'] ?? '58';
-        final itemsForPrinter = groupedBySettings[settings]!;
+        final parts = key.split('|');
+        final printerName = parts[0];
+        final paperSize = parts[1];
+
+        final itemsForPrinter = groupedByPrinterKey[key]!;
+        final orderForPrinter = order.copyWith(items: itemsForPrinter);
 
         final printers = await Printing.listPrinters();
         final selectedPrinter =
@@ -293,31 +295,32 @@ class PrinterProvider with ChangeNotifier {
 
         if (selectedPrinter != null) {
           await _printingService.printKitchenOrder(
-            items: itemsForPrinter,
-            tableNumber: tableNumber,
-            orderId: orderId,
+            order: orderForPrinter,
             printer: selectedPrinter,
             paperSize: paperSize,
             templateSettings: _templateSettings,
-            orderObservation: orderObservation,
           );
-          _addLog('Pedido #$orderIdDisplay enviado para: $printerName.');
+          _addLog('Pedido #${order.numeroPedido} enviado para: $printerName.');
         } else {
           _addLog(
-              'Impressora "$printerName" não encontrada. Pedido #$orderIdDisplay não impresso.');
+              'Impressora "$printerName" não encontrada. Pedido #${order.numeroPedido} não impresso.');
         }
       }
     } catch (e) {
       _addLog('ERRO CRÍTICO no processo de impressão: $e');
     }
 
-    try {
-      await _supabase
-          .from('pedidos')
-          .update({'status': 'production'}).eq('id', orderId);
-      _addLog('Pedido #$orderIdDisplay atualizado para "Em Produção".');
-    } catch (e) {
-      _addLog('ERRO ao atualizar o status do pedido #$orderIdDisplay: $e');
+    if (isNewOrder) {
+      try {
+        await _supabase
+            .from('pedidos')
+            .update({'status': 'production'})
+            .eq('id', order.id);
+        _addLog('Pedido #${order.numeroPedido} atualizado para "Em Produção".');
+      } catch (e) {
+        _addLog(
+            'ERRO ao atualizar o status do pedido #${order.numeroPedido}: $e');
+      }
     }
   }
 

@@ -8,7 +8,6 @@ import 'package:villabistromobile/providers/auth_provider.dart';
 import 'package:villabistromobile/providers/bot_provider.dart';
 import 'package:villabistromobile/providers/cart_provider.dart';
 import 'package:villabistromobile/providers/company_provider.dart';
-import 'package:villabistromobile/providers/estabelecimento_provider.dart';
 import 'package:villabistromobile/providers/kds_provider.dart';
 import 'package:villabistromobile/providers/navigation_provider.dart';
 import 'package:villabistromobile/providers/printer_provider.dart';
@@ -56,7 +55,6 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (context) => CartProvider()),
         ChangeNotifierProvider(create: (context) => ReportProvider()),
         ChangeNotifierProvider(create: (context) => BotProvider()),
-        ChangeNotifierProvider(create: (context) => EstabelecimentoProvider()),
         ChangeNotifierProvider(create: (context) => CompanyProvider()),
 
         // Provider Principal de Autenticação

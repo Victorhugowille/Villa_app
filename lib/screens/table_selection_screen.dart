@@ -4,8 +4,10 @@ import 'package:villabistromobile/data/app_data.dart' as app_data;
 import 'package:villabistromobile/providers/cart_provider.dart';
 import 'package:villabistromobile/providers/navigation_provider.dart';
 import 'package:villabistromobile/providers/table_provider.dart';
+import 'package:villabistromobile/providers/printer_provider.dart';
 import 'package:villabistromobile/screens/category_screen.dart';
 import 'package:villabistromobile/screens/order_list_screen.dart';
+import 'package:villabistromobile/services/printing_service.dart';
 import 'package:villabistromobile/widgets/side_menu.dart';
 
 class TableSelectionScreen extends StatefulWidget {
@@ -16,6 +18,9 @@ class TableSelectionScreen extends StatefulWidget {
 }
 
 class _TableSelectionScreenState extends State<TableSelectionScreen> {
+  // O serviço de impressão precisa ser uma variável da classe
+  final PrintingService _printingService = PrintingService();
+
   @override
   void initState() {
     super.initState();
@@ -57,6 +62,64 @@ class _TableSelectionScreenState extends State<TableSelectionScreen> {
     }
   }
 
+  // A função de impressão agora recebe a mesa como parâmetro
+  void _triggerPrintReceipt(BuildContext context, app_data.Table table) async {
+    final tableProvider = Provider.of<TableProvider>(context, listen: false);
+    final printerProvider = Provider.of<PrinterProvider>(context, listen: false);
+
+    // Busca os pedidos da mesa antes de tentar imprimir
+    try {
+      final loadedOrders = await tableProvider.getOrdersForTable(table.id);
+      
+      if (loadedOrders.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Nenhum pedido para imprimir nesta mesa.'),
+              backgroundColor: Colors.orange),
+        );
+        return;
+      }
+
+      final totalAmount =
+          loadedOrders.fold(0.0, (sum, order) => sum + order.total);
+      final conferencePrinter = printerProvider.conferencePrinter;
+
+      if (conferencePrinter == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Nenhuma impressora de conferência configurada!'),
+              backgroundColor: Colors.red),
+        );
+        return;
+      }
+
+      await _printingService.directPrintReceiptPdf(
+        orders: loadedOrders,
+        tableNumber: table.tableNumber.toString(),
+        totalAmount: totalAmount,
+        settings: printerProvider.receiptTemplateSettings,
+        printer: conferencePrinter,
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Conferência enviada para a impressora!'),
+            backgroundColor: Colors.green),
+      );
+
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text('Erro ao imprimir Conferência: $e'),
+            backgroundColor: Colors.red),
+      );
+    }
+  }
+
   void _showDesktopOptions(BuildContext context, app_data.Table table) {
     showDialog(
       context: context,
@@ -86,6 +149,13 @@ class _TableSelectionScreenState extends State<TableSelectionScreen> {
                       .navigateTo(context, CategoryScreen(table: table),
                           'Adicionar Itens');
                 },
+              ),
+              // Adicionando a opção de imprimir aqui
+              _buildOptionTile(
+                context: ctx,
+                icon: Icons.print_outlined,
+                title: 'Imprimir Conferência',
+                onTap: () => _triggerPrintReceipt(context, table),
               ),
               _buildOptionTile(
                 context: ctx,
@@ -127,6 +197,13 @@ class _TableSelectionScreenState extends State<TableSelectionScreen> {
                         context, CategoryScreen(table: table), 'Nova Venda');
               },
             ),
+            // Adicionando a opção de imprimir aqui
+            _buildOptionTile(
+              context: ctx,
+              icon: Icons.print_outlined,
+              title: 'Imprimir Conferência',
+              onTap: () => _triggerPrintReceipt(context, table),
+            ),
             _buildOptionTile(
               context: ctx,
               icon: Icons.delete_forever,
@@ -149,7 +226,7 @@ class _TableSelectionScreenState extends State<TableSelectionScreen> {
       leading: Icon(icon),
       title: Text(title),
       onTap: () {
-        Navigator.pop(context);
+        Navigator.pop(context); // Fecha o modal/dialog
         onTap();
       },
     );

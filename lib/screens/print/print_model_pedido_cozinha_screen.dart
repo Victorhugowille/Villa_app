@@ -1,24 +1,21 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
 import 'dart:io';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:villabistromobile/models/print_style_settings.dart';
-import 'package:villabistromobile/providers/navigation_provider.dart';
-import 'package:villabistromobile/providers/printer_provider.dart';
 import 'package:villabistromobile/data/app_data.dart' as app_data;
-import 'package:villabistromobile/screens/kitchen_printer_screen.dart';
+import 'package:villabistromobile/models/print_style_settings.dart';
+import 'package:villabistromobile/providers/printer_provider.dart';
 import 'package:villabistromobile/services/printing_service.dart';
-import 'package:villabistromobile/widgets/custom_app_bar.dart';
 
-class PrintLayoutEditorScreen extends StatefulWidget {
-  const PrintLayoutEditorScreen({super.key});
+class KitchenLayoutEditorTab extends StatefulWidget {
+  const KitchenLayoutEditorTab({super.key});
 
   @override
-  State<PrintLayoutEditorScreen> createState() =>
-      _PrintLayoutEditorScreenState();
+  State<KitchenLayoutEditorTab> createState() =>
+      _KitchenLayoutEditorTabState();
 }
 
-class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
+class _KitchenLayoutEditorTabState extends State<KitchenLayoutEditorTab> {
   late TextEditingController _footerController;
   Timer? _debounce;
 
@@ -52,35 +49,54 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
     _footerController.text = newSettings.footerText;
   }
 
+  // **MÉTODO CORRIGIDO**
   Widget _generatePreviewWidget(KitchenTemplateSettings settings) {
     final printingService = PrintingService();
+    final sampleDeliveryInfo = app_data.DeliveryInfo(
+        id: 'preview-d-id',
+        pedidoId: 'preview-123',
+        nomeCliente: 'Cliente Exemplo',
+        telefoneCliente: '(99) 99999-9999',
+        enderecoEntrega: 'Rua de Exemplo, 123');
+
+    // Cria um objeto Order completo para a pré-visualização
+    final sampleOrder = app_data.Order(
+        id: '999',
+        numeroPedido: 999,
+        timestamp: DateTime.now(),
+        status: 'production',
+        type: 'delivery',
+        deliveryInfo: sampleDeliveryInfo,
+        observacao: 'Pagamento em dinheiro.',
+        items: [
+          app_data.CartItem(
+              id: 'p1',
+              product: app_data.Product(
+                  id: '1',
+                  name: 'Produto Exemplo 1',
+                  price: 10.0,
+                  categoryId: '1',
+                  categoryName: 'Bebidas',
+                  displayOrder: 1,
+                  isSoldOut: false),
+              quantity: 2,
+              observacao: 'Com Gelo'),
+          app_data.CartItem(
+              id: 'p2',
+              product: app_data.Product(
+                  id: '2',
+                  name: 'Produto Exemplo 2',
+                  price: 15.0,
+                  categoryId: '1',
+                  categoryName: 'Bebidas',
+                  displayOrder: 2,
+                  isSoldOut: false),
+              quantity: 1),
+        ]);
+
+    // Chama a função com o objeto Order
     return printingService.buildKitchenOrderWidget(
-      items: [
-        app_data.CartItem(
-            id: 'p1',
-            product: app_data.Product(
-                id: '1',
-                name: 'Produto Exemplo 1',
-                price: 10.0,
-                categoryId: '1',
-                categoryName: 'Bebidas',
-                displayOrder: 1,
-                isSoldOut: false),
-            quantity: 2),
-        app_data.CartItem(
-            id: 'p2',
-            product: app_data.Product(
-                id: '2',
-                name: 'Produto Exemplo 2',
-                price: 15.0,
-                categoryId: '1',
-                categoryName: 'Bebidas',
-                displayOrder: 2,
-                isSoldOut: false),
-            quantity: 1),
-      ],
-      tableNumber: 'XX',
-      orderId: '999',
+      order: sampleOrder,
       templateSettings: settings,
     );
   }
@@ -94,45 +110,14 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
         final currentSettings = printerProvider.templateSettings;
 
         return Scaffold(
-          appBar: CustomAppBar(
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.print_outlined),
-                tooltip: 'Ir para Estação de Impressão',
-                onPressed: () {
-                  Provider.of<NavigationProvider>(context, listen: false)
-                      .navigateTo(
-                    context,
-                    const KitchenPrinterScreen(),
-                    'Estação de Impressão',
-                  );
-                },
-              ),
-              if (!isWideScreen)
-                IconButton(
-                  icon: const Icon(Icons.preview_outlined),
-                  tooltip: 'Visualizar',
-                  onPressed: () {
-                    showDialog(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                              content: SizedBox(
-                                width: 250,
-                                child: _generatePreviewWidget(currentSettings),
-                              ),
-                            ));
-                  },
-                ),
-              IconButton(
-                icon: const Icon(Icons.refresh),
-                tooltip: 'Redefinir Padrão',
-                onPressed: _resetToDefaults,
-              ),
-            ],
-          ),
           body: isWideScreen
               ? _buildWideLayout(currentSettings)
               : _buildNarrowLayout(currentSettings),
+          floatingActionButton: FloatingActionButton(
+            onPressed: _resetToDefaults,
+            tooltip: 'Redefinir Padrão',
+            child: const Icon(Icons.refresh),
+          ),
         );
       },
     );
@@ -142,7 +127,7 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
     return Row(
       children: [
         Expanded(
-          flex: 1,
+          flex: 2,
           child: _buildControlsPanel(currentSettings),
         ),
         const VerticalDivider(width: 1),
@@ -152,10 +137,10 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
             color: Colors.blueGrey.shade50,
             padding: const EdgeInsets.all(16.0),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  'Pré-visualização em Tempo Real',
+                  'Pré-visualização',
                   style: Theme.of(context)
                       .textTheme
                       .titleMedium
@@ -184,19 +169,25 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
   }
 
   Widget _buildControlsPanel(KitchenTemplateSettings currentSettings) {
+    if (_footerController.text != currentSettings.footerText) {
+      _footerController.text = currentSettings.footerText;
+    }
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         children: [
           _buildLogoEditor(currentSettings),
           _buildStyleEditor(
-              'Nome do Local (se não houver logo)', currentSettings.headerStyle,
+              'Cabeçalho (Mesa/Delivery)', currentSettings.headerStyle,
               (newStyle) {
             _autoSaveSettings(currentSettings.copyWith(headerStyle: newStyle));
           }),
-          _buildStyleEditor('Número da Mesa', currentSettings.tableStyle,
+          _buildStyleEditor(
+              'Informações do Delivery', currentSettings.deliveryInfoStyle,
               (newStyle) {
-            _autoSaveSettings(currentSettings.copyWith(tableStyle: newStyle));
+            _autoSaveSettings(
+                currentSettings.copyWith(deliveryInfoStyle: newStyle));
           }),
           _buildStyleEditor(
               'Informações do Pedido', currentSettings.orderInfoStyle,
@@ -208,11 +199,22 @@ class _PrintLayoutEditorScreenState extends State<PrintLayoutEditorScreen> {
               (newStyle) {
             _autoSaveSettings(currentSettings.copyWith(itemStyle: newStyle));
           }),
-          _buildTextAndStyleEditor('Rodapé', _footerController, (newStyle) {
-            _autoSaveSettings(currentSettings.copyWith(footerStyle: newStyle));
-          }, currentSettings.footerStyle, (newText) {
-            _autoSaveSettings(currentSettings.copyWith(footerText: newText));
+          _buildStyleEditor('Observações (Item e Geral)',
+              currentSettings.observationStyle, (newStyle) {
+            _autoSaveSettings(
+                currentSettings.copyWith(observationStyle: newStyle));
           }),
+          _buildTextAndStyleEditor(
+            'Rodapé',
+            _footerController,
+            (newStyle) {
+              _autoSaveSettings(currentSettings.copyWith(footerStyle: newStyle));
+            },
+            currentSettings.footerStyle,
+            (newText) {
+              _autoSaveSettings(currentSettings.copyWith(footerText: newText));
+            },
+          ),
         ],
       ),
     );
