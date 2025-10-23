@@ -1,8 +1,7 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:villabistromobile/data/app_data.dart' as app_data;
 import 'package:villabistromobile/providers/auth_provider.dart';
-
 class TableProvider with ChangeNotifier {
   final SupabaseClient _supabase = Supabase.instance.client;
   AuthProvider? _authProvider;
@@ -186,13 +185,13 @@ class TableProvider with ChangeNotifier {
   }
   
   Future<void> placeOrder({
+    required BuildContext context,
     required String tableId,
     required List<app_data.CartItem> items,
     String? orderObservation,
   }) async {
     final companyId = _getCompanyId();
     if (companyId == null) throw Exception('Empresa não encontrada.');
-
     final orderResponse = await _supabase.from('pedidos').insert({
       'mesa_id': tableId,
       'status': 'awaiting_print',
@@ -203,25 +202,26 @@ class TableProvider with ChangeNotifier {
     final orderId = orderResponse['id'];
 
     final itemsToInsert = items.map((cartItem) {
+        // ... (mapeamento dos itens continua igual) ...
         final adicionaisJson = cartItem.selectedAdicionais.map((itemAd) {
-          return {
-            'adicional_id': itemAd.adicional.id,
-            'quantity': itemAd.quantity,
-            'adicional': {
-              'id': itemAd.adicional.id,
-              'name': itemAd.adicional.name,
-              'price': itemAd.adicional.price,
-            }
-          };
-        }).toList();
+         return {
+           'adicional_id': itemAd.adicional.id,
+           'quantity': itemAd.quantity,
+           'adicional': {
+             'id': itemAd.adicional.id,
+             'name': itemAd.adicional.name,
+             'price': itemAd.adicional.price,
+           }
+         };
+       }).toList();
 
-      return {
-        'pedido_id': orderId,
-        'produto_id': cartItem.product.id,
-        'quantidade': cartItem.quantity,
-        'adicionais_selecionados': adicionaisJson,
-        'observacao': cartItem.observacao,
-      };
+       return {
+         'pedido_id': orderId,
+         'produto_id': cartItem.product.id,
+         'quantidade': cartItem.quantity,
+         'adicionais_selecionados': adicionaisJson,
+         'observacao': cartItem.observacao,
+       };
     }).toList();
 
     await _supabase.from('itens_pedido').insert(itemsToInsert);
@@ -231,6 +231,7 @@ class TableProvider with ChangeNotifier {
         _tables[tableIndex].isOccupied = true;
         notifyListeners();
     } else {
+        // Este await acontece depois de tocar o som, então não tem problema
         await updateStatus(tableId, 'ocupada');
     }
   }

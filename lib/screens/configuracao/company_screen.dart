@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart'; // NOVO PACOTE
+import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:villabistromobile/data/app_data.dart';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 import 'package:villabistromobile/providers/company_provider.dart';
-import 'package:provider/provider.dart';
+import 'package:villabistromobile/providers/navigation_provider.dart'; // IMPORT NECESSÁRIO
 
 class CompanyScreen extends StatefulWidget {
   const CompanyScreen({super.key});
@@ -138,53 +139,47 @@ class _CompanyScreenState extends State<CompanyScreen> {
     }
   }
 
-  // NOVA FUNÇÃO PARA UPLOAD DA LOGO 📸
   Future<void> _uploadLogo() async {
     if (_company == null) return;
-
+  
     final picker = ImagePicker();
     final imageFile = await picker.pickImage(
       source: ImageSource.gallery,
-      imageQuality: 50, // Comprime a imagem para economizar espaço
+      imageQuality: 50,
     );
-
+  
     if (imageFile == null) {
       return;
     }
-
+  
     setState(() => _isLoading = true);
-
+  
     try {
       final bytes = await imageFile.readAsBytes();
       final fileExt = imageFile.path.split('.').last;
       final fileName = '${DateTime.now().toIso8601String()}.$fileExt';
-      
-      // ### CORREÇÃO AQUI ###
-      // O caminho não deve começar com 'public/'. O bucket já é público.
       final filePath = '${_company!.id}/$fileName';
-
+  
       await _supabase.storage.from('product_images').uploadBinary(
             filePath,
             bytes,
             fileOptions: FileOptions(contentType: 'image/$fileExt'),
           );
-
+  
       final imageUrl =
           _supabase.storage.from('product_images').getPublicUrl(filePath);
-
+  
       await _supabase
           .from('companies')
           .update({'logo_url': imageUrl})
           .eq('id', _company!.id);
-
+  
       if (mounted) {
-        // Atualiza os dados da empresa no provider para refletir a nova logo
         await context.read<CompanyProvider>().fetchCompanyForCurrentUser();
-        // Atualiza o state local para redesenhar a tela
         setState(() {
           _company = context.read<CompanyProvider>().currentCompany;
         });
-
+  
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Logo atualizada com sucesso!'),
@@ -216,6 +211,7 @@ class _CompanyScreenState extends State<CompanyScreen> {
       }
     }
   }
+  
   Future<void> _resetOrderCounter() async {
     if (_company == null) return;
 
@@ -272,8 +268,9 @@ class _CompanyScreenState extends State<CompanyScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Pega a URL da logo do provider, que é a fonte mais atualizada dos dados
     final logoUrl = context.watch<CompanyProvider>().currentCompany?.logoUrl;
+    // Precisamos do NavigationProvider para abrir a nova tela
+    final navProvider = Provider.of<NavigationProvider>(context, listen: false);
 
     return Scaffold(
       appBar: AppBar(
@@ -302,7 +299,6 @@ class _CompanyScreenState extends State<CompanyScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // NOVO WIDGET PARA EXIBIR E EDITAR A LOGO
                         Center(
                           child: Stack(
                             children: [
@@ -333,6 +329,23 @@ class _CompanyScreenState extends State<CompanyScreen> {
                           ),
                         ),
                         const SizedBox(height: 24),
+                        
+                        // ### NOVO BOTÃO DE SONS AQUI ###
+                        /*
+                        ListTile(
+                          leading: const Icon(Icons.volume_up_outlined),
+                          title: const Text('Sons e Notificações'),
+                          subtitle: const Text('Alertas de novos pedidos'),
+                          trailing: const Icon(Icons.arrow_forward_ios),
+                          onTap: () {
+                            navProvider.navigateTo(
+                              context,
+                              const SoundSettingsScreen(),
+                              'Sons e Notificações',
+                            );
+                          },
+                        ),*/
+                        const Divider(height: 24),
 
                         TextFormField(
                           controller: _nameController,

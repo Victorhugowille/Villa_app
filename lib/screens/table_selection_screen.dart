@@ -18,7 +18,6 @@ class TableSelectionScreen extends StatefulWidget {
 }
 
 class _TableSelectionScreenState extends State<TableSelectionScreen> {
-  // O serviço de impressão precisa ser uma variável da classe
   final PrintingService _printingService = PrintingService();
 
   @override

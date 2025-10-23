@@ -200,6 +200,10 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                       style: TextStyle(
                           color: theme.colorScheme.onSurface,
                           fontWeight: FontWeight.bold)),
+                  subtitle: Text(
+                    'Visível em: ${category.appType.label}',
+                    style: TextStyle(color: theme.colorScheme.secondary),
+                  ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -209,11 +213,13 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                         tooltip: 'Duplicar',
                         onPressed: () async {
                           try {
-                            await productProvider.duplicateCategory(category.id);
+                            await productProvider
+                                .duplicateCategory(category.id);
                             if (mounted) {
                               ScaffoldMessenger.of(context)
                                   .showSnackBar(const SnackBar(
-                                content: Text('Categoria duplicada com sucesso!'),
+                                content: Text(
+                                    'Categoria duplicada com sucesso!'),
                                 backgroundColor: Colors.green,
                                 duration: Duration(seconds: 1),
                               ));
@@ -224,8 +230,8 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                         },
                       ),
                       IconButton(
-                        icon:
-                            const Icon(Icons.delete_outline, color: Colors.red),
+                        icon: const Icon(Icons.delete_outline,
+                            color: Colors.red),
                         onPressed: () {
                           _confirmDeleteCategory(category);
                         },
@@ -240,8 +246,10 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                     ],
                   ),
                   onTap: () {
-                    navProvider.navigateTo(context,
-                        CategoryEditScreen(category: category), 'Editar Categoria');
+                    navProvider.navigateTo(
+                        context,
+                        CategoryEditScreen(category: category),
+                        'Editar Categoria');
                   },
                 ),
               );

@@ -77,49 +77,52 @@ class ProductProvider with ChangeNotifier {
     }
   }
 
-  Future<void> addCategory(String name, IconData icon) async {
-    final companyId = _getCompanyId();
-    if (companyId == null) throw Exception('Usuário não autenticado.');
-    try {
-      final response = await _supabase
-          .from('categorias')
-          .select()
-          .eq('company_id', companyId)
-          .count();
-      final newDisplayOrder = response.count;
+  Future<void> addCategory(String name, IconData icon, app_data.CategoryAppType appType) async {
+  final companyId = _getCompanyId();
+  if (companyId == null) throw Exception('Usuário não autenticado.');
+  try {
+   final response = await _supabase
+     .from('categorias')
+     .select()
+     .eq('company_id', companyId)
+     .count();
+   final newDisplayOrder = response.count;
 
-      await _supabase.from('categorias').insert({
-        'name': name,
-        'icon_code_point': icon.codePoint,
-        'icon_font_family': icon.fontFamily,
-        'company_id': companyId,
-        'display_order': newDisplayOrder,
-      });
-      await fetchData();
-    } on PostgrestException catch (error) {
-      if (error.code == '23505') {
-        throw Exception('Uma categoria com este nome já existe.');
-      }
-      rethrow;
-    } catch (error) {
-      throw Exception('Falha ao criar categoria.');
-    }
+   await _supabase.from('categorias').insert({
+    'name': name,
+    'icon_code_point': icon.codePoint,
+    'icon_font_family': icon.fontFamily,
+    'company_id': companyId,
+    'display_order': newDisplayOrder,
+        'app_type': appType.name, // NOVO CAMPO
+   });
+   await fetchData();
+  } on PostgrestException catch (error) {
+   if (error.code == '23505') {
+    throw Exception('Uma categoria com este nome já existe.');
+   }
+   rethrow;
+  } catch (error) {
+   throw Exception('Falha ao criar categoria.');
   }
+ }
 
-  Future<void> updateCategory(String id, String name, IconData icon) async {
-    final companyId = _getCompanyId();
-    if (companyId == null) throw Exception('Usuário não autenticado.');
-    try {
-      await _supabase.from('categorias').update({
-        'name': name,
-        'icon_code_point': icon.codePoint,
-        'icon_font_family': icon.fontFamily,
-      }).eq('id', id).eq('company_id', companyId);
-      await fetchData();
-    } catch (error) {
-      throw Exception('Falha ao atualizar categoria.');
-    }
+  // ========== FUNÇÃO ATUALIZADA ==========
+ Future<void> updateCategory(String id, String name, IconData icon, app_data.CategoryAppType appType) async {
+  final companyId = _getCompanyId();
+  if (companyId == null) throw Exception('Usuário não autenticado.');
+  try {
+   await _supabase.from('categorias').update({
+    'name': name,
+    'icon_code_point': icon.codePoint,
+    'icon_font_family': icon.fontFamily,
+        'app_type': appType.name, // NOVO CAMPO
+   }).eq('id', id).eq('company_id', companyId);
+   await fetchData();
+  } catch (error) {
+   throw Exception('Falha ao atualizar categoria.');
   }
+ }
 
   Future<void> _deleteProductCascading(String productId) async {
     final companyId = _getCompanyId();

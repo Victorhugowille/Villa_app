@@ -161,6 +161,8 @@ class _DestaquesSiteScreenState extends State<DestaquesSiteScreen> {
     });
 
     return Scaffold(
+      appBar: AppBar(
+      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(

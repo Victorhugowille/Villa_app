@@ -78,6 +78,7 @@ class Company {
     };
   }
 }
+
 class DestaqueSite {
   final int id;
   final String companyId;
@@ -100,6 +101,7 @@ class DestaqueSite {
     );
   }
 }
+
 class SavedReport {
   final String id;
   final String name;
@@ -181,17 +183,40 @@ class Adicional {
   }
 }
 
+// ==================================================
+// ADICIONADO O ENUM QUE FALTAVA
+// ==================================================
+enum CategoryAppType {
+  todos('Todos'),
+  garcom('App Garçom'),
+  delivery('App Delivery');
+
+  final String label;
+  const CategoryAppType(this.label);
+
+  static CategoryAppType fromString(String? value) {
+    return CategoryAppType.values.firstWhere(
+      (e) => e.name == value,
+      orElse: () => CategoryAppType.todos,
+    );
+  }
+}
+// ==================================================
+
 class Category {
   final String id;
   final String name;
   final IconData icon;
   final int displayOrder;
+  final CategoryAppType appType; // NOVO CAMPO
 
-  Category(
-      {required this.id,
-      required this.name,
-      required this.icon,
-      required this.displayOrder});
+  Category({
+    required this.id,
+    required this.name,
+    required this.icon,
+    required this.displayOrder,
+    required this.appType, // NOVO CAMPO
+  });
 
   factory Category.fromJson(Map<String, dynamic> jsonData) {
     return Category(
@@ -200,6 +225,7 @@ class Category {
       icon: IconData(jsonData['icon_code_point'] ?? 0xe1de,
           fontFamily: jsonData['icon_font_family']),
       displayOrder: jsonData['display_order'] ?? 0,
+      appType: CategoryAppType.fromString(jsonData['app_type']), // NOVO CAMPO
     );
   }
 }
@@ -375,9 +401,10 @@ class DeliveryInfo {
     };
   }
 }
+
 class Order {
   final String id;
-  final int numeroPedido; 
+  final int numeroPedido;
   final List<CartItem> items;
   final DateTime timestamp;
   final String status;

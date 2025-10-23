@@ -52,7 +52,10 @@ class CartScreen extends StatelessWidget {
     if (cart.items.isEmpty) return;
 
     try {
+      // ### CORREÇÃO AQUI ###
+      // A função agora precisa do 'context' para poder tocar o som.
       await tableProvider.placeOrder(
+        context: context,
         tableId: table.id,
         items: cart.items,
         orderObservation: cart.orderObservation,

@@ -53,7 +53,14 @@ class _CategoryScreenState extends State<CategoryScreen> {
               child: CircularProgressIndicator(color: theme.primaryColor));
         }
 
-        if (!productProvider.isLoading && productProvider.categories.isEmpty) {
+        // ========== ALTERAÇÃO AQUI ==========
+        // Filtra a lista para mostrar apenas 'garcom' ou 'todos'
+        final categories = productProvider.categories
+            .where((cat) => cat.appType != app_data.CategoryAppType.delivery)
+            .toList();
+        // ====================================
+
+        if (!productProvider.isLoading && categories.isEmpty) {
           return RefreshIndicator(
             onRefresh: _refreshData,
             child: LayoutBuilder(
@@ -63,7 +70,8 @@ class _CategoryScreenState extends State<CategoryScreen> {
                   child: SizedBox(
                     height: constraints.maxHeight,
                     child: const Center(
-                      child: Text("Nenhuma categoria encontrada."),
+                      // Mensagem atualizada
+                      child: Text("Nenhuma categoria encontrada para este app."),
                     ),
                   ),
                 );
@@ -72,13 +80,11 @@ class _CategoryScreenState extends State<CategoryScreen> {
           );
         }
 
-        final categories = productProvider.categories;
-
         return RefreshIndicator(
           onRefresh: _refreshData,
           child: GridView.builder(
             padding: const EdgeInsets.all(16),
-            itemCount: categories.length,
+            itemCount: categories.length, // <-- Usa a lista filtrada
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: crossAxisCount,
               crossAxisSpacing: 16,
@@ -86,7 +92,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
               childAspectRatio: 1,
             ),
             itemBuilder: (context, index) {
-              final category = categories[index];
+              final category = categories[index]; // <-- Usa a lista filtrada
               final productsInCategory = productProvider.products
                   .where((p) => p.categoryId == category.id)
                   .toList();

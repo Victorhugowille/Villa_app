@@ -9,7 +9,7 @@ class IconPicker extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     // Lista de ícones combinando Material e FontAwesome
     final List<IconData> foodIcons = [
       // FontAwesome Icons
@@ -91,10 +91,10 @@ class IconPicker extends StatelessWidget {
                 Navigator.of(context).pop();
               },
               borderRadius: BorderRadius.circular(12),
-              child: Tooltip(
-                message: icon.fontFamily,
-                child: FaIcon(icon, size: 28, color: theme.colorScheme.onSurface),
-              ),
+              // ===== CORREÇÃO AQUI =====
+              // O widget 'Icon' padrão sabe como lidar com
+              // IconData do Material e do FontAwesome.
+              child: Icon(icon, size: 28, color: theme.colorScheme.onSurface),
             );
           },
         ),

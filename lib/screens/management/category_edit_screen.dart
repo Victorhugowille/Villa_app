@@ -17,6 +17,7 @@ class _CategoryEditScreenState extends State<CategoryEditScreen> {
   final _formKey = GlobalKey<FormState>();
   late String _name;
   late IconData _icon;
+  late CategoryAppType _selectedAppType; // <-- ADICIONADO
   bool _isEditMode = false;
   bool _isLoading = false;
 
@@ -27,9 +28,11 @@ class _CategoryEditScreenState extends State<CategoryEditScreen> {
       _isEditMode = true;
       _name = widget.category!.name;
       _icon = widget.category!.icon;
+      _selectedAppType = widget.category!.appType; // <-- ADICIONADO
     } else {
       _name = '';
       _icon = Icons.category;
+      _selectedAppType = CategoryAppType.todos; // <-- ADICIONADO
     }
   }
 
@@ -54,15 +57,17 @@ class _CategoryEditScreenState extends State<CategoryEditScreen> {
 
     try {
       if (_isEditMode) {
-        await productProvider.updateCategory(widget.category!.id, _name, _icon);
+        // ===== CORRIGIDO =====
+        await productProvider.updateCategory(
+            widget.category!.id, _name, _icon, _selectedAppType);
       } else {
-        await productProvider.addCategory(_name, _icon,);
+        // ===== CORRIGIDO =====
+        await productProvider.addCategory(_name, _icon, _selectedAppType);
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-                'Categoria "${_name}" salva com sucesso!'),
+            content: Text('Categoria "${_name}" salva com sucesso!'),
             backgroundColor: Colors.green,
           ),
         );
@@ -146,6 +151,41 @@ class _CategoryEditScreenState extends State<CategoryEditScreen> {
                 ),
               ),
             ),
+            const SizedBox(height: 24), // Espaçamento
+
+            // ========== NOVO SELETOR DE TIPO ADICIONADO AQUI ==========
+            Text('Visibilidade da Categoria',
+                style: TextStyle(
+                    color: theme.colorScheme.onBackground.withOpacity(0.7),
+                    fontSize: 16)),
+            const SizedBox(height: 16),
+            SegmentedButton<CategoryAppType>(
+              segments: CategoryAppType.values.map((type) {
+                return ButtonSegment<CategoryAppType>(
+                  value: type,
+                  label: Text(type.label),
+                  icon: Icon(type == CategoryAppType.garcom
+                      ? Icons.person_outline
+                      : type == CategoryAppType.delivery
+                          ? Icons.delivery_dining_outlined
+                          : Icons.apps_outlined),
+                );
+              }).toList(),
+              selected: {_selectedAppType},
+              onSelectionChanged: (Set<CategoryAppType> newSelection) {
+                if (!_isLoading) {
+                  setState(() {
+                    _selectedAppType = newSelection.first;
+                  });
+                }
+              },
+              showSelectedIcon: true,
+              style: SegmentedButton.styleFrom(
+                minimumSize: const Size(0, 48),
+              ),
+            ),
+            // ===========================================
+
             const SizedBox(height: 40),
             if (!isDesktop)
               ElevatedButton(
@@ -159,7 +199,9 @@ class _CategoryEditScreenState extends State<CategoryEditScreen> {
                         width: 24,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : Text(_isEditMode ? 'Salvar Alterações' : 'Criar Categoria'),
+                    : Text(_isEditMode
+                        ? 'Salvar Alterações'
+                        : 'Criar Categoria'),
               ),
           ],
         ),

@@ -5,7 +5,7 @@ import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:villabistromobile/providers/company_provider.dart';
-import 'package:villabistromobile/screens/login/signup_selection_screen.dart';
+import 'package:villabistromobile/screens/login/signup_selection_screen.dart'; // Ajuste o caminho se necessário
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -22,24 +22,28 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   bool _isCheckingCnpj = false;
   bool _acceptedPrivacy = false;
+  bool _obscurePassword = true;
 
   String _companyName = '';
-  String? _verifiedCompanyId; // MUDANÇA 1: Armazena o ID da empresa verificada
+  String? _verifiedCompanyId;
   Timer? _debounce;
 
   final _cnpjMaskFormatter =
-      MaskTextInputFormatter(mask: '##.###.###/####-##', filter: {"#": RegExp(r'[0-9]')});
+      MaskTextInputFormatter(mask: '##.###.###/####-##', filter: {"#": RegExp(r'[0-9]')}, type: MaskAutoCompletionType.lazy);
 
   @override
   void initState() {
     super.initState();
-    // Preenchimento para testes
-    if(mounted) {
-      _emailController.text = 'victorhugowille@gmail.com';
-      _passwordController.text = '123456';
-      _cnpjController.text = '59.902.925/0001-70';
-      _fetchCompanyData();
-    }
+     _emailController.text = 'victorhugowille@gmail.com';
+     _passwordController.text = '123456';
+     _cnpjController.text = _cnpjMaskFormatter.maskText('59902925000170'); 
+
+    // Verifica o CNPJ inicial após a primeira renderização
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+     if (_cnpjController.text.isNotEmpty && mounted) {
+        _fetchCompanyData(); // Chama a verificação inicial
+     }
+    });
   }
 
   @override
@@ -54,38 +58,38 @@ class _LoginScreenState extends State<LoginScreen> {
   void _onCnpjChanged(String cnpj) {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
     _debounce = Timer(const Duration(milliseconds: 700), () {
-      if (cnpj.length == 18) {
+      String unmasked = _cnpjMaskFormatter.getUnmaskedText();
+      if (unmasked.length == 14) { // Verifica pelo tamanho sem máscara
         _fetchCompanyData();
       } else {
         if (mounted) {
           setState(() {
             _companyName = '';
-            _verifiedCompanyId = null; // Limpa o ID verificado
+            _verifiedCompanyId = null;
           });
         }
       }
     });
   }
 
-  // MUDANÇA 2: Função renomeada e agora busca o ID também
   Future<void> _fetchCompanyData() async {
     if (!mounted) return;
     setState(() {
       _isCheckingCnpj = true;
       _companyName = '';
-      _verifiedCompanyId = null; // Limpa o ID antes de verificar
+      _verifiedCompanyId = null;
     });
 
     final unmaskedCnpj = _cnpjMaskFormatter.getUnmaskedText();
     if (unmaskedCnpj.length != 14) {
-      setState(() => _isCheckingCnpj = false);
+      if (mounted) setState(() => _isCheckingCnpj = false);
       return;
     }
 
     try {
       final response = await Supabase.instance.client
           .from('companies')
-          .select('id, name') // Busca o ID e o nome
+          .select('id, name')
           .eq('cnpj', unmaskedCnpj)
           .maybeSingle();
 
@@ -93,7 +97,7 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(() {
           if (response != null) {
             _companyName = response['name'];
-            _verifiedCompanyId = response['id']; // Armazena o ID
+            _verifiedCompanyId = response['id'];
           } else {
             _companyName = 'Empresa não encontrada';
             _verifiedCompanyId = null;
@@ -114,17 +118,18 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  // MUDANÇA 3: Lógica de login mais robusta
   Future<void> _submit() async {
+     FocusScope.of(context).unfocus(); // Esconde teclado
     if (!_formKey.currentState!.validate()) return;
     if (!_acceptedPrivacy) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Você precisa aceitar as políticas de privacidade.')),
+        const SnackBar(content: Text('Você precisa aceitar as políticas de privacidade.'), backgroundColor: Colors.orange,),
       );
       return;
     }
-    // Verificação extra: garante que uma empresa válida foi encontrada antes de prosseguir
-    if (_verifiedCompanyId == null) {
+    if (_verifiedCompanyId == null || _companyName == 'Empresa não encontrada' || _companyName == 'Erro ao buscar') {
+       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('Por favor, informe um CNPJ de uma empresa válida.'),
         backgroundColor: Colors.orange,
@@ -133,11 +138,10 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     setState(() => _isLoading = true);
-    
     final supabase = Supabase.instance.client;
+    final scaffoldMessenger = ScaffoldMessenger.of(context); // Guarda para uso seguro após await
 
     try {
-      // 1. Tenta autenticar o usuário com e-mail e senha
       await supabase.auth.signInWithPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
@@ -145,60 +149,71 @@ class _LoginScreenState extends State<LoginScreen> {
 
       final userId = supabase.auth.currentUser!.id;
 
-      // 2. Busca o company_id associado ao perfil do usuário
       final profileResponse = await supabase
           .from('profiles')
           .select('company_id')
           .eq('user_id', userId)
           .single();
-      
+
       final userCompanyId = profileResponse['company_id'];
 
-      // 3. Compara o ID do perfil do usuário com o ID da empresa digitada
       if (userCompanyId != null && userCompanyId == _verifiedCompanyId) {
-        // SUCESSO! Os IDs correspondem.
         if (mounted) {
           await Provider.of<CompanyProvider>(context, listen: false).fetchCompanyForCurrentUser();
+          // Certifique-se que '/home' está definido nas suas rotas
           Navigator.of(context).pushReplacementNamed('/home');
         }
       } else {
-        // FALHA! O usuário não pertence a esta empresa.
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          scaffoldMessenger.showSnackBar(const SnackBar(
             content: Text('Este usuário não tem permissão para acessar esta empresa.'),
             backgroundColor: Colors.red,
           ));
         }
+         // Desloga o usuário se a empresa não bate
         await supabase.auth.signOut();
       }
 
     } on SocketException catch (_) {
       if (mounted){
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        scaffoldMessenger.showSnackBar(const SnackBar(
           content: Text('Sem conexão com a internet. Verifique sua rede.'),
           backgroundColor: Colors.orange,
         ));
       }
     } on AuthException catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        scaffoldMessenger.showSnackBar(SnackBar(
           content: Text(error.message),
           backgroundColor: Colors.red,
         ));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Ocorreu um erro inesperado: $e'),
+        scaffoldMessenger.showSnackBar(SnackBar(
+          content: Text('Ocorreu um erro: ${e is PostgrestException ? e.message : e.toString()}'),
           backgroundColor: Colors.red,
         ));
       }
+      // Garante deslogar se houver erro após autenticação parcial
       if (supabase.auth.currentUser != null) {
-        await supabase.auth.signOut();
+        await supabase.auth.signOut().catchError((_) {}); // Ignora erro no signOut
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  String? _validateCnpj(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'CNPJ é obrigatório';
+    }
+    String unmaskedCnpj = _cnpjMaskFormatter.getUnmaskedText();
+    if (unmaskedCnpj.length != 14) {
+       return 'CNPJ incompleto';
+    }
+    // Adicione validação de dígito verificador se necessário
+    return null;
   }
 
   @override
@@ -229,59 +244,82 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     const SizedBox(height: 32),
-                    
+
                     TextFormField(
                       controller: _cnpjController,
+                      enabled: !_isLoading,
                       decoration: InputDecoration(
                         labelText: 'CNPJ da Empresa',
                         prefixIcon: const Icon(Icons.business_center_outlined),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        suffixIcon: _isCheckingCnpj
+                            ? const Padding(padding: EdgeInsets.all(12.0), child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)))
+                            : _companyName.isNotEmpty
+                                ? Icon(empresaValida ? Icons.check_circle_outline : Icons.error_outline, color: empresaValida ? Colors.green : Colors.red)
+                                : null,
                       ),
                       keyboardType: TextInputType.number,
                       inputFormatters: [_cnpjMaskFormatter],
                       onChanged: _onCnpjChanged,
-                      validator: (v) => (v == null || v.length < 18) ? 'CNPJ inválido' : null,
+                      validator: _validateCnpj, // Usa a função separada
                     ),
-                    SizedBox(
-                      height: 24,
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 4.0),
-                        child: _isCheckingCnpj
-                            ? const Center(
-                                child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)))
-                            : Center(
-                                child: Text(
-                                  _companyName,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: empresaValida ? theme.primaryColor.withOpacity(0.8) : Colors.redAccent,
-                                  ),
-                                ),
-                              ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
+                    // Espaço para feedback sem empurrar layout se nome for grande
+                     SizedBox(
+                       height: 24,
+                       child: Padding(
+                         padding: const EdgeInsets.only(top: 4.0, left: 12.0, right: 12.0), // Ajuste padding
+                         child: Center(
+                           child: Text(
+                             _isCheckingCnpj ? 'Verificando...' : (_companyName.isNotEmpty && !empresaValida ? _companyName : ''), // Só mostra erro aqui
+                             style: TextStyle(
+                               fontWeight: FontWeight.bold,
+                               color: Colors.redAccent,
+                             ),
+                             textAlign: TextAlign.center,
+                             overflow: TextOverflow.ellipsis,
+                           ),
+                         ),
+                       ),
+                     ),
+                    const SizedBox(height: 16), // Espaço ajustado
 
                     TextFormField(
                       controller: _emailController,
+                      enabled: !_isLoading,
                       decoration: InputDecoration(
                         labelText: 'Email',
                         prefixIcon: const Icon(Icons.email_outlined),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      validator: (v) => v!.isEmpty ? 'Campo obrigatório' : null,
+                       keyboardType: TextInputType.emailAddress,
+                       autovalidateMode: AutovalidateMode.onUserInteraction,
+                       validator: (value) {
+                         if (value == null || value.trim().isEmpty) return 'Email é obrigatório';
+                         if (!value.contains('@') || !value.contains('.')) return 'Formato de email inválido';
+                         return null;
+                       },
                     ),
                     const SizedBox(height: 16),
 
                     TextFormField(
                       controller: _passwordController,
+                      enabled: !_isLoading,
                       decoration: InputDecoration(
                         labelText: 'Senha',
                         prefixIcon: const Icon(Icons.lock_outline),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        suffixIcon: IconButton(
+                           icon: Icon(_obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                           onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                         ),
                       ),
-                      obscureText: true,
-                      validator: (v) => v!.isEmpty ? 'Campo obrigatório' : null,
+                      obscureText: _obscurePassword,
+                       autovalidateMode: AutovalidateMode.onUserInteraction,
+                      validator: (v) {
+                          if (v == null || v.isEmpty) return 'Senha é obrigatória';
+                          // if (v.length < 6) return 'Mínimo 6 caracteres'; // Exemplo
+                          return null;
+                      },
                     ),
                     const SizedBox(height: 8),
 
@@ -289,11 +327,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       children: [
                         Checkbox(
                           value: _acceptedPrivacy,
-                          onChanged: (v) => setState(() => _acceptedPrivacy = v ?? false),
+                          onChanged: _isLoading ? null : (v) => setState(() => _acceptedPrivacy = v ?? false),
                         ),
                         Flexible(
                           child: GestureDetector(
                             onTap: () {
+                              // TODO: Mostrar dialog/modal com as políticas
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(content: Text('Exibir políticas de privacidade...')),
                               );
@@ -307,7 +346,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ],
                     ),
                     const SizedBox(height: 24),
-                    
+
                     _isLoading
                         ? const Center(child: CircularProgressIndicator())
                         : ElevatedButton(
@@ -327,15 +366,20 @@ class _LoginScreenState extends State<LoginScreen> {
                       children: [
                         const Text('Não tem uma conta?'),
                         TextButton(
-                          onPressed: () {
+                          onPressed: _isLoading ? null : () {
                             Navigator.of(context).push(MaterialPageRoute(
-                              builder: (context) => const SignUpSelectionScreen(),
+                              builder: (context) => const SignUpSelectionScreen(), // Verifique o nome da tela
                             ));
                           },
                           child: const Text('Cadastre-se'),
                         ),
                       ],
                     ),
+                     // Botão "Esqueci minha senha" (opcional)
+                     // TextButton(
+                     //   onPressed: _isLoading ? null : () { /* Implementar recuperação */ },
+                     //   child: const Text('Esqueci minha senha'),
+                     // ),
                   ],
                 ),
               ),
