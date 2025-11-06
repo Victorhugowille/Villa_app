@@ -17,39 +17,39 @@ class _GoogleSheetsScreenState extends State<GoogleSheetsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Stack(
-        children: [
-          InAppWebView(
-            key: webViewKey,
-            initialUrlRequest: URLRequest(url: WebUri(initialUrl)),
-            onWebViewCreated: (controller) {
-              webViewController = controller;
-            },
-            onLoadStart: (controller, url) {
-              setState(() {
-                isLoading = true;
-              });
-            },
-            onLoadStop: (controller, url) {
+    // --- CORREÇÃO AQUI ---
+    // Removemos o Scaffold e retornamos diretamente o Stack (o body).
+    return Stack(
+      children: [
+        InAppWebView(
+          key: webViewKey,
+          initialUrlRequest: URLRequest(url: WebUri(initialUrl)),
+          onWebViewCreated: (controller) {
+            webViewController = controller;
+          },
+          onLoadStart: (controller, url) {
+            setState(() {
+              isLoading = true;
+            });
+          },
+          onLoadStop: (controller, url) {
+            setState(() {
+              isLoading = false;
+            });
+          },
+          onProgressChanged: (controller, progress) {
+            if (progress == 100) {
               setState(() {
                 isLoading = false;
               });
-            },
-            onProgressChanged: (controller, progress) {
-              if (progress == 100) {
-                setState(() {
-                  isLoading = false;
-                });
-              }
-            },
+            }
+          },
+        ),
+        if (isLoading)
+          const Center(
+            child: CircularProgressIndicator(),
           ),
-          if (isLoading)
-            const Center(
-              child: CircularProgressIndicator(),
-            ),
-        ],
-      ),
+      ],
     );
   }
 }

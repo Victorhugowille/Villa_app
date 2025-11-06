@@ -1,30 +1,54 @@
+// lib/providers/company_provider.dart
+
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart'; // Added Material import for ChangeNotifier if not implicitly imported
+import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:villabistromobile/data/app_data.dart' as app_data; // Using alias
 
 class CompanyProvider with ChangeNotifier {
   final SupabaseClient _supabase = Supabase.instance.client;
 
-  app_data.Company? _currentCompany; // Use the alias
+  app_data.Company? _currentCompany;
   String? _role;
   bool _isLoading = false;
 
+  // --- CAMPOS PARA O PERFIL DO USUÁRIO ---
+  String? _fullName;
+  String? _phoneNumber;
+  String? _avatarUrl;
+  String? _userId;
+  String? _email; // <-- NOVO CAMPO
+
   // --- Getters ---
-  app_data.Company? get currentCompany => _currentCompany; // Use the alias
+  app_data.Company? get currentCompany => _currentCompany;
   String? get role => _role;
   bool get isLoading => _isLoading;
   String get companyName => _currentCompany?.name ?? 'Carregando...';
   String? get companyId => _currentCompany?.id;
 
-  // --- Methods ---
+  // --- GETTERS DO PERFIL ---
+  String? get fullName => _fullName;
+  String? get phoneNumber => _phoneNumber;
+  String? get avatarUrl => _avatarUrl;
+  String? get userId => _userId;
+  String? get email => _email; // <-- NOVO GETTER
 
-  /// Updates the locally stored company's latitude and longitude.
-  /// Does NOT save to the database, only updates the provider state.
+  /// Atualiza localmente os dados do perfil após a edição
+  void updateLocalProfile(
+      {String? fullName,
+      String? phoneNumber,
+      String? avatarUrl,
+      String? email}) { // <-- NOVO PARÂMETRO
+    _fullName = fullName ?? _fullName;
+    _phoneNumber = phoneNumber ?? _phoneNumber;
+    _avatarUrl = avatarUrl ?? _avatarUrl;
+    _email = email ?? _email; // <-- ATUALIZA EMAIL
+    notifyListeners();
+  }
+
   void updateLocalCompanyLocation(double latitude, double longitude) {
     if (_currentCompany != null) {
-      // Create a new instance with updated values
-      _currentCompany = app_data.Company( // Use the alias
+      _currentCompany = app_data.Company(
         id: _currentCompany!.id,
         name: _currentCompany!.name,
         logoUrl: _currentCompany!.logoUrl,
@@ -40,68 +64,71 @@ class CompanyProvider with ChangeNotifier {
         notificationEmail: _currentCompany!.notificationEmail,
         slug: _currentCompany!.slug,
         colorSite: _currentCompany!.colorSite,
-        // Update the latitude and longitude
         latitude: latitude,
         longitude: longitude,
+        status: _currentCompany!.status,
       );
-      notifyListeners(); // Notify listeners about the change
+      notifyListeners();
     }
   }
 
-  /// Fetches the company data associated with the currently logged-in user.
   Future<void> fetchCompanyForCurrentUser() async {
-    // Check if user is logged in
     if (_supabase.auth.currentUser == null) {
-      debugPrint('[CompanyProvider] User not logged in. Aborting company fetch.');
-      // Optionally clear existing data if user logs out
-      // clearCompany();
+      debugPrint('[CompanyProvider] User not logged in.');
+      clearCompany();
       return;
     }
 
     _isLoading = true;
-    notifyListeners(); // Notify UI that loading started
+    notifyListeners();
 
     try {
-      final userId = _supabase.auth.currentUser!.id;
+      _userId = _supabase.auth.currentUser!.id; // Salva o ID do usuário
+      _email = _supabase.auth.currentUser!.email; // <-- PEGA O EMAIL
 
-      // Fetch profile and associated company data in one go
+      // ATUALIZADO: Busca mais campos do profile
       final response = await _supabase
           .from('profiles')
-          .select('role, company_id, companies (*)') // Select profile role, company_id, and all columns from the related company
-          .eq('user_id', userId)
-          .single(); // Expect only one profile per user
+          .select(
+              'role, company_id, full_name, phone_number, avatar_url, companies (*)')
+          .eq('user_id', _userId!)
+          .single();
 
-      _role = response['role'] as String?; // Safely cast role
+      // Salva os dados do perfil
+      _role = response['role'] as String?;
+      _fullName = response['full_name'] as String?;
+      _phoneNumber = response['phone_number'] as String?;
+      _avatarUrl = response['avatar_url'] as String?;
 
-      // Check if the nested 'companies' data exists
       if (response['companies'] != null) {
         final companyData = response['companies'] as Map<String, dynamic>;
-        _currentCompany = app_data.Company.fromJson(companyData); // Use the alias
-        debugPrint('[CompanyProvider] Company "${_currentCompany?.name}" loaded successfully.');
+        _currentCompany = app_data.Company.fromJson(companyData);
+        debugPrint(
+            '[CompanyProvider] Company "${_currentCompany?.name}" loaded.');
       } else {
-        _currentCompany = null; // Ensure company is null if not found
-        debugPrint('[CompanyProvider] No company associated with the profile.');
+        _currentCompany = null;
+        debugPrint('[CompanyProvider] No company associated with profile.');
       }
-
     } catch (e) {
-      debugPrint('[CompanyProvider] ERROR fetching company data: $e');
-       // Clear data on error to avoid showing stale info
-      _currentCompany = null;
-      _role = null;
-      // You might want to re-throw the error or handle it differently
-      // depending on your app's error handling strategy.
+      debugPrint('[CompanyProvider] ERROR fetching data: $e');
+      clearCompany(); // Limpa tudo em caso de erro
     } finally {
       _isLoading = false;
-      notifyListeners(); // Notify UI that loading finished (success or error)
+      notifyListeners();
     }
   }
 
-  /// Clears the current company and role information.
   void clearCompany() {
     _currentCompany = null;
     _role = null;
-    _isLoading = false; // Reset loading state as well
+    _isLoading = false;
+    // --- LIMPA DADOS DO PERFIL ---
+    _fullName = null;
+    _phoneNumber = null;
+    _avatarUrl = null;
+    _userId = null;
+    _email = null; // <-- LIMPA EMAIL
     notifyListeners();
-    debugPrint('[CompanyProvider] Company data cleared.');
+    debugPrint('[CompanyProvider] All data cleared.');
   }
 }

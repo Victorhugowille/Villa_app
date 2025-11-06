@@ -1,11 +1,11 @@
-// lib/screens/management/management_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:villabistromobile/providers/navigation_provider.dart';
 import 'package:villabistromobile/screens/management/category_management_screen.dart';
 import 'package:villabistromobile/screens/management/product_management_screen.dart';
 import 'package:villabistromobile/screens/management/table_management_screen.dart';
-import 'package:villabistromobile/widgets/side_menu.dart';
+// O import do 'side_menu.dart' não é mais necessário aqui
+// import 'package:villabistromobile/widgets/side_menu.dart';
 
 class ManagementScreen extends StatelessWidget {
   const ManagementScreen({super.key});
@@ -13,7 +13,7 @@ class ManagementScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final navProvider = Provider.of<NavigationProvider>(context, listen: false);
-    final isDesktop = MediaQuery.of(context).size.width > 800;
+    // final isDesktop = MediaQuery.of(context).size.width > 800; // Não é mais necessário
 
     Widget bodyContent = ListView(
       padding: const EdgeInsets.all(16.0),
@@ -50,17 +50,9 @@ class ManagementScreen extends StatelessWidget {
       ],
     );
 
-    if (isDesktop) {
-      return bodyContent;
-    } else {
-      return Scaffold(
-        drawer: const SideMenu(),
-        appBar: AppBar(
-          title: const Text('Gestão'),
-        ),
-        body: bodyContent,
-      );
-    }
+    // --- CORREÇÃO AQUI ---
+    // Removemos o 'if (isDesktop)' e o 'Scaffold' extra.
+    return bodyContent;
   }
 
   Widget _buildManagementCard({

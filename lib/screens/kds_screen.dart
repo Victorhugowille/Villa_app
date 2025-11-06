@@ -6,7 +6,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:villabistromobile/data/app_data.dart' as app_data;
 import 'package:villabistromobile/providers/kds_provider.dart';
 import 'package:villabistromobile/providers/printer_provider.dart';
-import 'package:villabistromobile/widgets/side_menu.dart';
+// O import do 'side_menu.dart' não é mais necessário aqui
+// import 'package:villabistromobile/widgets/side_menu.dart';
 
 class KdsScreen extends StatefulWidget {
   const KdsScreen({super.key});
@@ -38,64 +39,134 @@ class _KdsScreenState extends State<KdsScreen> {
 
     // =================== LAYOUT PARA DESKTOP ===================
     if (isDesktop) {
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      // Lista de booleanos para o ToggleButtons
+      final isSelected = [
+        kdsProvider.filter == KdsFilter.all,
+        kdsProvider.filter == KdsFilter.table,
+        kdsProvider.filter == KdsFilter.delivery,
+      ];
+
+      return Stack(
+        // 1. O Stack permite sobrepor widgets
         children: [
-          Expanded(
-            child: OrderColumn(
-              key: const ValueKey('production_column_desktop'),
-              title: 'Em produção',
-              color: Colors.orange.shade700,
-              orders: kdsProvider.productionOrders,
-            ),
+          // 2. O conteúdo principal (as colunas)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: OrderColumn(
+                  key: const ValueKey('production_column_desktop'),
+                  title: 'Em produção',
+                  color: Colors.orange.shade700,
+                  orders: kdsProvider.productionOrders,
+                ),
+              ),
+              Expanded(
+                child: OrderColumn(
+                  key: const ValueKey('ready_column_desktop'),
+                  title: 'Prontos',
+                  color: Colors.green.shade700,
+                  orders: kdsProvider.readyOrders,
+                ),
+              ),
+            ],
           ),
-          Expanded(
-            child: OrderColumn(
-              key: const ValueKey('ready_column_desktop'),
-              title: 'Prontos',
-              color: Colors.green.shade700,
-              orders: kdsProvider.readyOrders,
+          // 3. O widget de filtro flutuante
+          Positioned(
+            bottom: 16,
+            right: 16,
+            child: Material(
+              elevation: 6.0,
+              borderRadius: BorderRadius.circular(8.0),
+              clipBehavior: Clip.antiAlias, // Para o 'splash' do botão
+              child: ToggleButtons(
+                isSelected: isSelected,
+                onPressed: (int index) {
+                  KdsFilter newFilter;
+                  switch (index) {
+                    case 0:
+                      newFilter = KdsFilter.all;
+                      break;
+                    case 1:
+                      newFilter = KdsFilter.table;
+                      break;
+                    case 2:
+                      newFilter = KdsFilter.delivery;
+                      break;
+                    default:
+                      newFilter = KdsFilter.all;
+                  }
+                  // Usar 'read' para chamar a função sem reconstruir o widget
+                  context.read<KdsProvider>().setFilter(newFilter);
+                },
+                children: const [
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16.0),
+                    child: Tooltip(
+                      message: 'Todos os Pedidos',
+                      child: Icon(Icons.apps),
+                    ),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16.0),
+                    child: Tooltip(
+                      message: 'Apenas Mesas',
+                      child: Icon(Icons.deck_outlined),
+                    ),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16.0),
+                    child: Tooltip(
+                      message: 'Apenas Delivery',
+                      child: Icon(Icons.delivery_dining_outlined),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
       );
     }
-
-    // =================== LAYOUT PARA CELULAR (COM ABAS) ===================
     return DefaultTabController(
-      length: 2, // 2 abas: Produção e Prontos
-      child: Scaffold(
-        drawer: const SideMenu(),
-        appBar: AppBar(
-          title: const Text('Painel de Pedidos'),
-          bottom: TabBar(
-            indicatorColor: Theme.of(context).indicatorColor,
-            tabs: [
-              Tab(text: 'EM PRODUÇÃO (${kdsProvider.productionOrders.length})'),
-              Tab(text: 'PRONTOS (${kdsProvider.readyOrders.length})'),
-            ],
+      length: 2, 
+      child: Column(
+        children: [
+          Container(
+            color: Theme.of(context).appBarTheme.backgroundColor,
+            child: TabBar(
+              indicatorColor: Theme.of(context).indicatorColor,
+              labelColor: Theme.of(context).textTheme.titleMedium?.color, 
+              unselectedLabelColor: Theme.of(context).textTheme.titleMedium?.color?.withOpacity(0.7),
+              tabs: [
+                Tab(text: 'EM PRODUÇÃO (${kdsProvider.productionOrders.length})'),
+                Tab(text: 'PRONTOS (${kdsProvider.readyOrders.length})'),
+              ],
+            ),
           ),
-        ),
-        body: kdsProvider.isLoading && kdsProvider.productionOrders.isEmpty && kdsProvider.readyOrders.isEmpty
-            ? const Center(child: CircularProgressIndicator())
-            : TabBarView(
-                children: [
-                  // Conteúdo da primeira aba
-                  OrderColumn(
-                    key: const ValueKey('production_column_mobile'),
-                    title: 'Em produção',
-                    orders: kdsProvider.productionOrders,
-                    showTitle: false, // O título já está na aba
+          Expanded(
+            child: kdsProvider.isLoading &&
+                    kdsProvider.productionOrders.isEmpty &&
+                    kdsProvider.readyOrders.isEmpty
+                ? const Center(child: CircularProgressIndicator())
+                : TabBarView(
+                    children: [
+                      OrderColumn(
+                        key: const ValueKey('production_column_mobile'),
+                        title: 'Em produção',
+                        orders: kdsProvider.productionOrders,
+                        showTitle: false, // O título já está na aba
+                      ),
+                      OrderColumn(
+                        key: const ValueKey('ready_column_mobile'),
+                        title: 'Prontos',
+                        orders: kdsProvider.readyOrders,
+                        showTitle: false, // O título já está na aba
+                      ),
+                    ],
                   ),
-                  // Conteúdo da segunda aba
-                  OrderColumn(
-                    key: const ValueKey('ready_column_mobile'),
-                    title: 'Prontos',
-                    orders: kdsProvider.readyOrders,
-                    showTitle: false, // O título já está na aba
-                  ),
-                ],
-              ),
+          ),
+        ],
       ),
     );
   }

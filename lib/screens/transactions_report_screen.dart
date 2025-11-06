@@ -6,7 +6,8 @@ import 'package:villabistromobile/data/app_data.dart' as app_data;
 import 'package:villabistromobile/providers/transaction_provider.dart';
 import 'package:villabistromobile/widgets/charts/daily_revenue_bar_chart.dart';
 import 'package:villabistromobile/widgets/charts/payment_method_pie_chart.dart';
-import 'package:villabistromobile/widgets/side_menu.dart';
+// O import do 'side_menu.dart' não é mais necessário aqui
+// import 'package:villabistromobile/widgets/side_menu.dart';
 
 class TransactionsReportScreen extends StatefulWidget {
   const TransactionsReportScreen({super.key});
@@ -102,7 +103,7 @@ class _TransactionsReportScreenState extends State<TransactionsReportScreen>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDesktop = MediaQuery.of(context).size.width > 800;
+    // final isDesktop = MediaQuery.of(context).size.width > 800; // Não é mais necessário
     final transactionProvider = Provider.of<TransactionProvider>(context);
     final DateFormat formatter = DateFormat('dd/MM/yyyy');
 
@@ -123,6 +124,8 @@ class _TransactionsReportScreenState extends State<TransactionsReportScreen>
                       children: [
                         TabBar(
                           controller: _tabController,
+                          labelColor: Theme.of(context).textTheme.bodyLarge?.color, // Corrigindo cor
+                          unselectedLabelColor: Theme.of(context).textTheme.bodyLarge?.color?.withOpacity(0.7),
                           tabs: const [
                             Tab(icon: Icon(Icons.pie_chart), text: 'Pagamentos'),
                             Tab(icon: Icon(Icons.bar_chart), text: 'Faturamento'),
@@ -149,19 +152,10 @@ class _TransactionsReportScreenState extends State<TransactionsReportScreen>
       ],
     );
 
-    if (isDesktop) {
-      return bodyContent;
-    } else {
-      return Scaffold(
-        drawer: const SideMenu(),
-        appBar: AppBar(
-          title: const Text('Relatório de Movimentação'),
-        ),
-        body: bodyContent,
-      );
-    }
+    // --- CORREÇÃO AQUI ---
+    // Removemos o 'if (isDesktop)' e o 'Scaffold' extra.
+    return bodyContent;
   }
-
   Widget _buildChartCard(Widget chart) {
     return SingleChildScrollView(
       child: Padding(

@@ -8,7 +8,7 @@ import 'package:villabistromobile/providers/printer_provider.dart';
 import 'package:villabistromobile/screens/category_screen.dart';
 import 'package:villabistromobile/screens/order_list_screen.dart';
 import 'package:villabistromobile/services/printing_service.dart';
-import 'package:villabistromobile/widgets/side_menu.dart';
+// import 'package:villabistromobile/widgets/side_menu.dart'; // Não é mais necessário
 
 class TableSelectionScreen extends StatefulWidget {
   const TableSelectionScreen({super.key});
@@ -270,7 +270,7 @@ class _TableSelectionScreenState extends State<TableSelectionScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth > 800;
+    // final isDesktop = screenWidth > 800; // Não precisamos mais disso aqui
 
     int crossAxisCount;
     if (screenWidth > 1200) {
@@ -362,16 +362,10 @@ class _TableSelectionScreenState extends State<TableSelectionScreen> {
       },
     );
 
-    if (isDesktop) {
-      return screenContent;
-    } else {
-      return Scaffold(
-        drawer: const SideMenu(),
-        appBar: AppBar(
-          title: const Text('Seleção de Mesas'),
-        ),
-        body: screenContent,
-      );
-    }
+    // --- CORREÇÃO AQUI ---
+    // Removemos o 'if (isDesktop)' e o 'Scaffold' extra.
+    // Esta tela agora SEMPRE retorna apenas o 'screenContent',
+    // que será o 'body:' do MobileShell ou DesktopShell.
+    return screenContent;
   }
 }

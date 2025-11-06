@@ -5,12 +5,12 @@ import 'package:villabistromobile/providers/company_provider.dart';
 import 'package:villabistromobile/providers/navigation_provider.dart';
 import 'package:villabistromobile/screens/configuracao/company_requests_screen.dart';
 import 'package:villabistromobile/screens/configuracao/company_screen.dart';
-// ADICIONE ESTE IMPORT
 import 'package:villabistromobile/screens/configuracao/destaques_site_screen.dart';
 import 'package:villabistromobile/screens/configuracao/delivery_zones_screen.dart';
 import 'package:villabistromobile/screens/configuracao/pending_requests_screen.dart';
 import 'package:villabistromobile/screens/management/theme_management_screen.dart';
-import 'package:villabistromobile/widgets/side_menu.dart';
+// O import do 'side_menu.dart' não é mais necessário aqui
+// import 'package:villabistromobile/widgets/side_menu.dart';
 
 class ConfiguracaoScreen extends StatelessWidget {
   const ConfiguracaoScreen({super.key});
@@ -20,7 +20,7 @@ class ConfiguracaoScreen extends StatelessWidget {
     final currentUserEmail = Supabase.instance.client.auth.currentUser?.email;
     final navProvider = Provider.of<NavigationProvider>(context, listen: false);
     
-    final isDesktop = MediaQuery.of(context).size.width > 800;
+    // final isDesktop = MediaQuery.of(context).size.width > 800; // Não é mais necessário
 
     Widget bodyContent = Consumer<CompanyProvider>(
       builder: (context, companyProvider, child) {
@@ -125,16 +125,9 @@ class ConfiguracaoScreen extends StatelessWidget {
       },
     );
 
-    if (isDesktop) {
-      return bodyContent;
-    } else {
-      return Scaffold(
-        drawer: const SideMenu(),
-        appBar: AppBar(
-          title: const Text('Configurações'),
-        ),
-        body: bodyContent,
-      );
-    }
+    // --- CORREÇÃO AQUI ---
+    // Removemos o 'if (isDesktop)' e o 'Scaffold' extra.
+    // Esta tela agora SEMPRE retorna apenas o 'bodyContent'.
+    return bodyContent;
   }
 }

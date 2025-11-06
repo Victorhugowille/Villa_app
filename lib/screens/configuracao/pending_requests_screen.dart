@@ -1,7 +1,11 @@
+// lib/screens/pending_requests_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:villabistromobile/providers/company_provider.dart';
+// 1. IMPORTE A NOVA TELA
+import 'package:villabistromobile/screens/configuracao/employee_management_screen.dart';
 
 class PendingRequestsScreen extends StatefulWidget {
   const PendingRequestsScreen({super.key});
@@ -21,6 +25,7 @@ class _PendingRequestsScreenState extends State<PendingRequestsScreen> {
   }
 
   Future<List<Map<String, dynamic>>> _fetchPendingRequests() async {
+    // Busca o companyId do provider
     final companyId = context.read<CompanyProvider>().currentCompany?.id;
     if (companyId == null) {
       throw 'Empresa não encontrada para o usuário atual.';
@@ -32,7 +37,7 @@ class _PendingRequestsScreenState extends State<PendingRequestsScreen> {
         .eq('target_company_id', companyId)
         .eq('status', 'pending');
 
-    return response;
+    return (response as List).map((e) => e as Map<String, dynamic>).toList();
   }
 
   // NOVA FUNÇÃO: Mostra o diálogo para escolher o cargo
@@ -84,7 +89,8 @@ class _PendingRequestsScreenState extends State<PendingRequestsScreen> {
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(dialogContext);
-                _approveRequest(requestId, selectedRole); // Chama a aprovação com o cargo
+                _approveRequest(
+                    requestId, selectedRole); // Chama a aprovação com o cargo
               },
               child: const Text('Aprovar'),
             ),
@@ -200,7 +206,8 @@ class _PendingRequestsScreenState extends State<PendingRequestsScreen> {
                           const SizedBox(width: 8),
                           ElevatedButton(
                             // O botão agora chama o diálogo
-                            onPressed: () => _showApprovalDialog(request['id']),
+                            onPressed: () =>
+                                _showApprovalDialog(request['id']),
                             child: const Text('Aprovar'),
                           ),
                         ],
@@ -212,6 +219,18 @@ class _PendingRequestsScreenState extends State<PendingRequestsScreen> {
             },
           );
         },
+      ),
+      // 2. BOTÃO (FAB) ADICIONADO PARA GESTÃO
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (context) => const EmployeeManagementScreen()),
+          );
+        },
+        tooltip: 'Gerenciar Funcionários',
+        child: const Icon(Icons.manage_accounts),
       ),
     );
   }

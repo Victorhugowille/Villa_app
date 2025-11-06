@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 class Company {
   final String id;
   final String name;
-  final String? logoUrl; // NOVO CAMPO
+  final String? logoUrl;
   final String? cnpj;
   final String? telefone;
   final String? rua;
@@ -15,6 +15,7 @@ class Company {
   final String? zapiToken;
   final String? notificationEmail;
   final String? slug;
+  final String status; // <-- CAMPO ADICIONADO
   final String? colorSite;
   final double? latitude;
   final double? longitude;
@@ -22,7 +23,7 @@ class Company {
   Company({
     required this.id,
     required this.name,
-    this.logoUrl, // NOVO CAMPO
+    this.logoUrl,
     this.cnpj,
     this.telefone,
     this.rua,
@@ -34,6 +35,7 @@ class Company {
     this.zapiToken,
     this.notificationEmail,
     this.slug,
+    required this.status, // <-- CAMPO ADICIONADO
     this.colorSite,
     this.latitude,
     this.longitude,
@@ -43,7 +45,7 @@ class Company {
     return Company(
       id: json['id']?.toString() ?? '',
       name: json['name'] ?? '',
-      logoUrl: json['logo_url'], // NOVO CAMPO
+      logoUrl: json['logo_url'],
       cnpj: json['cnpj'],
       telefone: json['telefone'],
       rua: json['rua'],
@@ -55,6 +57,7 @@ class Company {
       zapiToken: json['zapi_token'],
       notificationEmail: json['notification_email'],
       slug: json['slug'],
+      status: json['status'] ?? 'pending', // <-- CAMPO ADICIONADO
       colorSite: json['color_site'],
       latitude: (json['latitude'] as num?)?.toDouble(),
       longitude: (json['longitude'] as num?)?.toDouble(),
@@ -65,7 +68,7 @@ class Company {
     return {
       'id': id,
       'name': name,
-      'logo_url': logoUrl, // NOVO CAMPO
+      'logo_url': logoUrl,
       'cnpj': cnpj,
       'telefone': telefone,
       'rua': rua,
@@ -75,6 +78,7 @@ class Company {
       'estado': estado,
       'latitude': latitude,
       'longitude': longitude,
+      'status': status, // <-- CAMPO ADICIONADO
     };
   }
 }

@@ -8,7 +8,7 @@ class NavigationProvider with ChangeNotifier {
   String _currentTitle = 'Seleção de Mesas';
   List<Widget> _currentActions = [];
 
-  // Histórico para a navegação customizada do Desktop
+  // Histórico para a navegação customizada
   final List<Widget> _screenHistory = [const TableSelectionScreen()];
   final List<String> _titleHistory = ['Seleção de Mesas'];
   final List<List<Widget>> _actionsHistory = [[]];
@@ -20,39 +20,43 @@ class NavigationProvider with ChangeNotifier {
 
   bool get canPop => _screenHistory.length > 1;
 
-  void navigateTo(BuildContext context, Widget screen, String title) {
-    final isDesktop = MediaQuery.of(context).size.width > 800;
-
-    if (isDesktop) {
-      // No DESKTOP: Atualiza o estado e adiciona ao histórico customizado
-      _currentScreen = screen;
-      _currentTitle = title;
-      _currentActions = []; // Limpa ações da tela anterior
-
-      _screenHistory.add(screen);
-      _titleHistory.add(title);
-      _actionsHistory.add([]); // Adiciona um placeholder para as ações
-
-      notifyListeners();
-    } else {
-      // ===================================================================
-      // CORREÇÃO AQUI (PARA O CELULAR)
-      // ===================================================================
-      // Usamos Scaffold.maybeOf() para verificar se há um drawer de forma segura.
-      final scaffoldState = Scaffold.maybeOf(context);
-      if (scaffoldState != null && scaffoldState.isDrawerOpen) {
-        Navigator.of(context).pop(); // Fecha o menu apenas se ele existir e estiver aberto
-      }
-      
-      // A navegação continua como antes, empurrando a nova tela.
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => screen,
-        ),
-      );
+  // --- CORREÇÃO AQUI ---
+  // Adicionamos um parâmetro opcional {bool isRootNavigation = false}
+  void navigateTo(
+    BuildContext context,
+    Widget screen,
+    String title, {
+    bool isRootNavigation = false, // <-- NOVO PARÂMETRO
+  }) {
+    
+    // 1. Fecha o drawer (só vai executar no Mobile)
+    final scaffoldState = Scaffold.maybeOf(context);
+    if (scaffoldState != null && scaffoldState.isDrawerOpen) {
+      Navigator.of(context).pop(); // Fecha o menu
     }
+
+    // 2. --- LÓGICA ATUALIZADA ---
+    // Se for uma navegação "raiz" (vinda do Drawer),
+    // limpamos o histórico.
+    if (isRootNavigation) {
+      _screenHistory.clear();
+      _titleHistory.clear();
+      _actionsHistory.clear();
+    }
+
+    // 3. Adiciona a nova tela ao histórico (que pode estar limpo ou não)
+    _currentScreen = screen;
+    _currentTitle = title;
+    _currentActions = []; 
+
+    _screenHistory.add(screen);
+    _titleHistory.add(title);
+    _actionsHistory.add([]);
+
+    notifyListeners();
   }
 
+  // O pop() continua igual.
   void pop() {
     if (canPop) {
       _screenHistory.removeLast();

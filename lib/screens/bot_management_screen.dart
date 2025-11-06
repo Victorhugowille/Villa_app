@@ -1,15 +1,15 @@
-// lib/screens/bot_management_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:villabistromobile/providers/bot_provider.dart';
-import 'package:villabistromobile/widgets/side_menu.dart';
+// O import do 'side_menu.dart' não é mais necessário aqui
+// import 'package:villabistromobile/widgets/side_menu.dart';
 
 class BotManagementScreen extends StatelessWidget {
   const BotManagementScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final isDesktop = MediaQuery.of(context).size.width > 800;
+    // final isDesktop = MediaQuery.of(context).size.width > 800; // Não é mais necessário
 
     Widget bodyContent = Padding(
       padding: const EdgeInsets.all(16.0),
@@ -31,16 +31,9 @@ class BotManagementScreen extends StatelessWidget {
       ),
     );
 
-    if (isDesktop) {
-      return bodyContent;
-    } else {
-      return Scaffold(
-        drawer: const SideMenu(),
-        appBar: AppBar(
-          title: const Text('Gerenciamento do Robô'),
-        ),
-        body: bodyContent,
-      );
-    }
+    // --- CORREÇÃO AQUI ---
+    // Removemos o 'if (isDesktop)' e o 'Scaffold' extra.
+    // Esta tela agora SEMPRE retorna apenas o 'bodyContent'.
+    return bodyContent;
   }
 }

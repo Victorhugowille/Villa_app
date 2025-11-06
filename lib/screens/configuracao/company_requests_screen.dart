@@ -1,5 +1,8 @@
+// lib/screens/admin/company_requests_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:villabistromobile/screens/configuracao/company_management_screen.dart'; // Importe a nova tela
 
 class CompanyRequestsScreen extends StatefulWidget {
   const CompanyRequestsScreen({super.key});
@@ -10,6 +13,7 @@ class CompanyRequestsScreen extends StatefulWidget {
 
 class _CompanyRequestsScreenState extends State<CompanyRequestsScreen> {
   late Future<List<Map<String, dynamic>>> _requestsFuture;
+  final supabase = Supabase.instance.client; // Instância do Supabase
 
   @override
   void initState() {
@@ -19,7 +23,7 @@ class _CompanyRequestsScreenState extends State<CompanyRequestsScreen> {
 
   Future<List<Map<String, dynamic>>> _fetchRequests() async {
     try {
-      final response = await Supabase.instance.client
+      final response = await supabase
           .from('signup_requests')
           .select()
           .eq('status', 'pending');
@@ -45,7 +49,7 @@ class _CompanyRequestsScreenState extends State<CompanyRequestsScreen> {
 
   Future<void> _approveRequest(String requestId) async {
     try {
-      await Supabase.instance.client.functions.invoke(
+      await supabase.functions.invoke(
         'approve-new-company',
         body: {'request_id': requestId},
       );
@@ -72,10 +76,9 @@ class _CompanyRequestsScreenState extends State<CompanyRequestsScreen> {
 
   Future<void> _rejectRequest(String requestId) async {
     try {
-      await Supabase.instance.client
+      await supabase
           .from('signup_requests')
-          .update({'status': 'rejected'})
-          .eq('id', requestId);
+          .update({'status': 'rejected'}).eq('id', requestId);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -129,7 +132,8 @@ class _CompanyRequestsScreenState extends State<CompanyRequestsScreen> {
               itemBuilder: (context, index) {
                 final request = requests[index];
                 return Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  margin:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   elevation: 3,
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
@@ -153,7 +157,8 @@ class _CompanyRequestsScreenState extends State<CompanyRequestsScreen> {
                           children: [
                             TextButton(
                               onPressed: () => _rejectRequest(request['id']),
-                              child: const Text('Recusar', style: TextStyle(color: Colors.red)),
+                              child: const Text('Recusar',
+                                  style: TextStyle(color: Colors.red)),
                             ),
                             const SizedBox(width: 8),
                             ElevatedButton(
@@ -174,6 +179,19 @@ class _CompanyRequestsScreenState extends State<CompanyRequestsScreen> {
             ),
           );
         },
+      ),
+      // --- BOTÃO (FAB) ADICIONADO ---
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const CompanyManagementScreen(),
+            ),
+          );
+        },
+        tooltip: 'Gerenciar Empresas',
+        child: const Icon(Icons.business_center),
       ),
     );
   }
