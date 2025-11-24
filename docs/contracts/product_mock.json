@@ -1,0 +1,28 @@
+{
+  "id": "prod_001",
+  "name": "Hambúrguer Villa Especial",
+  "price": 35.90,
+  "description": "Pão brioche, blend de 180g, queijo cheddar e cebola caramelizada.",
+  "category_id": "cat_burgers",
+  "image_url": "https://supabasestorage.com/bucket/burguer.png",
+  "is_available": true,
+  "adicionais_groups": [
+    {
+      "group_name": "Ponto da Carne",
+      "required": true,
+      "options": [
+        { "id": 1, "name": "Mal Passado", "price": 0.00 },
+        { "id": 2, "name": "Ao Ponto", "price": 0.00 },
+        { "id": 3, "name": "Bem Passado", "price": 0.00 }
+      ]
+    },
+    {
+      "group_name": "Extras",
+      "required": false,
+      "options": [
+        { "id": 4, "name": "Bacon Extra", "price": 5.00 },
+        { "id": 5, "name": "Maionese Verde", "price": 2.50 }
+      ]
+    }
+  ]
+}
