@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\projetos\VILLABISTRO\villamobile\Villa_app\build\windows\x64\CMakeFiles\459088ac1df5891b1b9974c0d458b48b\generate.stamp.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{41DB0941-5ED5-348E-B2D7-D1D0A2D93F5A}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
