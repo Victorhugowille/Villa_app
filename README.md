@@ -1,5 +1,7 @@
 # Villa_app - Gestão Inteligente de Restaurantes
 
+PRD: https://docs.google.com/document/d/140Q4w-iIxWAiZDNWOn1u2Vjr-wb6VXhzRYPcmXS_8Zg/edit?tab=t.0#heading=h.frwj0pcjxme9
+
 **Autor:** Victor Hugo Wille
 
 **Tech Stack:** Flutter • Supabase • Realtime • Thermal Printing
