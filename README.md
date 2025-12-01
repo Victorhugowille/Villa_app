@@ -1,17 +1,17 @@
 **PRD:** https://docs.google.com/document/d/140Q4w-iIxWAiZDNWOn1u2Vjr-wb6VXhzRYPcmXS_8Zg/edit?tab=t.0#heading=h.frwj0pcjxme9
 
-# 📜 VillaBistrô: Documento de Arquitetura e Visão Abrangente
+# 📜 Villa_app
 
 ## 1. Visão Geral e Propósito do Projeto
 
-O **VillaBistrô** é uma aplicação completa de gestão para o setor de restaurantes e serviços de alimentação. Seu principal objetivo é otimizar o fluxo de trabalho, desde a abertura de uma mesa (pelo Garçom) até o monitoramento do pedido (pela Cozinha) e a notificação do cliente (pelo Bot).
+O **Villa_app_** é uma aplicação completa de gestão para o setor de restaurantes e serviços de alimentação. Seu principal objetivo é otimizar o fluxo de trabalho, desde a abertura de uma mesa (pelo Garçom) até o monitoramento do pedido (pela Cozinha) e a notificação do cliente (pelo Bot).
 
 | Característica | Detalhe |
 | :--- | :--- |
-| **Nome do Projeto** | VillaBistrô (ou Villa\_app) |
+| **Nome do Projeto** | Villa_app |
 | **Propósito** | Gestão de restaurantes, otimização de pedidos e fluxo de delivery/mesa. |
-| **Público-Alvo** | Garçons (App Mobile), Caixas/Gestores (App Desktop/Tablet) e Clientes (Notificações). |
-| **Identidade** | Aconchegante e sofisticada (paleta de tons de verde escuro, creme e dourado). |
+| **Público-Alvo** | Garçons (App Mobile), Caixas/Gestores (App Desktop/Tablet)  |
+| **Identidade** | Aconchegante e sofis_ticada (paleta de tons de verde escuro, creme e dourado). |
 
 ---
 
@@ -33,9 +33,9 @@ A arquitetura segue o padrão **MVVM simplificado (Modelo-Visão-ViewModel)**, o
 
 | Pasta | Conteúdo e Responsabilidade |
 | :--- | :--- |
-| `lib/data/` | **Models:** Classes Dart para mapear as tabelas do Supabase (e.g., `Product`, `Order`, `Table`). |
-| `lib/providers/` | **Agentes / ViewModels:** Lógica de Estado e Negócio (e.g., `AuthProvider`, `TableProvider`). |
-| `lib/screens/` | **Vistas (UI):** Telas do aplicativo (e.g., `login/`, `home/`, `config/`). |
+| `lib/presentation/models/` | **Models:** Classes Dart para mapear as tabelas do Supabase (e.g., `Product`, `Order`, `Table`). |
+| `lib/presentation/providers/` | **Agentes / ViewModels:** Lógica de Estado e Negócio (e.g., `AuthProvider`, `TableProvider`). |
+| `lib/presentation/screens/` | **Vistas (UI):** Telas do aplicativo (e.g., `login/`, `home/`, `config/`). |
 
 ---
 
@@ -96,9 +96,6 @@ Os Providers são os agentes de inteligência:
 
 ### 6.2. Pedidos e Cálculo
 * A lógica de cálculo de preço (`totalPrice` no `CartItem`) inclui a iteração sobre a lista de **Adicionais** para somar corretamente os valores extras antes de computar o total.
-
-### 6.3. Notificação Externa (Bot de WhatsApp)
-* Foi arquitetada a integração de notificação de status de pedido via **Supabase Edge Functions** (serviço serverless), que se conecta a uma API de terceiros (como Z-API) para enviar mensagens via WhatsApp, mantendo as chaves de API seguras no backend.
 
 ---
 
