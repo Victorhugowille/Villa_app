@@ -1,0 +1,21 @@
+{
+  "id": "12345",
+  "mesa_id": 4,
+  "status": "production",
+  "created_at": "2025-11-24T18:30:00Z",
+  "itens": [
+    {
+      "produto": "Hambúrguer Villa",
+      "quantidade": 2,
+      "adicionais": [
+        { "nome": "Bacon Extra", "preco": 5.00 },
+        { "nome": "Ponto da Carne: Bem passado", "preco": 0.00 }
+      ]
+    },
+    {
+      "produto": "Coca-Cola Lata",
+      "quantidade": 2,
+      "adicionais": []
+    }
+  ]
+}
