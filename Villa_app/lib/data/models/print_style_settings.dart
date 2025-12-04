@@ -67,6 +67,13 @@ class KitchenTemplateSettings {
   final String? logoPath;
   final double logoHeight;
   final CrossAxisAlignment logoAlignment;
+  // Dados do estabelecimento (opcional - só aparecem se houver cliente)
+  final String subtitleText;
+  final PrintStyle subtitleStyle;
+  final String addressText;
+  final PrintStyle addressStyle;
+  final String phoneText;
+  final PrintStyle phoneStyle;
 
   KitchenTemplateSettings({
     required this.headerStyle,
@@ -79,6 +86,12 @@ class KitchenTemplateSettings {
     this.logoPath,
     this.logoHeight = 40.0,
     required this.logoAlignment,
+    this.subtitleText = '',
+    required this.subtitleStyle,
+    this.addressText = '',
+    required this.addressStyle,
+    this.phoneText = '',
+    required this.phoneStyle,
   });
 
   KitchenTemplateSettings copyWith({
@@ -92,6 +105,12 @@ class KitchenTemplateSettings {
     String? logoPath,
     double? logoHeight,
     CrossAxisAlignment? logoAlignment,
+    String? subtitleText,
+    PrintStyle? subtitleStyle,
+    String? addressText,
+    PrintStyle? addressStyle,
+    String? phoneText,
+    PrintStyle? phoneStyle,
   }) {
     return KitchenTemplateSettings(
       headerStyle: headerStyle ?? this.headerStyle,
@@ -104,6 +123,12 @@ class KitchenTemplateSettings {
       logoPath: logoPath ?? this.logoPath,
       logoHeight: logoHeight ?? this.logoHeight,
       logoAlignment: logoAlignment ?? this.logoAlignment,
+      subtitleText: subtitleText ?? this.subtitleText,
+      subtitleStyle: subtitleStyle ?? this.subtitleStyle,
+      addressText: addressText ?? this.addressText,
+      addressStyle: addressStyle ?? this.addressStyle,
+      phoneText: phoneText ?? this.phoneText,
+      phoneStyle: phoneStyle ?? this.phoneStyle,
     );
   }
 
@@ -118,6 +143,12 @@ class KitchenTemplateSettings {
         logoPath: null,
         logoHeight: 40.0,
         logoAlignment: CrossAxisAlignment.center,
+        subtitleText: '',
+        subtitleStyle: PrintStyle(fontSize: 10, isBold: false, alignment: CrossAxisAlignment.center),
+        addressText: '',
+        addressStyle: PrintStyle(fontSize: 9, isBold: false, alignment: CrossAxisAlignment.center),
+        phoneText: '',
+        phoneStyle: PrintStyle(fontSize: 9, isBold: false, alignment: CrossAxisAlignment.center),
       );
 
   factory KitchenTemplateSettings.fromJson(Map<String, dynamic> json) {
@@ -136,6 +167,12 @@ class KitchenTemplateSettings {
       logoPath: json['logoPath'],
       logoHeight: (json['logoHeight'] as num? ?? 40.0).toDouble(),
       logoAlignment: alignmentFromString(json['logoAlignment'] as String? ?? 'center'),
+      subtitleText: json['subtitleText'] ?? '',
+      subtitleStyle: PrintStyle.fromJson(json['subtitleStyle'] ?? {}),
+      addressText: json['addressText'] ?? '',
+      addressStyle: PrintStyle.fromJson(json['addressStyle'] ?? {}),
+      phoneText: json['phoneText'] ?? '',
+      phoneStyle: PrintStyle.fromJson(json['phoneStyle'] ?? {}),
     );
   }
 
@@ -151,6 +188,12 @@ class KitchenTemplateSettings {
         'logoPath': logoPath,
         'logoHeight': logoHeight,
         'logoAlignment': alignmentToString(logoAlignment),
+        'subtitleText': subtitleText,
+        'subtitleStyle': subtitleStyle.toJson(),
+        'addressText': addressText,
+        'addressStyle': addressStyle.toJson(),
+        'phoneText': phoneText,
+        'phoneStyle': phoneStyle.toJson(),
       };
 }
 

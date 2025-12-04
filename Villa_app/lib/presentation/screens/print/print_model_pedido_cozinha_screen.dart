@@ -3,9 +3,11 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../data/models/app_data.dart' as app_data;
-// import '../../../data/models/print_style_settings.dart';
+import '../../../data/models/print_style_settings.dart';
 import '../../providers/printer_provider.dart';
+import '../../providers/company_provider.dart';
 import '../../services/printing_service.dart';
+import 'print_layout_helpers.dart';
 
 class KitchenLayoutEditorTab extends StatefulWidget {
   const KitchenLayoutEditorTab({super.key});
@@ -216,6 +218,7 @@ class _KitchenLayoutEditorTabState extends State<KitchenLayoutEditorTab> {
               _autoSaveSettings(currentSettings.copyWith(footerText: newText));
             },
           ),
+          _buildDadosEstabelecimentoEditor(currentSettings),
         ],
       ),
     );
@@ -417,6 +420,88 @@ class _KitchenLayoutEditorTabState extends State<KitchenLayoutEditorTab> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildDadosEstabelecimentoEditor(dynamic currentSettings) {
+    final company =
+        Provider.of<CompanyProvider>(context, listen: false).currentCompany;
+
+    // Só mostra se houver empresa/cliente vinculado
+    if (company == null) {
+      return const SizedBox.shrink();
+    }
+
+    // Garante que os estilos não sejam null
+    final subtitleStyle = currentSettings.subtitleStyle ?? 
+        PrintStyle(fontSize: 10, isBold: false, alignment: CrossAxisAlignment.center);
+    final addressStyle = currentSettings.addressStyle ?? 
+        PrintStyle(fontSize: 9, isBold: false, alignment: CrossAxisAlignment.center);
+    final phoneStyle = currentSettings.phoneStyle ?? 
+        PrintStyle(fontSize: 9, isBold: false, alignment: CrossAxisAlignment.center);
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Dados do Estabelecimento',
+                    style:
+                        TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                Tooltip(
+                  message: 'Preencher com os dados cadastrados',
+                  child: IconButton(
+                    icon: const Icon(Icons.storefront),
+                    onPressed: () {
+                      final newSettings = currentSettings.copyWith(
+                        subtitleText: 'CNPJ: ${company.cnpj ?? ''}',
+                        addressText:
+                            '${company.rua ?? ''}, ${company.numero ?? ''}, ${company.bairro ?? ''}',
+                        phoneText: 'Tel: ${company.telefone ?? ''}',
+                      );
+                      Provider.of<PrinterProvider>(context, listen: false)
+                          .saveTemplateSettings(newSettings);
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const Divider(),
+            buildTextAndStyleEditor(
+              'Subtítulo (CNPJ)',
+              currentSettings.subtitleText ?? '',
+              (newText) =>
+                  _autoSaveSettings(currentSettings.copyWith(subtitleText: newText)),
+              subtitleStyle,
+              (newStyle) => _autoSaveSettings(
+                  currentSettings.copyWith(subtitleStyle: newStyle)),
+            ),
+            buildTextAndStyleEditor(
+              'Endereço',
+              currentSettings.addressText ?? '',
+              (newText) =>
+                  _autoSaveSettings(currentSettings.copyWith(addressText: newText)),
+              addressStyle,
+              (newStyle) =>
+                  _autoSaveSettings(currentSettings.copyWith(addressStyle: newStyle)),
+            ),
+            buildTextAndStyleEditor(
+              'Telefone',
+              currentSettings.phoneText ?? '',
+              (newText) =>
+                  _autoSaveSettings(currentSettings.copyWith(phoneText: newText)),
+              phoneStyle,
+              (newStyle) =>
+                  _autoSaveSettings(currentSettings.copyWith(phoneStyle: newStyle)),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

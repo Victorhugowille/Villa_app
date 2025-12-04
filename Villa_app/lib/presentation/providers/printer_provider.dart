@@ -37,11 +37,20 @@ class PrinterProvider with ChangeNotifier {
   Printer? _conferencePrinter;
   Printer? get conferencePrinter => _conferencePrinter;
 
+  bool _settingsLoaded = false;
+  bool get settingsLoaded => _settingsLoaded;
+
   List<String> _logMessages = [];
   List<String> get logMessages => _logMessages;
 
   PrinterProvider(this._authProvider) {
-    _loadSettings();
+    _initializeSettings();
+  }
+
+  Future<void> _initializeSettings() async {
+    await _loadSettings();
+    _settingsLoaded = true;
+    _addLog('✅ Configurações de impressora carregadas e prontas para uso.');
   }
 
   void updateAuthProvider(AuthProvider newAuthProvider) {
@@ -88,6 +97,9 @@ class PrinterProvider with ChangeNotifier {
         isDefault: printerMap['isDefault'] ?? false,
         isAvailable: printerMap['isAvailable'] ?? true,
       );
+      _addLog('✅ Impressora de conferência carregada: ${_conferencePrinter!.name}');
+    } else {
+      _addLog('⚠️ Nenhuma impressora de conferência salva nos settings.');
     }
     notifyListeners();
   }
@@ -182,7 +194,13 @@ class PrinterProvider with ChangeNotifier {
   void startListening() {
     final companyId = _getCompanyId();
     if (_isListening || companyId == null) return;
-    _addLog('Iniciando monitoramento de impressão...');
+    
+    if (!_settingsLoaded) {
+      _addLog('⚠️ Aguardando carregamento das configurações antes de iniciar monitoramento...');
+      return;
+    }
+    
+    _addLog('✅ Iniciando monitoramento de impressão...');
     _orderChannel = _supabase.channel('public:pedidos:company_id=eq.$companyId');
     _orderChannel!
         .onPostgresChanges(
@@ -277,15 +295,22 @@ class PrinterProvider with ChangeNotifier {
       // Se for DELIVERY, imprime tudo junto em uma única impressora
       if (order.type == 'delivery') {
         _addLog('Pedido DELIVERY #${order.numeroPedido}: Buscando impressora de conferência...');
+        _addLog('DEBUG: _settingsLoaded = $_settingsLoaded, _conferencePrinter = ${_conferencePrinter?.name ?? 'NULL'}');
+        
+        if (!_settingsLoaded) {
+          _addLog('⚠️ DELIVERY #${order.numeroPedido}: Aguardando carregamento das configurações...');
+          await Future.delayed(Duration(milliseconds: 500));
+        }
         
         if (_conferencePrinter != null) {
+          _addLog('✅ Enviando para impressora: ${_conferencePrinter!.name} com papel 58mm');
           await _printingService.printKitchenOrder(
             order: order,
             printer: _conferencePrinter!,
-            paperSize: '80',
+            paperSize: '58',
             templateSettings: _templateSettings,
           );
-          _addLog('Pedido DELIVERY #${order.numeroPedido} enviado para conferência.');
+          _addLog('✅ Pedido DELIVERY #${order.numeroPedido} enviado para conferência: ${_conferencePrinter!.name}');
         } else {
           _addLog('❌ DELIVERY #${order.numeroPedido}: Nenhuma impressora de conferência configurada!');
         }
