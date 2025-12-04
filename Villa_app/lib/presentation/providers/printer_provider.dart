@@ -190,14 +190,20 @@ class PrinterProvider with ChangeNotifier {
           schema: 'public',
           table: 'pedidos',
           callback: (payload) {
-            if (payload.newRecord['status'] == 'awaiting_print') {
+            final newStatus = payload.newRecord['status'];
+            final orderType = payload.newRecord['type'];
+            _addLog('📦 Novo pedido detectado - Tipo: $orderType | Status: $newStatus');
+            
+            if (newStatus == 'awaiting_print') {
               _handleNewOrder(payload.newRecord);
+            } else {
+              _addLog('⏭️  Pedido ignorado. Status: $newStatus (esperado: awaiting_print)');
             }
           },
         )
         .subscribe((status, [error]) {
       _addLog('Status da conexão de Impressão: $status');
-      if (error != null) _addLog('ERRO DE IMPRESSÃO: ${error.toString()}');
+      if (error != null) _addLog('❌ ERRO DE IMPRESSÃO: ${error.toString()}');
       final newListeningStatus = (status == RealtimeSubscribeStatus.subscribed);
       if (_isListening != newListeningStatus) {
         _isListening = newListeningStatus;
@@ -219,12 +225,16 @@ class PrinterProvider with ChangeNotifier {
   Future<void> _handleNewOrder(Map<String, dynamic> newOrderData) async {
     if (newOrderData.isEmpty) return;
     final orderId = newOrderData['id'].toString();
+    final orderType = newOrderData['type'] ?? 'desconhecido';
+    final orderNumber = newOrderData['numero_pedido'] ?? 'N/A';
+    
     try {
+      _addLog('🔄 Buscando detalhes completos do pedido #$orderNumber (tipo: $orderType)...');
       final order = await _fetchFullOrderDetails(orderId);
-      _addLog('Novo pedido #${order.numeroPedido} para impressão.');
+      _addLog('✅ Detalhes carregados. Items: ${order.items.length}. Iniciando roteamento de impressão...');
       await _routeAndPrintOrder(order, isNewOrder: true);
     } catch (e) {
-      _addLog('ERRO ao buscar detalhes do pedido #$orderId: $e');
+      _addLog('❌ ERRO ao buscar detalhes do pedido #$orderNumber: $e');
     }
   }
 
@@ -264,50 +274,64 @@ class PrinterProvider with ChangeNotifier {
     }
 
     try {
-      final groupedByPrinterKey =
-          groupBy(order.items, findPrinterKeyForItem);
-
-      if (groupedByPrinterKey.isEmpty) {
-        _addLog(
-            'Pedido #${order.numeroPedido}: Nenhum item corresponde a uma impressora configurada.');
-      }
-
-      for (final key in groupedByPrinterKey.keys) {
-        if (key == null) {
-          final unassignedItems = groupedByPrinterKey[key]!
-              .map((e) => e.product.name)
-              .join(', ');
-          _addLog(
-              'Pedido #${order.numeroPedido}: Itens sem impressora: $unassignedItems');
-          continue;
-        }
-
-        final parts = key.split('|');
-        final printerName = parts[0];
-        final paperSize = parts[1];
-
-        final itemsForPrinter = groupedByPrinterKey[key]!;
-        final orderForPrinter = order.copyWith(items: itemsForPrinter);
-
-        final printers = await Printing.listPrinters();
-        final selectedPrinter =
-            printers.firstWhereOrNull((p) => p.name == printerName);
-
-        if (selectedPrinter != null) {
+      // Se for DELIVERY, imprime tudo junto em uma única impressora
+      if (order.type == 'delivery') {
+        _addLog('Pedido DELIVERY #${order.numeroPedido}: Buscando impressora de conferência...');
+        
+        if (_conferencePrinter != null) {
           await _printingService.printKitchenOrder(
-            order: orderForPrinter,
-            printer: selectedPrinter,
-            paperSize: paperSize,
+            order: order,
+            printer: _conferencePrinter!,
+            paperSize: '80',
             templateSettings: _templateSettings,
           );
-          _addLog('Pedido #${order.numeroPedido} enviado para: $printerName.');
+          _addLog('Pedido DELIVERY #${order.numeroPedido} enviado para conferência.');
         } else {
-          _addLog(
-              'Impressora "$printerName" não encontrada. Pedido #${order.numeroPedido} não impresso.');
+          _addLog('❌ DELIVERY #${order.numeroPedido}: Nenhuma impressora de conferência configurada!');
+        }
+      } else {
+        // Se for MESA, roteia por categoria/impressora
+        final groupedByPrinterKey = groupBy(order.items, findPrinterKeyForItem);
+
+        if (groupedByPrinterKey.isEmpty) {
+          _addLog('Pedido MESA #${order.numeroPedido}: Nenhum item corresponde a uma impressora configurada.');
+        }
+
+        for (final key in groupedByPrinterKey.keys) {
+          if (key == null) {
+            final unassignedItems = groupedByPrinterKey[key]!
+                .map((e) => e.product.name)
+                .join(', ');
+            _addLog('Pedido MESA #${order.numeroPedido}: Itens sem impressora: $unassignedItems');
+            continue;
+          }
+
+          final parts = key.split('|');
+          final printerName = parts[0];
+          final paperSize = parts[1];
+
+          final itemsForPrinter = groupedByPrinterKey[key]!;
+          final orderForPrinter = order.copyWith(items: itemsForPrinter);
+
+          final printers = await Printing.listPrinters();
+          final selectedPrinter =
+              printers.firstWhereOrNull((p) => p.name == printerName);
+
+          if (selectedPrinter != null) {
+            await _printingService.printKitchenOrder(
+              order: orderForPrinter,
+              printer: selectedPrinter,
+              paperSize: paperSize,
+              templateSettings: _templateSettings,
+            );
+            _addLog('Pedido MESA #${order.numeroPedido} enviado para: $printerName.');
+          } else {
+            _addLog('❌ Impressora "$printerName" não encontrada. Pedido MESA #${order.numeroPedido} não impresso.');
+          }
         }
       }
     } catch (e) {
-      _addLog('ERRO CRÍTICO no processo de impressão: $e');
+      _addLog('❌ ERRO CRÍTICO no processo de impressão: $e');
     }
 
     if (isNewOrder) {
@@ -316,10 +340,9 @@ class PrinterProvider with ChangeNotifier {
             .from('pedidos')
             .update({'status': 'production'})
             .eq('id', order.id);
-        _addLog('Pedido #${order.numeroPedido} atualizado para "Em Produção".');
+        _addLog('✅ Pedido #${order.numeroPedido} atualizado para "Em Produção".');
       } catch (e) {
-        _addLog(
-            'ERRO ao atualizar o status do pedido #${order.numeroPedido}: $e');
+        _addLog('❌ ERRO ao atualizar o status do pedido #${order.numeroPedido}: $e');
       }
     }
   }

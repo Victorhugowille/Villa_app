@@ -44,10 +44,11 @@ class ProductRepositoryImpl implements ProductRepository {
       // Converter entity para mapa para enviar ao datasource
       final productData = {
         'name': product.name,
-        'description': product.description,
         'price': product.price,
         'category_id': product.categoryId,
-        'company_id': product.companyId,
+        'display_order': product.displayOrder,
+        'image_url': product.imageUrl,
+        'is_sold_out': product.isSoldOut,
       };
       final createdProduct = await remoteDatasource.createProduct(productData);
       // Converter model para entity
@@ -65,9 +66,11 @@ class ProductRepositoryImpl implements ProductRepository {
       // Converter entity para mapa para enviar ao datasource
       final updates = {
         'name': product.name,
-        'description': product.description,
         'price': product.price,
         'category_id': product.categoryId,
+        'display_order': product.displayOrder,
+        'image_url': product.imageUrl,
+        'is_sold_out': product.isSoldOut,
       };
       await remoteDatasource.updateProduct(product.id, updates);
       return Right(product);

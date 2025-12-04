@@ -149,6 +149,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Pagamento'),
+        elevation: 0,
       ),
       body: CustomScrollView(
         slivers: [
@@ -228,6 +229,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                       isFinal: true),
                   const SizedBox(height: 24),
                   _buildPaymentMethodSelector(theme),
+                  const SizedBox(height: 100),
                 ],
               ),
             ),

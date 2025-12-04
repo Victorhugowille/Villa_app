@@ -12,31 +12,19 @@ class MobileShell extends StatelessWidget {
   Widget build(BuildContext context) {
     final navProvider = context.watch<NavigationProvider>();
 
-    // --- CORREÇÃO AQUI ---
-    // 1. Pega a largura total da tela
+    // Pega a largura total da tela
     final double screenWidth = MediaQuery.of(context).size.width;
 
-    // 2. Define a largura do drawer.
-    // O padrão do Flutter é (largura_da_tela - 56).
-    // Vamos definir como 75% da tela.
-    // Altere para 0.5 se quiser exatamente a metade.
+    // Define a largura do drawer como 75% da tela
     final double drawerWidth = screenWidth * 0.75;
-    // --- FIM DA CORREÇÃO ---
 
     return Scaffold(
       appBar: const CustomAppBar(),
-
-      // O menu "hambúrguer" (Drawer)
       drawer: Drawer(
-        // --- CORREÇÃO AQUI ---
-        // 3. Aplica a largura customizada ao Drawer
         width: drawerWidth,
-        // --- FIM DA CORREÇÃO ---
-        
-        child: SideMenu(), // Reutiliza o mesmo SideMenu!
+        child: SideMenu(),
       ),
-
-      // O corpo da tela
+      // O corpo: renderiza a tela atual direto
       body: navProvider.currentScreen,
     );
   }

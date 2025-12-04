@@ -26,11 +26,13 @@ class DesktopShell extends StatelessWidget {
           Expanded(
             child: Column(
               children: [
-                // Nossa AppBar customizada que reage ao provider
+                // AppBar customizada que reage ao provider
                 const CustomAppBar(),
                 Expanded(
-                  // A tela atual é exibida aqui
-                  child: navProvider.currentScreen,
+                  // Remove AppBar da tela se existir
+                  child: _ScreenBodyWrapper(
+                    child: navProvider.currentScreen,
+                  ),
                 ),
               ],
             ),
@@ -38,5 +40,30 @@ class DesktopShell extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+/// Remove o AppBar de um Scaffold interno para manter consistência
+class _ScreenBodyWrapper extends StatelessWidget {
+  final Widget child;
+
+  const _ScreenBodyWrapper({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    // Se a tela é um Scaffold, extrai apenas o body
+    if (child is Scaffold) {
+      final scaffold = child as Scaffold;
+      return Scaffold(
+        body: scaffold.body ?? const SizedBox.shrink(),
+        floatingActionButton: scaffold.floatingActionButton,
+        floatingActionButtonLocation: scaffold.floatingActionButtonLocation,
+        bottomNavigationBar: scaffold.bottomNavigationBar,
+        backgroundColor: scaffold.backgroundColor,
+      );
+    }
+
+    // Se não for Scaffold, renderiza normalmente
+    return child;
   }
 }

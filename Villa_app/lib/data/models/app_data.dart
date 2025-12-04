@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../domain/entities/product_entity.dart';
 
 class Company {
   final String id;
@@ -266,6 +267,20 @@ class Product {
         displayOrder: jsonData['display_order'] ?? 0,
         imageUrl: jsonData['image_url'],
         isSoldOut: jsonData['is_sold_out'] ?? false);
+  }
+
+  /// Converte o modelo Product para a entidade ProductEntity do domain
+  ProductEntity toEntity() {
+    return ProductEntity(
+      id: id,
+      name: name,
+      price: price,
+      categoryId: categoryId,
+      categoryName: categoryName,
+      displayOrder: displayOrder,
+      imageUrl: imageUrl,
+      isSoldOut: isSoldOut,
+    );
   }
 }
 

@@ -30,6 +30,11 @@ class _ThemeManagementScreenState extends State<ThemeManagementScreen> {
     });
   }
 
+  // Função auxiliar para verificar se uma cor é escura
+  bool _isDark(Color color) {
+    return ThemeData.estimateBrightnessForColor(color) == Brightness.dark;
+  }
+
   Future<void> _showAdvancedColorPicker(
       BuildContext context, Color initialColor, Function(Color) onColorSelected) async {
     Color pickerColor = initialColor;
@@ -75,6 +80,7 @@ class _ThemeManagementScreenState extends State<ThemeManagementScreen> {
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
+    // Assumindo que o CompanyProvider existe no seu projeto
     final companyProvider = Provider.of<CompanyProvider>(context, listen: false);
     final theme = Theme.of(context);
 
@@ -93,6 +99,12 @@ class _ThemeManagementScreenState extends State<ThemeManagementScreen> {
                 style: theme.textTheme.headlineSmall,
                 textAlign: TextAlign.center,
               ),
+              
+              // --- NOVO WIDGET SOL/LUA ---
+              const SizedBox(height: 16),
+              _buildBrightnessToggle(),
+              // ---------------------------
+
               const SizedBox(height: 24),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -126,6 +138,8 @@ class _ThemeManagementScreenState extends State<ThemeManagementScreen> {
                       icon: const Icon(Icons.save),
                       label: const Text('Salvar Tema'),
                       onPressed: () {
+                        // O seu código original já lida com a criação do tema
+                        // baseado nas cores selecionadas aqui.
                         themeProvider.setCustomTheme(
                           primaryColor: _primaryColor,
                           backgroundColor: _backgroundColor,
@@ -175,7 +189,56 @@ class _ThemeManagementScreenState extends State<ThemeManagementScreen> {
     );
   }
 
+  // --- NOVO MÉTODO PARA CONSTRUIR O SWITCH ---
+  Widget _buildBrightnessToggle() {
+    // Verifica se a cor de fundo ATUALMENTE selecionada na tela é escura
+    final isCurrentlyDark = _isDark(_backgroundColor);
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        // Ícone do Sol (Claro)
+        Icon(Icons.wb_sunny_rounded, 
+          color: isCurrentlyDark ? Colors.grey : Colors.orangeAccent),
+        
+        const SizedBox(width: 8),
+        Switch(
+          // Se estiver escuro, o switch está ativo
+          value: isCurrentlyDark, 
+          activeColor: Colors.blueGrey.shade700,
+          activeTrackColor: Colors.blueGrey.shade300,
+          inactiveThumbColor: Colors.yellow.shade700,
+          inactiveTrackColor: Colors.yellow.shade200,
+          onChanged: (value) {
+            setState(() {
+              if (value) {
+                // Mudou para Escuro (Lua) -> Define um fundo padrão escuro
+                _backgroundColor = const Color(0xFF121212); 
+              } else {
+                // Mudou para Claro (Sol) -> Define um fundo padrão claro
+                _backgroundColor = const Color(0xFFFAFAFA); 
+              }
+              // Nota: Não alteramos a cor primária, mantendo a escolha do usuário.
+              // O sistema existente (AppThemes) se encarregará de ajustar os contrastes
+              // quando o usuário clicar em "Salvar Tema".
+            });
+          },
+        ),
+        const SizedBox(width: 8),
+        
+        // Ícone da Lua (Escuro)
+        Icon(Icons.nightlight_round, 
+          color: isCurrentlyDark ? Colors.blueAccent : Colors.grey),
+      ],
+    );
+  }
+  // ---------------------------------------------------------
+
   Widget _buildColorSelector(String label, Color color, Function(Color) onColorSelected) {
+    // Pequena melhoria visual: se a cor selecionada for muito clara, 
+    // a borda branca desaparece. Usamos a cor do tema para contraste.
+    final borderColor = Theme.of(context).colorScheme.onSurface.withOpacity(0.2);
+
     return Column(
       children: [
         GestureDetector(
@@ -186,7 +249,7 @@ class _ThemeManagementScreenState extends State<ThemeManagementScreen> {
             decoration: BoxDecoration(
               color: color,
               shape: BoxShape.circle,
-              border: Border.all(color: Theme.of(context).colorScheme.onSurface, width: 3),
+              border: Border.all(color: borderColor, width: 3),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.2),
@@ -231,7 +294,7 @@ class _ThemeManagementScreenState extends State<ThemeManagementScreen> {
                 children: [
                   Container(width: 24, height: 24, decoration: BoxDecoration(color: palette.primary, shape: BoxShape.circle)),
                   Container(width: 24, height: 24, decoration: BoxDecoration(color: palette.secondary, shape: BoxShape.circle)),
-                  Container(width: 24, height: 24, decoration: BoxDecoration(color: palette.background, shape: BoxShape.circle)),
+                  Container(width: 24, height: 24, decoration: BoxDecoration(color: palette.background, shape: BoxShape.circle, border: Border.all(color: Colors.grey.shade300))),
                 ],
               )
             ],
@@ -240,5 +303,4 @@ class _ThemeManagementScreenState extends State<ThemeManagementScreen> {
       ),
     );
   }
-
 }
